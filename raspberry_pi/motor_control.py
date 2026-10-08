@@ -7,6 +7,7 @@ import platform
 import queue
 import secrets
 import signal
+import subprocess
 import sys
 import threading
 import time
@@ -118,6 +119,120 @@ def select_gpio_chip(chips, requested=None):
         + "\n".join(gpio_chip_description(chip) for chip in chips))
 
 
+def read_motor_gpio_lines(lgpio, chip):
+    handle = lgpio.gpiochip_open(chip)
+    lines = []
+    try:
+        for motor, pair in enumerate(DIRECTION_PINS, 1):
+            for pin in pair:
+                _, offset, flags, name, consumer = lgpio.gpio_get_line_info(handle, pin)
+                consumer = gpio_text(consumer)
+                lines.append(dict(motor=motor, pin=pin, offset=offset, flags=flags,
+                                  name=gpio_text(name), consumer=consumer,
+                                  used=bool(flags & 1) or bool(consumer)))
+    finally:
+        lgpio.gpiochip_close(handle)
+    return lines
+
+
+def parse_gpio_fdinfo(text):
+    chip = None
+    pins = []
+    for line in text.splitlines():
+        key, separator, value = line.partition(":")
+        if not separator:
+            continue
+        if key == "gpio-chip":
+            chip = value.strip()
+        elif key == "gpio-line" and value.strip().isdigit():
+            pins.append(int(value.strip()))
+    return chip, pins
+
+
+def gpio_process_holders(chip_name, proc_root=Path("/proc")):
+    """Read Linux GPIO fdinfo; never inspect process arguments or signal PIDs."""
+    holders = []
+    unreadable = 0
+    for process in proc_root.glob("[0-9]*"):
+        try:
+            descriptors = list((process / "fdinfo").iterdir())
+        except PermissionError:
+            unreadable += 1
+            continue
+        except OSError:
+            continue
+        for descriptor in descriptors:
+            try:
+                chip, pins = parse_gpio_fdinfo(descriptor.read_text())
+                if chip != chip_name or not set(pins).intersection(MOTOR_GPIO_PINS):
+                    continue
+                name = (process / "comm").read_text().strip()
+                holders.append(dict(pid=int(process.name), process=name,
+                                    pins=sorted(set(pins).intersection(MOTOR_GPIO_PINS))))
+            except PermissionError:
+                unreadable += 1
+            except OSError:
+                continue
+    return holders, unreadable
+
+
+def gpio_boot_settings(paths=None):
+    paths = (Path("/boot/firmware/config.txt"), Path("/boot/config.txt")) if paths is None else paths
+    settings = []
+    for path in paths:
+        try:
+            text = path.read_text()
+        except OSError:
+            continue
+        for number, line in enumerate(text.splitlines(), 1):
+            content = line.split("#", 1)[0].strip()
+            if content.startswith(("dtoverlay=", "dtparam=", "include ")):
+                if content.startswith("include ") or any(word in content.lower()
+                                                         for word in ("uart", "spi", "w1", "pwm", "gpio", "i2s")):
+                    settings.append(f"{path}:{number}: {content}")
+    return settings
+
+
+def print_gpio_claim_details(chip_name):
+    holders, unreadable = gpio_process_holders(chip_name)
+    print("Processes holding motor GPIO lines (when exported by this kernel):")
+    for holder in holders:
+        print(f"  PID {holder['pid']} ({holder['process']}): "
+              + ", ".join(f"GPIO{pin}" for pin in holder["pins"]))
+    if not holders:
+        print("  No readable process-specific owner found. Kernel drivers have no process PID;\n"
+              "  older kernels may omit GPIO fdinfo. This does not mean the pins are free.")
+    if unreadable:
+        print("  Some process metadata was inaccessible. For a read-only check of other users,\n"
+              "  run this script with sudo and --diagnose.")
+    print("Configured boot settings to check (not proof of which drivers are active):")
+    settings = gpio_boot_settings()
+    for setting in settings:
+        print("  " + setting)
+    if not settings:
+        print("  No matching settings found in the main boot config files.")
+    try:
+        result = subprocess.run(["pinctrl", "get", ",".join(map(str, MOTOR_GPIO_PINS))],
+                                capture_output=True, text=True, timeout=3, check=False)
+        if result.returncode == 0:
+            print("Current pin functions (read-only pinctrl get):\n" + result.stdout.strip())
+        else:
+            print("pinctrl could not read pin functions: " + result.stderr.strip())
+    except (OSError, subprocess.TimeoutExpired):
+        print("pinctrl is unavailable; line metadata and boot settings are shown above.")
+
+
+def ensure_motor_gpio_available(lgpio, chip):
+    used = [line for line in read_motor_gpio_lines(lgpio, chip) if line["used"]]
+    if used:
+        claims = "\n".join(f"  Motor{line['motor']} GPIO{line['pin']}: "
+                           + (line["consumer"] or "claimed; kernel supplied no consumer label")
+                           for line in used)
+        raise RuntimeError("Motor GPIOs already claimed; no direction pins were configured.\n"
+                           + claims + "\nRun --diagnose for process/boot-setting clues. "
+                           "Close the owning program or disable its conflicting overlay and reboot.")
+
+
 def diagnose_gpio(requested=None):
     """Read-only local diagnostics; no ESP32/I2C connection is required."""
     try:
@@ -156,19 +271,22 @@ def diagnose_gpio(requested=None):
         print(error)
         return 1
     print(f"Header GPIO chip: /dev/gpiochip{selected}")
-    handle = lgpio.gpiochip_open(selected)
-    try:
-        for motor, pair in enumerate(DIRECTION_PINS, 1):
-            for pin in pair:
-                _, offset, flags, name, consumer = lgpio.gpio_get_line_info(handle, pin)
-                owner = consumer or ("in use" if flags & 1 else "unclaimed")
-                print(f"  Motor{motor} GPIO{pin}: line {offset} ({name}), {owner}")
-    finally:
-        lgpio.gpiochip_close(handle)
+    lines = read_motor_gpio_lines(lgpio, selected)
+    for line in lines:
+        state = "CLAIMED" if line["used"] else "unclaimed"
+        owner = repr(line["consumer"]) if line["consumer"] else "<not supplied by kernel>"
+        print(f"  Motor{line['motor']} GPIO{line['pin']}: line {line['offset']} ({line['name']}), "
+              f"{state}, consumer={owner}, flags=0x{line['flags']:x}")
+    used = [line for line in lines if line["used"]]
+    if used:
+        print("Claimed motor pins: " + ", ".join(f"GPIO{line['pin']}" for line in used))
+        selected_chip = next(chip for chip in chips if chip["index"] == selected)
+        print_gpio_claim_details(gpio_text(selected_chip.get("name", "")) or f"gpiochip{selected}")
     print("If a motor pin is owned by SPI, disable SPI in raspi-config and reboot.\n"
+          "Also check old UART3/4/5 overlays: they overlap GPIO4/5, GPIO9, and GPIO13 on Pi 4.\n"
           "Close other motor programs. GPIO4 can also be claimed by a 1-Wire overlay.\n"
           "For permissions: sudo usermod -aG gpio,i2c \"$USER\", then log out and back in.")
-    return 0
+    return 1 if used else 0
 
 
 def make_gpio_factory(requested=None):
@@ -178,6 +296,7 @@ def make_gpio_factory(requested=None):
     except ImportError as error:
         raise RuntimeError("Install GPIO support: sudo apt install python3-lgpio python3-gpiozero") from error
     chip = select_gpio_chip(scan_gpio_chips(lgpio), requested)
+    ensure_motor_gpio_available(lgpio, chip)
     print(f"Using header GPIO chip /dev/gpiochip{chip} (BCM numbering).")
     if requested is not None:
         print("Explicit chip selection: verify this device is the 40-pin header controller.")

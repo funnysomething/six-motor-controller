@@ -4,6 +4,7 @@ import contextlib
 import io
 from pathlib import Path
 from types import SimpleNamespace
+import tempfile
 import unittest
 from unittest.mock import Mock, patch
 
@@ -112,15 +113,82 @@ class GpioSetupTests(unittest.TestCase):
         output = io.StringIO()
         with patch.dict("sys.modules", {"lgpio": lgpio}), \
                 patch.object(motors, "scan_gpio_chips", return_value=[chip(1, "pinctrl-bcm2711")]), \
+                patch.object(motors, "print_gpio_claim_details") as details, \
                 patch.object(Path, "read_text", return_value="Raspberry Pi 4 Model B\x00"), \
                 contextlib.redirect_stdout(output):
-            self.assertEqual(motors.diagnose_gpio(), 0)
+            self.assertEqual(motors.diagnose_gpio(), 1)
         self.assertIn("Header GPIO chip: /dev/gpiochip1", output.getvalue())
-        self.assertIn("Motor1 GPIO26: line 26 (GPIO26), spi0", output.getvalue())
+        self.assertIn("Motor1 GPIO26: line 26 (GPIO26), CLAIMED, consumer='spi0'", output.getvalue())
+        details.assert_called_once_with("gpiochip1")
         self.assertEqual(lgpio.gpio_get_line_info.call_count, 12)
         lgpio.gpio_claim_input.assert_not_called()
         lgpio.gpio_claim_output.assert_not_called()
         lgpio.gpiochip_close.assert_called_once_with(10)
+
+    def test_blank_consumer_is_reported_as_unknown_not_as_free(self):
+        lgpio = Mock()
+        lgpio.gpiochip_open.return_value = 10
+        lgpio.gpio_get_line_info.side_effect = lambda handle, pin: [0, pin, int(pin == 13), f"GPIO{pin}", ""]
+        output = io.StringIO()
+        with patch.dict("sys.modules", {"lgpio": lgpio}), \
+                patch.object(motors, "scan_gpio_chips", return_value=[chip(0, "pinctrl-bcm2711")]), \
+                patch.object(motors, "print_gpio_claim_details"), \
+                patch.object(Path, "read_text", return_value="Raspberry Pi 4 Model B\x00"), \
+                contextlib.redirect_stdout(output):
+            self.assertEqual(motors.diagnose_gpio(), 1)
+        self.assertIn("GPIO13: line 13 (GPIO13), CLAIMED, consumer=<not supplied by kernel>", output.getvalue())
+        self.assertIn("Claimed motor pins: GPIO13", output.getvalue())
+
+    def test_preflight_lists_all_claimed_motor_pins_without_claiming_more(self):
+        lgpio = Mock()
+        lgpio.gpiochip_open.return_value = 10
+        lgpio.gpio_get_line_info.side_effect = lambda handle, pin: [0, pin, int(pin in (13, 5, 9, 4)), f"GPIO{pin}", ""]
+        with self.assertRaises(RuntimeError) as caught:
+            motors.ensure_motor_gpio_available(lgpio, 0)
+        for pin in (13, 5, 9, 4):
+            self.assertIn(f"GPIO{pin}", str(caught.exception))
+        lgpio.gpio_claim_input.assert_not_called()
+        lgpio.gpio_claim_output.assert_not_called()
+        lgpio.gpiochip_close.assert_called_once_with(10)
+
+    def test_fdinfo_parser_tracks_repeated_gpio_lines(self):
+        text = "pos:\t0\ngpio-chip:\tgpiochip4\ngpio-line:\t13\ngpio-line:\t5\n"
+        self.assertEqual(motors.parse_gpio_fdinfo(text), ("gpiochip4", [13, 5]))
+        self.assertEqual(motors.parse_gpio_fdinfo("pos: 0\ngpio-line: invalid\n"), (None, []))
+
+    def test_process_scan_identifies_motor_line_holder_and_ignores_other_chip(self):
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            process = root / "123"
+            (process / "fdinfo").mkdir(parents=True)
+            (process / "comm").write_text("python3\n")
+            (process / "fdinfo" / "7").write_text("gpio-chip: gpiochip0\ngpio-line: 13\ngpio-line: 5\n")
+            (process / "fdinfo" / "8").write_text("gpio-chip: gpiochip1\ngpio-line: 4\n")
+            holders, unreadable = motors.gpio_process_holders("gpiochip0", root)
+        self.assertEqual(holders, [dict(pid=123, process="python3", pins=[5, 13])])
+        self.assertEqual(unreadable, 0)
+
+    def test_boot_settings_report_uart_and_overlay_clues_without_editing(self):
+        with tempfile.TemporaryDirectory() as directory:
+            config = Path(directory) / "config.txt"
+            text = "#dtoverlay=w1-gpio\ndtoverlay=uart3\ndtparam=spi=on\ndtoverlay=w1-gpio\ninclude usercfg.txt\n"
+            config.write_text(text)
+            settings = motors.gpio_boot_settings([config])
+            self.assertEqual(config.read_text(), text)
+        self.assertEqual(len(settings), 4)
+        self.assertIn(":2: dtoverlay=uart3", settings[0])
+
+    def test_claimed_gpio_aborts_before_gpiozero_factory_creation(self):
+        lgpio = Mock()
+        factory_class = Mock()
+        module = SimpleNamespace(LGPIOFactory=factory_class)
+        with patch.dict("sys.modules", {"lgpio": lgpio, "gpiozero": SimpleNamespace(),
+                                        "gpiozero.pins": SimpleNamespace(), "gpiozero.pins.lgpio": module}), \
+                patch.object(motors, "scan_gpio_chips", return_value=[chip(0, "pinctrl-bcm2711")]), \
+                patch.object(motors, "ensure_motor_gpio_available", side_effect=RuntimeError("GPIO13 claimed")):
+            with self.assertRaisesRegex(RuntimeError, "GPIO13 claimed"):
+                motors.make_gpio_factory()
+        factory_class.assert_not_called()
 
     def test_diagnostic_command_does_not_initialize_motor_hardware(self):
         with patch("sys.argv", ["motor_control.py", "--diagnose"]), \
