@@ -10,7 +10,7 @@ Pi numbers in the code are **BCM GPIO numbers**, not physical header positions. 
 | --- | --- | --- | --- | --- |
 | 1 | Module 1, A: ENA / IN1 / IN2 | 4 | 26 (37) | 19 (35) |
 | 2 | Module 1, B: ENB / IN3 / IN4 | 13 | 13 (33) | 6 (31) |
-| 3 | Module 2, A: ENA / IN1 / IN2 | 14 | 5 (29) | 11 (23) |
+| 3 | Module 2, A: ENA / IN1 / IN2 | 12 | 5 (29) | 11 (23) |
 | 4 | Module 2, B: ENB / IN3 / IN4 | 16 | 9 (21) | 10 (19) |
 | 5 | Module 3, A: ENA / IN1 / IN2 | 17 | 22 (15) | 27 (13) |
 | 6 | Module 3, B: ENB / IN3 / IN4 | 18 | 17 (11) | 4 (7) |
