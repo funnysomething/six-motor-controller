@@ -35,7 +35,7 @@ pio run -e six-motor-i2c -t upload
 `pio run` also builds this environment by default. On the Pi, enable I2C with `sudo raspi-config` (Interface Options > I2C), disable SPI if enabled, and reboot after configuration changes. Install and run:
 
 ```sh
-sudo apt install python3-gpiozero python3-smbus2
+sudo apt install python3-gpiozero python3-lgpio python3-smbus2
 python3 raspberry_pi/motor_control.py
 ```
 

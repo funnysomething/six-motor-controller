@@ -2,6 +2,8 @@
 """Control six L298N motors: Pi direction GPIO, ESP32 PWM over I2C."""
 
 import argparse
+from pathlib import Path
+import platform
 import queue
 import secrets
 import signal
@@ -18,6 +20,108 @@ I2C_ADDRESS = 0x32
 REVERSE_PAUSE = 0.5
 HEARTBEAT_INTERVAL = 0.2
 ACK_TIMEOUT = 0.3
+HEADER_CHIP_LABELS = {"pinctrl-bcm2835", "pinctrl-bcm2711", "pinctrl-rp1"}
+
+
+def scan_gpio_chips(lgpio, devices=None):
+    """Inspect chip metadata without claiming GPIOs or changing their modes."""
+    devices = Path("/dev").glob("gpiochip*") if devices is None else devices
+    chips = []
+    for device in devices:
+        if not device.name.removeprefix("gpiochip").isdigit():
+            continue
+        chip = {"index": int(device.name[8:]), "path": str(device)}
+        handle = None
+        try:
+            handle = lgpio.gpiochip_open(chip["index"])
+            _, lines, name, label = lgpio.gpio_get_chip_info(handle)
+            chip.update(lines=lines, name=name, label=label)
+        except Exception as error:
+            chip["error"] = str(error)
+        finally:
+            if handle is not None:
+                lgpio.gpiochip_close(handle)
+        chips.append(chip)
+    return sorted(chips, key=lambda chip: chip["index"])
+
+
+def select_gpio_chip(chips, requested=None):
+    candidates = [chip for chip in chips if "error" not in chip
+                  and chip["label"] in HEADER_CHIP_LABELS
+                  and chip["lines"] > max(pin for pair in DIRECTION_PINS for pin in pair)]
+    if requested is not None:
+        candidates = [chip for chip in candidates if chip["index"] == requested]
+    if len(candidates) == 1:
+        return candidates[0]["index"]
+    raise RuntimeError(
+        "Cannot identify one accessible Pi header GPIO chip. Run --diagnose; "
+        "check gpio-group permissions and use --gpiochip N for the header chip.")
+
+
+def diagnose_gpio():
+    """Read-only local diagnostics; no ESP32/I2C connection is required."""
+    try:
+        model = Path("/proc/device-tree/model").read_text().rstrip("\x00\n")
+    except OSError:
+        model = "unknown (device-tree model unavailable)"
+    print(f"Pi model: {model}\nKernel: {platform.release()}")
+    try:
+        import lgpio
+    except ImportError:
+        print("Install GPIO support: sudo apt install python3-lgpio python3-gpiozero")
+        return 1
+    chips = scan_gpio_chips(lgpio)
+    if not chips:
+        print("No /dev/gpiochip devices found.")
+        return 1
+    for chip in chips:
+        if "error" in chip:
+            print(f"{chip['path']}: cannot open: {chip['error']}")
+        else:
+            print(f"{chip['path']}: {chip['label']}, {chip['lines']} lines")
+    try:
+        selected = select_gpio_chip(chips)
+    except RuntimeError as error:
+        print(error)
+        return 1
+    print(f"Header GPIO chip: /dev/gpiochip{selected}")
+    handle = lgpio.gpiochip_open(selected)
+    try:
+        for motor, pair in enumerate(DIRECTION_PINS, 1):
+            for pin in pair:
+                _, offset, flags, name, consumer = lgpio.gpio_get_line_info(handle, pin)
+                owner = consumer or ("in use" if flags & 1 else "unclaimed")
+                print(f"  Motor{motor} GPIO{pin}: line {offset} ({name}), {owner}")
+    finally:
+        lgpio.gpiochip_close(handle)
+    print("If a motor pin is owned by SPI, disable SPI in raspi-config and reboot.\n"
+          "Close other motor programs. GPIO4 can also be claimed by a 1-Wire overlay.\n"
+          "For permissions: sudo usermod -aG gpio,i2c \"$USER\", then log out and back in.")
+    return 0
+
+
+def make_gpio_factory(requested=None):
+    try:
+        import lgpio
+        from gpiozero.pins.lgpio import LGPIOFactory
+    except ImportError as error:
+        raise RuntimeError("Install GPIO support: sudo apt install python3-lgpio python3-gpiozero") from error
+    chip = select_gpio_chip(scan_gpio_chips(lgpio), requested)
+    print(f"Using header GPIO chip /dev/gpiochip{chip} (BCM numbering).")
+    return LGPIOFactory(chip=chip)
+
+
+def make_output_factory(pin_factory, output_type):
+    def output(pin, initial_value=False):
+        try:
+            return output_type(pin, initial_value=initial_value, pin_factory=pin_factory)
+        except Exception as error:
+            motor = next(i for i, pair in enumerate(DIRECTION_PINS, 1) if pin in pair)
+            raise RuntimeError(
+                f"Cannot initialize Motor{motor} GPIO{pin} on gpiochip{pin_factory.chip}: {error}. "
+                "Run --diagnose; check SPI/1-Wire overlays, other GPIO programs, "
+                "permissions, and installed gpiozero/lgpio versions.") from error
+    return output
 
 
 def checksum(data):
@@ -87,9 +191,15 @@ class MotorController:
             self.done.set()
             if self.worker is not None and self.worker.is_alive():
                 self.worker.join()
-            self._direction_off()
             for output in self.outputs:
-                output.close()
+                try:
+                    output.off()
+                except Exception:
+                    pass
+                try:
+                    output.close()
+                except Exception:
+                    pass
             raise
 
     def _direction_off(self):
@@ -434,9 +544,19 @@ def main():
     parser.add_argument("--address", type=lambda value: int(value, 0), default=I2C_ADDRESS,
                         help="ESP32 7-bit I2C address (default: 0x32)")
     parser.add_argument("--gui", action="store_true", help="open the optional six-motor desktop GUI")
+    parser.add_argument("--gpiochip", type=int, help="header GPIO chip index (default: detect by label)")
+    parser.add_argument("--diagnose", action="store_true", help="inspect GPIO chips/pin owners without changing pins")
     args = parser.parse_args()
     if args.bus < 0 or not 0x08 <= args.address <= 0x77:
         parser.error("Use a nonnegative bus and a 7-bit address from 0x08 to 0x77")
+    if args.gpiochip is not None and args.gpiochip < 0:
+        parser.error("--gpiochip must be nonnegative")
+    if args.diagnose:
+        try:
+            return diagnose_gpio()
+        except Exception as error:
+            print(f"GPIO diagnostic error: {error}", file=sys.stderr)
+            return 1
     try:
         from gpiozero import DigitalOutputDevice
         from smbus2 import SMBus, i2c_msg
@@ -445,9 +565,12 @@ def main():
         return 1
     signal.signal(signal.SIGTERM, interrupted)
     signal.signal(signal.SIGHUP, interrupted)
+    pin_factory = None
     try:
+        pin_factory = make_gpio_factory(args.gpiochip)
         with SMBus(args.bus) as bus:
-            controller = MotorController(I2CPwm(bus, i2c_msg, args.address), DigitalOutputDevice)
+            controller = MotorController(I2CPwm(bus, i2c_msg, args.address),
+                                         make_output_factory(pin_factory, DigitalOutputDevice))
             try:
                 if args.gui:
                     run_gui(controller)
@@ -476,9 +599,15 @@ def main():
                 controller.close()
     except (KeyboardInterrupt, EOFError):
         print("\nStopped and exited.")
-    except (OSError, RuntimeError) as error:
+    except Exception as error:
         print(f"Motor controller error: {error}", file=sys.stderr)
         return 1
+    finally:
+        if pin_factory is not None:
+            try:
+                pin_factory.close()
+            except Exception as error:
+                print(f"GPIO cleanup error: {error}", file=sys.stderr)
     return 0
 
 

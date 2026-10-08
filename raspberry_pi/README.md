@@ -48,7 +48,7 @@ On the Pi:
 
 ```sh
 sudo apt update
-sudo apt install -y python3-gpiozero python3-smbus2
+sudo apt install -y python3-gpiozero python3-lgpio python3-smbus2
 sudo usermod -aG i2c,gpio "$USER"
 sudo raspi-config
 ```
@@ -68,6 +68,22 @@ python3 ~/motor_control.py
 The default device is `/dev/i2c-1`, with ESP32 address `0x32`. `--bus` selects another bus; `--address 0x32` selects a different address only if you also change `I2C_ADDRESS` in the firmware. The Pi SDA pin is GPIO2 (physical 3), connected to ESP32 GPIO23; SCL is Pi GPIO3 (physical 5), connected to ESP32 GPIO22. All grounds must be shared and I2C pull-ups must be at 3.3 V.
 
 This controller replaces the earlier UART script. UART presets/options are no longer used. GPIO16/17 on the ESP32 are now PWM outputs, so disconnect the old UART2 wiring before using this firmware.
+
+### GPIO startup errors
+
+The controller detects the header GPIO chip by its label and opens it explicitly. It uses BCM numbering, even if the header controller appears as `/dev/gpiochip1` or `/dev/gpiochip4`. If discovery finds no accessible header chip or finds more than one, it stops before claiming any pins.
+
+For `lgpio.error: 'unexpected error'`, run local diagnostics:
+
+```sh
+python3 ~/motor_control.py --diagnose
+```
+
+This prints the Pi model, kernel, available GPIO chips, and owners of the twelve motor GPIOs. It does not claim pins, change pin modes, or communicate with the ESP32. If needed, select the header chip explicitly, for example `python3 ~/motor_control.py --gpiochip 1 --gui` when diagnostics identifies `gpiochip1` as the header. Do not select a different chip merely to bypass an error.
+
+GPIO9/10/11 overlap SPI0, and GPIO4 overlaps the common 1-Wire overlay. Disable conflicting interfaces/overlays in `raspi-config` or the boot configuration, close other motor/GPIO programs, then reboot after interface changes. If a chip cannot be opened due to permissions, run `sudo usermod -aG gpio,i2c "$USER"`, then log out and back in. Keep system `python3-gpiozero` and `python3-lgpio` packages current; if using a virtual environment, ensure it has access to the intended packages.
+
+A `KeyError` at `pin = self.pins[info]` is normally a handled cache miss: GPIO Zero then constructs the pin. A subsequent error in `gpio_claim_input` can occur even for a `DigitalOutputDevice`, because the lgpio backend initially claims pins as inputs. The last exception is the failure to investigate. The controller now reports the motor number, BCM GPIO and chip when initialization fails, while preserving that original exception through cleanup. See [GPIO Zero pin cache](https://gpiozero.readthedocs.io/en/stable/_modules/gpiozero/pins/pi.html) and [lgpio backend](https://gpiozero.readthedocs.io/en/stable/_modules/gpiozero/pins/lgpio.html).
 
 ### Optional desktop GUI
 
