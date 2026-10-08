@@ -2,7 +2,7 @@
 
 ## Ultrasonic distance sensor on the Pi
 
-`ultrasonic_test.py` reads a four-pin HC-SR04-style sensor directly from the Pi. It needs no ESP32 firmware or serial link. The default BCM GPIO pins do not overlap the UART presets below.
+`ultrasonic_test.py` reads a four-pin HC-SR04-style sensor directly from the Pi. It needs no ESP32 firmware or serial link. The default BCM GPIO pins do not overlap the six-motor direction GPIOs below.
 
 With power disconnected, wire:
 
@@ -25,102 +25,79 @@ python3 ~/ultrasonic_test.py
 
 The script prints distance in centimeters every 0.5 seconds. Use Ctrl+C to stop or `--once` for one reading. Use `--trigger` and `--echo` with BCM GPIO numbers if you choose different pins. A reading at the 4 m limit is reported as no echo or out of range. Do not connect the sensor's 5V ECHO directly to Pi GPIO.
 
-## UART motor controller
+## Six-motor I2C controller
 
-`motor_control.py` runs on Raspberry Pi OS and sends UART commands to the ESP32. The ESP32 needs the matching `motor-only` or `six-motor-pinout` firmware from this project. The Pi does not run the ESP32 C++ code.
-
-For the `six-motor-pinout` firmware, run `python3 ~/motor_control.py --esp32-runtime six-motor-pinout`. In that mode, connect Pi TX to ESP32 GPIO3 and Pi RX to ESP32 GPIO1, plus common GND. The diagram's `PI TX` label at GPIO33 is incorrect. Isolate the board's USB serial chip TX output from GPIO3 before connecting Pi TX; unplugging USB may not isolate it on every board. The six-motor pin map and boot-pin cautions are in the project [README](../README.md#six-motor-diagram-runtime). The UART presets below still select the Pi's own TX and RX pins.
-
-## Choose and wire a UART
-
-Run this to show every preset:
+`motor_control.py` controls all six motors simultaneously. The Pi owns L298N direction inputs; the ESP32 owns six enable/PWM inputs. Upload the matching firmware from the development computer with:
 
 ```sh
-python3 ~/motor_control.py --list-uarts
+pio run -e six-motor-i2c -t upload
 ```
 
-The Pi 4 choices are:
+Follow the [complete motor and I2C wiring table](../README.md#pin-map-from-the-supplied-diagrams). The Pi diagram duplicates Motor6 labels; the code assumes module 3 IN1/IN2 is Motor5 and IN3/IN4 is Motor6. Edit the last two `DIRECTION_PINS` pairs if your wiring differs.
 
-- `primary`: TX GPIO14, physical pin 8; RX GPIO15, physical pin 10; `/dev/serial0`.
-- `uart2`: TX GPIO0, physical pin 27; RX GPIO1, physical pin 28; `/dev/ttyAMA1`.
-- `uart3`: TX GPIO4, physical pin 7; RX GPIO5, physical pin 29; `/dev/ttyAMA2`.
-- `uart4`: TX GPIO8, physical pin 24; RX GPIO9, physical pin 21; `/dev/ttyAMA3`.
-- `uart5`: TX GPIO12, physical pin 32; RX GPIO13, physical pin 33; `/dev/ttyAMA4`.
+### Copy and configure
 
-For any preset, wire with power disconnected:
-
-- Selected Pi TX → ESP32 GPIO16 RX.
-- Selected Pi RX → ESP32 GPIO17 TX.
-- Pi physical pin 6, GND → ESP32 GND.
-- Keep ESP32 GND, L298N GND and motor supply negative connected together.
-- Keep L298N ENA → ESP32 GPIO25, IN1 → GPIO26, IN2 → GPIO27. Remove ENA's jumper.
-
-UART is 3.3V logic. Power the Pi and ESP32 through their usual power connections; do not join their 5V or 3V3 pins. Motor power comes from the external motor supply through the L298N. UART2 uses the HAT ID pins, and UART4 shares pins with SPI0, so avoid those presets if the corresponding interface is in use.
-
-## Copy from your Mac
-
-Replace `YOUR_USER` and `PI_ADDRESS` with your Pi login and hostname or IP address. From the project directory:
+From the project directory on your development computer:
 
 ```sh
 scp raspberry_pi/motor_control.py YOUR_USER@PI_ADDRESS:~/motor_control.py
 ssh YOUR_USER@PI_ADDRESS
 ```
 
-## Configure the Pi
-
-In the SSH session:
+On the Pi:
 
 ```sh
 sudo apt update
-sudo apt install -y python3-serial
-sudo usermod -aG dialout "$USER"
+sudo apt install -y python3-gpiozero python3-smbus2
+sudo usermod -aG i2c,gpio "$USER"
 sudo raspi-config
 ```
 
-Choose **Interface Options → Serial Port**. Answer **No** to the serial login shell and **Yes** to serial hardware. Finish and reboot:
+Enable **Interface Options > I2C**. Disable SPI: direction GPIO9/10/11 use the SPI0 pins. Remove other overlays using any of the twelve motor direction GPIOs. Reboot after changing interface configuration/group membership:
 
 ```sh
 sudo reboot
 ```
 
-That enables the `primary` preset. To test an additional UART, add exactly one matching overlay under `[all]` in `/boot/firmware/config.txt`, such as:
-
-```text
-dtoverlay=uart3
-```
-
-Use `uart2`, `uart3`, `uart4`, or `uart5` to match the preset you want. Reboot after changing the overlay. Raspberry Pi OS documents the installed definitions through `dtoverlay -h uart3` and `/boot/firmware/overlays/README`.
-
-Reconnect with SSH after reboot. Select the same preset in the controller:
+Reconnect with SSH, then run:
 
 ```sh
-python3 ~/motor_control.py --uart uart3
+python3 ~/motor_control.py
 ```
 
-The default remains `primary`. You can instead edit `DEFAULT_UART` near the top of `motor_control.py`. The `--uart` option takes precedence over that default. If Linux assigned an unexpected device name, keep the pin preset and override only the device, for example `python3 ~/motor_control.py --uart uart3 --port /dev/ttyAMA2`. Check available names with `ls -l /dev/serial* /dev/ttyAMA*`.
+The default device is `/dev/i2c-1`, with ESP32 address `0x32`. `--bus` selects another bus; `--address 0x32` selects a different address only if you also change `I2C_ADDRESS` in the firmware. The Pi SDA pin is GPIO2 (physical 3), connected to ESP32 GPIO23; SCL is Pi GPIO3 (physical 5), connected to ESP32 GPIO22. All grounds must be shared and I2C pull-ups must be at 3.3 V.
 
-The script uses 115200 baud, 8N1, no flow control. It sends stop on startup and requires the ESP32's stop acknowledgement before accepting motor commands. An error opening the port means the matching overlay is missing, permissions are wrong, or another process owns the device. No acknowledgement usually means TX/RX wiring is reversed, the common ground is missing, the wrong preset was selected, or the ESP32 still runs firmware without UART2 support.
+This controller replaces the earlier UART script. UART presets/options are no longer used. GPIO16/17 on the ESP32 are now PWM outputs, so disconnect the old UART2 wiring before using this firmware.
 
-## Commands
+### Optional desktop GUI
 
-Type each command and press Enter:
+The same script includes a small GUI. On the Pi desktop, install Tk and add `--gui`:
+
+```sh
+sudo apt install python3-tk
+python3 ~/motor_control.py --gui
+```
+
+Use the six sliders or number boxes to select signed speeds, then click **Apply six speeds**. The **All motors** control and **Copy to six** button set all six fields together; click Apply to send them. **Last applied** shows the controller's last acknowledged speeds. **STOP ALL** (or Escape) clears the fields and requests zero speed for all motors. If a request is already running, Stop runs immediately after it completes. Closing the window stops the motors and releases the GPIOs.
+
+The GUI keeps responding during I2C transactions and reversal pauses, and shows link failures while disabling further motion controls. Sliders only edit the pending speeds; they do not start motors until Apply is clicked. Bus/address options still work with `--gui`. Run it on the Pi's desktop or through SSH with X forwarding; an ordinary headless SSH session can use the default terminal mode. Only run one controller at a time.
+
+### Terminal commands
 
 ```text
-help
-m 60
-s
-m -60
-s
-q
+m 60                  all six forward at 60%
+m -60                 all six reverse at 60%
+m 1 60                Motor1 at 60%, preserving other motors
+m 60 -60 40 40 0 75    independent signed speeds for Motors 1-6
+s                     stop all motors
+help                  show commands
+q                     stop and quit
 ```
 
-The motor starts stopped. Commands use signed percentages from -100 to 100, so `m 100` requests full forward output and `m -100` requests full reverse output. The usable starting percentage depends on the motor and load. Send `s`, wait at least 0.5 seconds, then send the opposite direction to reverse. The script displays ESP32 replies and stops if a motor command isn't acknowledged. An acknowledgement confirms the firmware accepted a command, not that the motor physically moved.
+Speeds are integers from -100 to 100. The controller automatically disables the affected PWM channels before switching direction and waits a 0.5-second coast interval for a reversal. Unchanged motors continue running.
 
-The ESP32 keeps its last motor setting until it receives `s` or `m 0`, resets, or loses power. `q`, Ctrl+C, EOF, termination and SSH hangup attempt to send `s`. If UART communication is lost, that stop command may not arrive, so manually reset or power off the ESP32 before approaching the motor. Messages produced while the script waits at its prompt are not streamed continuously.
+Startup requires an acknowledged all-zero PWM command. A background thread refreshes the six-channel command every 0.2 seconds even while the prompt waits. If communication fails, the Pi lowers all twelve direction outputs, attempts an all-zero command, and refuses further motion until the program is restarted. The ESP32's one-second watchdog independently disables PWM and requires a zero command before rearming. Quit, Ctrl+C, EOF, SIGTERM and SSH hangup attempt to stop and release GPIO resources.
 
-Upload the ESP32 firmware from the Mac with `pio run -e motor-only -t upload`. Disconnect the browser motion viewer and close other serial monitors before uploading. The Pi controller uses GPIO UART, not the Mac USB serial port; avoid sending motor commands from both controllers at once.
+Only one process should own the motor outputs. For control from a vision/navigation program, import `I2CPwm` and `MotorController`; call `set_speeds` with six signed percentages, or `set_motor` with a motor number (1-6) and speed. Always call `close()` in `finally` before closing the I2C bus.
 
-## Sources
-
-- [Raspberry Pi serial configuration](https://www.raspberrypi.com/documentation/computers/configuration.html)
-- [pySerial API](https://pyserial.readthedocs.io/en/stable/pyserial_api.html)
+See the [project README](../README.md) for the frame protocol, hardware notes, legacy firmware targets, and validation commands.
