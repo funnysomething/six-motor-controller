@@ -31,19 +31,53 @@ class GpioSetupTests(unittest.TestCase):
             with self.assertRaisesRegex(RuntimeError, "--diagnose"):
                 motors.select_gpio_chip(chips)
         with self.assertRaises(RuntimeError):
-            motors.select_gpio_chip([chip(0, "expander"), chip(1, "pinctrl-bcm2711")], 0)
+            motors.select_gpio_chip([chip(0, "expander", 8), chip(1, "pinctrl-bcm2711")], 0)
 
     def test_explicit_chip_resolves_ambiguity(self):
         chips = [chip(0, "pinctrl-bcm2711"), chip(1, "pinctrl-bcm2835")]
         self.assertEqual(motors.select_gpio_chip(chips, 1), 1)
 
+    def test_unknown_label_detected_by_all_motor_gpio_names(self):
+        header = chip(4, "rp1-gpio-controller")
+        header["gpio_names"] = {pin: f"GPIO{pin}" for pin in motors.MOTOR_GPIO_PINS}
+        chips = [chip(0, "internal-gpio"), chip(1, "expander", 8), header]
+        self.assertEqual(motors.select_gpio_chip(chips), 4)
+
+    def test_byte_labels_and_nul_padding_are_normalized(self):
+        self.assertEqual(motors.select_gpio_chip([chip(0, b"pinctrl-bcm2711\x00 ")]), 0)
+
+    def test_explicit_chip_accepts_unknown_label_without_line_names(self):
+        self.assertEqual(motors.select_gpio_chip([chip(0, "different-kernel-label")], 0), 0)
+
+    def test_explicit_chip_rejects_inaccessible_missing_or_wrong_offsets(self):
+        wrong = chip(0, "internal-gpio")
+        wrong["gpio_names"] = {26: "SD_CARD_DETECT"}
+        for chips, index in (([{"index": 0, "path": "/dev/gpiochip0", "error": "denied"}], 0),
+                             ([chip(0, "pinctrl-bcm2711")], 4), ([wrong], 0)):
+            with self.assertRaises(RuntimeError):
+                motors.select_gpio_chip(chips, index)
+
+    def test_complete_motor_names_resolve_multiple_labels(self):
+        header = chip(4, "pinctrl-rp1")
+        header["gpio_names"] = {pin: f"GPIO{pin}" for pin in motors.MOTOR_GPIO_PINS}
+        self.assertEqual(motors.select_gpio_chip([chip(0, "pinctrl-bcm2711"), header]), 4)
+
+    def test_two_device_paths_for_same_controller_are_not_ambiguous(self):
+        header = chip(0, "pinctrl-rp1")
+        alias = chip(4, "pinctrl-rp1")
+        alias["name"] = header["name"]
+        self.assertEqual(motors.select_gpio_chip([alias, header]), 0)
+        self.assertEqual(motors.select_gpio_chip([alias, header], 4), 4)
+
     def test_scan_reports_permissions_and_closes_metadata_handles(self):
         lgpio = Mock()
         lgpio.gpiochip_open.side_effect = [PermissionError("permission denied"), 10]
         lgpio.gpio_get_chip_info.return_value = [0, 54, "gpiochip1", "pinctrl-bcm2711"]
+        lgpio.gpio_get_line_info.side_effect = lambda handle, pin: [0, pin, 0, f"GPIO{pin}", ""]
         chips = motors.scan_gpio_chips(lgpio, [Path("/dev/gpiochip0"), Path("/dev/gpiochip1")])
         self.assertIn("permission denied", chips[0]["error"])
         self.assertEqual(chips[1]["label"], "pinctrl-bcm2711")
+        self.assertTrue(motors.matching_gpio_names(chips[1]))
         lgpio.gpiochip_close.assert_called_once_with(10)
         lgpio.gpio_claim_input.assert_not_called()
         lgpio.gpio_claim_output.assert_not_called()
@@ -90,10 +124,17 @@ class GpioSetupTests(unittest.TestCase):
 
     def test_diagnostic_command_does_not_initialize_motor_hardware(self):
         with patch("sys.argv", ["motor_control.py", "--diagnose"]), \
-                patch.object(motors, "diagnose_gpio", return_value=0), \
+                patch.object(motors, "diagnose_gpio", return_value=0) as diagnose, \
                 patch.object(motors, "make_gpio_factory") as factory:
             self.assertEqual(motors.main(), 0)
         factory.assert_not_called()
+        diagnose.assert_called_once_with(None)
+
+    def test_diagnostic_command_honors_explicit_chip(self):
+        with patch("sys.argv", ["motor_control.py", "--diagnose", "--gpiochip", "4"]), \
+                patch.object(motors, "diagnose_gpio", return_value=0) as diagnose:
+            self.assertEqual(motors.main(), 0)
+        diagnose.assert_called_once_with(4)
 
 
 if __name__ == "__main__":

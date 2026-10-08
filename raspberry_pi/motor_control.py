@@ -21,6 +21,27 @@ REVERSE_PAUSE = 0.5
 HEARTBEAT_INTERVAL = 0.2
 ACK_TIMEOUT = 0.3
 HEADER_CHIP_LABELS = {"pinctrl-bcm2835", "pinctrl-bcm2711", "pinctrl-rp1"}
+MOTOR_GPIO_PINS = sorted({pin for pair in DIRECTION_PINS for pin in pair})
+
+
+def gpio_text(value):
+    if isinstance(value, bytes):
+        value = value.decode("utf-8", errors="replace")
+    return str(value).strip("\x00 \t\r\n")
+
+
+def matching_gpio_names(chip):
+    names = chip.get("gpio_names", {})
+    return all(gpio_text(names.get(pin, "")).upper() == f"GPIO{pin}" for pin in MOTOR_GPIO_PINS)
+
+
+def gpio_chip_description(chip):
+    path = chip.get("path", f"/dev/gpiochip{chip['index']}")
+    if "error" in chip:
+        return f"{path}: cannot open/read chip metadata: {chip['error']}"
+    name = gpio_text(chip.get("name", ""))
+    label = gpio_text(chip.get("label", ""))
+    return f"{path}: name={name!r}, label={label!r}, {chip['lines']} lines"
 
 
 def scan_gpio_chips(lgpio, devices=None):
@@ -35,7 +56,17 @@ def scan_gpio_chips(lgpio, devices=None):
         try:
             handle = lgpio.gpiochip_open(chip["index"])
             _, lines, name, label = lgpio.gpio_get_chip_info(handle)
-            chip.update(lines=lines, name=name, label=label)
+            chip.update(lines=lines, name=gpio_text(name), label=gpio_text(label))
+            chip["gpio_names"] = {}
+            for pin in MOTOR_GPIO_PINS:
+                if pin >= lines:
+                    continue
+                try:
+                    _, offset, flags, line_name, consumer = lgpio.gpio_get_line_info(handle, pin)
+                    chip["gpio_names"][pin] = gpio_text(line_name)
+                except Exception as error:
+                    chip["line_error"] = str(error)
+                    break
         except Exception as error:
             chip["error"] = str(error)
         finally:
@@ -46,19 +77,48 @@ def scan_gpio_chips(lgpio, devices=None):
 
 
 def select_gpio_chip(chips, requested=None):
-    candidates = [chip for chip in chips if "error" not in chip
-                  and chip["label"] in HEADER_CHIP_LABELS
-                  and chip["lines"] > max(pin for pair in DIRECTION_PINS for pin in pair)]
+    # Explicit selection must not repeat the automatic label restriction.
+    # Validate that the device exists, is accessible and contains every offset.
     if requested is not None:
-        candidates = [chip for chip in candidates if chip["index"] == requested]
+        selected = next((chip for chip in chips if chip["index"] == requested), None)
+        if selected is None:
+            raise RuntimeError(f"/dev/gpiochip{requested} was not found. Run --diagnose.")
+        if "error" in selected:
+            raise RuntimeError(gpio_chip_description(selected) + "; run --diagnose.")
+        if selected["lines"] <= max(MOTOR_GPIO_PINS):
+            raise RuntimeError(
+                f"/dev/gpiochip{requested} has only {selected['lines']} lines; "
+                "motor directions require offsets through GPIO26. Run --diagnose.")
+        # Reject a controller whose named lines contradict BCM GPIO numbering.
+        for pin, name in selected.get("gpio_names", {}).items():
+            if name and gpio_text(name).upper() != f"GPIO{pin}":
+                raise RuntimeError(
+                    f"/dev/gpiochip{requested} offset {pin} is {name!r}, not GPIO{pin}; "
+                    "the BCM mapping is not verified. Run --diagnose.")
+        return requested
+    candidates = [chip for chip in chips if "error" not in chip
+                  and chip["lines"] > max(MOTOR_GPIO_PINS)
+                  and (gpio_text(chip["label"]) in HEADER_CHIP_LABELS or matching_gpio_names(chip))]
+    # Prefer complete pin-name evidence if more than one label resembles a header.
+    verified = [chip for chip in candidates if matching_gpio_names(chip)]
+    if verified:
+        candidates = verified
+    # Compatibility symlinks can expose one controller under two device numbers.
+    # Its kernel chip name is the same through both paths; prefer the lower index.
+    controllers = {}
+    for chip in sorted(candidates, key=lambda chip: chip["index"]):
+        identity = gpio_text(chip.get("name", "")) or chip["index"]
+        controllers.setdefault(identity, chip)
+    candidates = list(controllers.values())
     if len(candidates) == 1:
         return candidates[0]["index"]
     raise RuntimeError(
         "Cannot identify one accessible Pi header GPIO chip. Run --diagnose; "
-        "check gpio-group permissions and use --gpiochip N for the header chip.")
+        "check gpio-group permissions and use --gpiochip N for the header chip.\n"
+        + "\n".join(gpio_chip_description(chip) for chip in chips))
 
 
-def diagnose_gpio():
+def diagnose_gpio(requested=None):
     """Read-only local diagnostics; no ESP32/I2C connection is required."""
     try:
         model = Path("/proc/device-tree/model").read_text().rstrip("\x00\n")
@@ -75,12 +135,23 @@ def diagnose_gpio():
         print("No /dev/gpiochip devices found.")
         return 1
     for chip in chips:
+        print(gpio_chip_description(chip))
         if "error" in chip:
-            print(f"{chip['path']}: cannot open: {chip['error']}")
+            continue
+        if chip["lines"] <= max(MOTOR_GPIO_PINS):
+            print("  Too few lines for the motor GPIO offsets.")
+        elif matching_gpio_names(chip):
+            print("  All twelve motor line names match BCM GPIO offsets.")
+        elif gpio_text(chip["label"]) in HEADER_CHIP_LABELS:
+            print("  Recognized Pi header label.")
         else:
-            print(f"{chip['path']}: {chip['label']}, {chip['lines']} lines")
+            print("  Header not automatically verified; inspect the line names below.")
+            for pin, name in chip.get("gpio_names", {}).items():
+                print(f"    offset {pin}: {name!r}")
+        if "line_error" in chip:
+            print(f"  Cannot read line names: {chip['line_error']}")
     try:
-        selected = select_gpio_chip(chips)
+        selected = select_gpio_chip(chips, requested)
     except RuntimeError as error:
         print(error)
         return 1
@@ -108,6 +179,8 @@ def make_gpio_factory(requested=None):
         raise RuntimeError("Install GPIO support: sudo apt install python3-lgpio python3-gpiozero") from error
     chip = select_gpio_chip(scan_gpio_chips(lgpio), requested)
     print(f"Using header GPIO chip /dev/gpiochip{chip} (BCM numbering).")
+    if requested is not None:
+        print("Explicit chip selection: verify this device is the 40-pin header controller.")
     return LGPIOFactory(chip=chip)
 
 
@@ -553,7 +626,7 @@ def main():
         parser.error("--gpiochip must be nonnegative")
     if args.diagnose:
         try:
-            return diagnose_gpio()
+            return diagnose_gpio(args.gpiochip)
         except Exception as error:
             print(f"GPIO diagnostic error: {error}", file=sys.stderr)
             return 1

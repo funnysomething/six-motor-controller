@@ -71,7 +71,7 @@ This controller replaces the earlier UART script. UART presets/options are no lo
 
 ### GPIO startup errors
 
-The controller detects the header GPIO chip by its label and opens it explicitly. It uses BCM numbering, even if the header controller appears as `/dev/gpiochip1` or `/dev/gpiochip4`. If discovery finds no accessible header chip or finds more than one, it stops before claiming any pins.
+The controller detects the header GPIO chip by a known label or by verifying all twelve motor line names against their BCM offsets, and opens it explicitly. It handles labels returned as bytes or with padding, and recognizes device aliases reporting the same kernel chip name. It uses BCM numbering, even if the header controller appears as `/dev/gpiochip1` or `/dev/gpiochip4`. If discovery cannot select a single accessible header chip, it prints each chip's metadata and stops before claiming any pins.
 
 For `lgpio.error: 'unexpected error'`, run local diagnostics:
 
@@ -79,7 +79,9 @@ For `lgpio.error: 'unexpected error'`, run local diagnostics:
 python3 ~/motor_control.py --diagnose
 ```
 
-This prints the Pi model, kernel, available GPIO chips, and owners of the twelve motor GPIOs. It does not claim pins, change pin modes, or communicate with the ESP32. If needed, select the header chip explicitly, for example `python3 ~/motor_control.py --gpiochip 1 --gui` when diagnostics identifies `gpiochip1` as the header. Do not select a different chip merely to bypass an error.
+This prints the Pi model, kernel, chip names/labels/line counts, and the reason each chip was accepted or rejected. Once a chip is selected it also prints the owners of the twelve motor GPIOs. It does not claim pins, change pin modes, or communicate with the ESP32. Device files existing does not identify the header; an eight-line chip cannot cover the motor offsets through GPIO26.
+
+If you have identified the header chip, select it explicitly. For example, use `python3 ~/motor_control.py --diagnose --gpiochip 4` to inspect chip 4 and `python3 ~/motor_control.py --gpiochip 4 --gui` to run on it. Explicit selection bypasses the exact-label requirement, but still checks device access, line count, and conflicting line names. An unknown-label chip with unnamed lines can be selected explicitly only when you have confirmed it is the header controller. The chip number in these examples must match your Pi; do not try arbitrary chip numbers to bypass an error.
 
 GPIO9/10/11 overlap SPI0, and GPIO4 overlaps the common 1-Wire overlay. Disable conflicting interfaces/overlays in `raspi-config` or the boot configuration, close other motor/GPIO programs, then reboot after interface changes. If a chip cannot be opened due to permissions, run `sudo usermod -aG gpio,i2c "$USER"`, then log out and back in. Keep system `python3-gpiozero` and `python3-lgpio` packages current; if using a virtual environment, ensure it has access to the intended packages.
 
