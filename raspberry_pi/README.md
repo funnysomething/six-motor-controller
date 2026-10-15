@@ -111,18 +111,6 @@ The GUI keeps responding during I2C transactions and reversal pauses, and shows 
 
 The GUI shows **Ultrasonic 1**, **Ultrasonic 2**, and **Ultrasonic 3** using the same I2C heartbeat, including when motors are stopped. Sensor 1 uses ESP32 RX0/GPIO3 and TX0/GPIO1; sensor 2 uses ESP32 RX/GPIO21 and TX/GPIO19; sensor 3 uses ESP32 RX/GPIO25 and TX/GPIO26. Connect each sensor TX to its ESP32 RX, and sensor RX to ESP32 TX, with the voltage translation described in the main wiring guide. Each reading independently shows centimeters, no underwater echo/outside 2-300 cm, no valid UART response, or stale readings. An I2C link failure marks all three unavailable. It does not issue automatic motor stops. Update both the firmware and Pi script for three readings; older firmware leaves unsupported sensors unavailable.
 
-### ESP32 I2C input/output errors
-
-An immediate startup error occurs before IMU polling starts. The motor controller first sends an all-zero command and waits for an ESP32 acknowledgement. A low-level I2C error now identifies whether the command write or the 29-byte status read failed, with the address and pin map. The third sensor uses ESP32 RX/GPIO25 and TX/GPIO26; it does not change I2C SDA/GPIO23 and SCL/GPIO22.
-
-Close all motor controllers and run on the Pi:
-
-```sh
-python3 ~/motor_control.py --diagnose-i2c
-```
-
-This reads raw ESP32 status without claiming direction GPIOs or sending motor commands. It tries full 29-byte status and, if necessary, the 14-byte motor prefix. Valid full status confirms reads and frame checksums, but does not verify command writes or actual motor operation. A readable prefix with failed full status can indicate a firmware mismatch or longer-read problem. Failed reads do not by themselves identify whether wiring, power, reset, or firmware is responsible. Check Pi physical pin 3 to ESP32 GPIO23, physical pin 5 to GPIO22, common GND, and 3.3 V bus pull-ups. USB supplies/programs the ESP32 but does not replace these I2C wires. If needed, power off and disconnect newly added sensor wiring, then power on/reset the ESP32 and repeat to isolate the wiring change. For motor testing, all sensor telemetry can be unavailable while motor I2C still works.
-
 ### SEN0140 V2 IMU readings
 
 The GUI automatically reads the SEN0140 V2 on the same I2C bus as the ESP32. Copy `sen0140.py` alongside `motor_control.py`, then run with `--gui`. No firmware update is needed. Acceleration, gyro rotation rate, magnetic raw counts, barometer temperature/pressure, and acceleration-based roll/pitch appear below the ultrasonic readings. Each missing component reports its own error and retries, and stale values are cleared from the display. Use `--gui --no-imu` to disable it. See the [IMU wiring and component addresses](../README.md#sen0140-v2-imu-on-the-shared-i2c-bus). Keep the board dry; the barometer does not measure underwater depth.

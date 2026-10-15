@@ -323,73 +323,6 @@ def checksum(data):
     return result
 
 
-def i2c_transfer(bus, message, address, operation):
-    """Retain errno and identify which transaction failed before latching stop."""
-    try:
-        bus.i2c_rdwr(message)
-    except OSError as error:
-        raise OSError(error.errno,
-                      f"ESP32 I2C {operation} failed at 0x{address:02x}: "
-                      f"{error.strerror or error}. Check SDA=ESP32 GPIO23, "
-                      "SCL=GPIO22, common ground and ESP32 power. "
-                      "Run --diagnose-i2c with the GUI closed.") from error
-
-
-def inspect_i2c(bus, message_factory, address):
-    """Read raw status only; no motor commands or GPIO claims are made."""
-    for size in (29, 14):
-        print(f"Reading {size} status bytes from ESP32 address 0x{address:02x}...")
-        # The classic ESP32 can return a previously queued status first.
-        for attempt in range(2):
-            if attempt:
-                time.sleep(0.02)
-            reply = message_factory.read(address, size)
-            try:
-                bus.i2c_rdwr(reply)
-            except OSError as error:
-                print(f"  Read failed: {error}")
-                continue
-            status = bytes(reply)
-            print(f"  Received: {status.hex(' ')}")
-            if (len(status) >= 14 and status[:2] == b"\x5a\x01"
-                    and status[13] == checksum(status[:13])
-                    and all(value <= 100 for value in status[7:13])):
-                print(f"  Motor status checksum OK; flags=0x{status[6]:02x}.")
-                if (size == 29 and len(status) == 29
-                        and status[14] == 0xD1 and status[18] == checksum(status[:18])
-                        and status[19] == 0xD2 and status[23] == checksum(status[19:23])
-                        and status[24] == 0xD3 and status[28] == checksum(status[24:28])):
-                    print("  Three-sensor firmware status detected. Raw I2C reads work.")
-                    print("  This does not test command writes or physical motor operation.")
-                    return 0
-                if size == 14:
-                    print("  Motor status is readable, but full three-sensor status was not verified.")
-                    print("  Check the uploaded firmware version and longer-read bus reliability.")
-                    return 1
-                print("  Motor prefix is valid; three-sensor extension is missing or corrupt.")
-            else:
-                print("  Not a valid motor status frame; checksum/header or length mismatch.")
-    print("ESP32 status could not be verified. Check I2C wiring, power, and firmware.")
-    print("Pi physical pin 3 (SDA) -> ESP32 GPIO23; pin 5 (SCL) -> GPIO22; shared GND.")
-    print("USB alone does not carry this I2C connection; use 3.3 V bus pull-ups.")
-    return 1
-
-
-def diagnose_i2c(bus_number, address):
-    print(f"I2C diagnostic: /dev/i2c-{bus_number}, ESP32 0x{address:02x}.")
-    print("Close all other motor controllers first. No GPIO claims or motor commands are sent.")
-    try:
-        from smbus2 import SMBus, i2c_msg
-        with SMBus(bus_number) as bus:
-            return inspect_i2c(bus, i2c_msg, address)
-    except ImportError:
-        print("Install smbus2: sudo apt install python3-smbus2")
-    except OSError as error:
-        print(f"Cannot open/use /dev/i2c-{bus_number}: {error}")
-        print("Check that I2C is enabled and your user has permission to access the bus.")
-    return 1
-
-
 class I2CPwm:
     """Raw I2C frames; no SMBus register or length bytes are added."""
 
@@ -414,15 +347,14 @@ class I2CPwm:
         self.sequence = (self.sequence + 1) & 0xFFFFFFFF
         sequence = self.sequence.to_bytes(4, "little")
         frame = bytes((0xA5, 1)) + sequence + bytes(values)
-        i2c_transfer(self.bus, self.message.write(self.address, frame + bytes((checksum(frame),))),
-                     self.address, "command write")
+        self.bus.i2c_rdwr(self.message.write(self.address, frame + bytes((checksum(frame),))))
         deadline = time.monotonic() + ACK_TIMEOUT
         while time.monotonic() < deadline:
             # Separate write/read transactions give the ESP32 callback time to
             # apply all six channels. Its first read may contain old status.
             time.sleep(0.005)
             reply = self.message.read(self.address, 29)
-            i2c_transfer(self.bus, reply, self.address, "29-byte status read")
+            self.bus.i2c_rdwr(reply)
             status = bytes(reply)
             if (len(status) >= 14 and status[:2] == b"\x5a\x01"
                     and status[2:6] == sequence and status[6] == 0
@@ -926,15 +858,11 @@ def main():
     parser.add_argument("--no-imu", action="store_true", help="disable SEN0140 polling in the GUI")
     parser.add_argument("--gpiochip", type=int, help="header GPIO chip index (default: detect by label)")
     parser.add_argument("--diagnose", action="store_true", help="inspect GPIO chips/pin owners without changing pins")
-    parser.add_argument("--diagnose-i2c", action="store_true",
-                        help="read ESP32 status without claiming GPIOs or sending motor commands")
     args = parser.parse_args()
     if args.bus < 0 or not 0x08 <= args.address <= 0x77:
         parser.error("Use a nonnegative bus and a 7-bit address from 0x08 to 0x77")
     if args.gpiochip is not None and args.gpiochip < 0:
         parser.error("--gpiochip must be nonnegative")
-    if args.diagnose_i2c:
-        return diagnose_i2c(args.bus, args.address)
     if args.diagnose:
         try:
             return diagnose_gpio(args.gpiochip)
