@@ -1,0 +1,82 @@
+{
+  "session_id": "20261015T193358_197891Z_69907358",
+  "started_utc": "2026-10-15T19:33:58.199342+00:00",
+  "status": "interrupted",
+  "class_name": "testudo",
+  "kind": "positive",
+  "environment": "dry",
+  "notes": "",
+  "camera": {
+    "Model": "imx500",
+    "Location": 2,
+    "Rotation": 0,
+    "Id": "/base/soc/i2c0mux/i2c@1/imx500@1a",
+    "Num": 0
+  },
+  "arguments": {
+    "list_cameras": false,
+    "camera": 0,
+    "output": "/home/watergate/six-motor-controller/raspberry_pi/dataset_capture/sessions",
+    "kind": "positive",
+    "environment": "dry",
+    "notes": "",
+    "width": 1280,
+    "height": 960,
+    "fps": 15,
+    "interval": 2,
+    "warmup": 3,
+    "max_images": null,
+    "seconds": null,
+    "preview": true,
+    "manual": true,
+    "quality": 95
+  },
+  "image_count": 0,
+  "annotation_status": "unlabeled",
+  "camera_configuration": {
+    "use_case": "video",
+    "transform": "<libcamera.Transform 'identity'>",
+    "colour_space": "<libcamera.ColorSpace 'Rec709'>",
+    "buffer_count": 4,
+    "queue": true,
+    "main": {
+      "format": "RGB888",
+      "size": [
+        1280,
+        960
+      ],
+      "preserve_ar": true,
+      "stride": 3840,
+      "framesize": 3686400
+    },
+    "lores": null,
+    "raw": {
+      "format": "SRGGB10_CSI2P",
+      "size": [
+        2028,
+        1520
+      ],
+      "stride": 2560,
+      "framesize": 3891200
+    },
+    "controls": {
+      "NoiseReductionMode": "NoiseReductionModeEnum.Fast",
+      "FrameDurationLimits": [
+        33333,
+        33333
+      ],
+      "FrameRate": 15
+    },
+    "sensor": {
+      "bit_depth": 10,
+      "output_size": [
+        2028,
+        1520
+      ]
+    },
+    "display": "main",
+    "encode": "main"
+  },
+  "finished_utc": "2026-10-15T19:34:17.521687+00:00",
+  "elapsed_s": 16.273852264999988
+}
