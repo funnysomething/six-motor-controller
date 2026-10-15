@@ -115,6 +115,27 @@ class GuiTests(unittest.TestCase):
         self.controller.fault = OSError("link lost")
         self.wait_until(lambda: "link failed" in self.app.distance.get())
 
+    def test_two_sensor_readings_and_faults_are_independent(self):
+        now = time.monotonic()
+        self.controller.ultrasonic_samples = ((now, 1, 1234), (now, 1, 2345))
+        self.wait_until(lambda: "234.5 cm" in self.app.distances[1].get())
+        self.assertEqual(self.app.distances[0].get(), "Ultrasonic 1: 123.4 cm")
+        self.assertEqual(self.app.distances[1].get(), "Ultrasonic 2: 234.5 cm")
+        self.controller.ultrasonic_samples = ((time.monotonic(), 1, 1234),
+                                              (time.monotonic(), 3, 0))
+        self.wait_until(lambda: "no valid UART response" in self.app.distances[1].get())
+        self.assertIn("123.4 cm", self.app.distances[0].get())
+        self.controller.ultrasonic_samples = ((time.monotonic() - 2, 1, 1234),
+                                              (time.monotonic(), 1, 2345))
+        self.wait_until(lambda: "stale" in self.app.distances[0].get())
+        self.assertIn("234.5 cm", self.app.distances[1].get())
+        self.controller.ultrasonic_samples = (None, (time.monotonic(), 2, 0))
+        self.wait_until(lambda: "no underwater echo" in self.app.distances[1].get())
+        self.assertIn("unavailable", self.app.distances[0].get())
+        self.controller.fault = OSError("link lost")
+        self.wait_until(lambda: all("link failed" in variable.get()
+                                    for variable in self.app.distances))
+
     def test_close_waits_for_active_request_before_leaving_mainloop(self):
         self.controller.release.clear()
         self.app.values[0].set(60)

@@ -307,6 +307,56 @@ class ProtocolTests(unittest.TestCase):
             pwm.set_percentages((30,) * 6)
         self.assertIsNone(pwm.ultrasonic_sample)
 
+    def test_two_sensors_are_checked_and_cached_independently(self):
+        class DualSensorBus(Bus):
+            samples = [(1, 1234), (1, 2345)]
+            corrupt = [False, False]
+            second_present = True
+
+            def i2c_rdwr(self, message):
+                if message.is_read:
+                    self.requested_size = len(message)
+                super().i2c_rdwr(message)
+                if message.is_read:
+                    state, mm = self.samples[0]
+                    message.extend(bytes((0xD1, state)) + mm.to_bytes(2, "little"))
+                    message.append(motors.checksum(message) ^ int(self.corrupt[0]))
+                    if self.second_present:
+                        state, mm = self.samples[1]
+                        block = bytes((0xD2, state)) + mm.to_bytes(2, "little")
+                        message.extend(block + bytes((motors.checksum(block)
+                                                      ^ int(self.corrupt[1]),)))
+                    else:
+                        message.extend(b"\x00" * 5)  # Old firmware padding.
+
+        bus = DualSensorBus()
+        pwm = motors.I2CPwm(bus, Message)
+        pwm.set_percentages((30,) * 6)
+        self.assertEqual(bus.requested_size, 24)
+        self.assertEqual(pwm.ultrasonic_samples, ((self.clock.now, 1, 1234),
+                                                (self.clock.now, 1, 2345)))
+        first, second = pwm.ultrasonic_samples
+        bus.samples = [(1, 432), (3, 0)]
+        bus.corrupt = [True, False]
+        pwm.set_percentages((30,) * 6)
+        self.assertEqual(pwm.ultrasonic_samples, (first, (self.clock.now, 3, 0)))
+        second = pwm.ultrasonic_samples[1]
+        bus.corrupt = [False, True]
+        pwm.set_percentages((30,) * 6)
+        self.assertEqual(pwm.ultrasonic_samples, ((self.clock.now, 1, 432), second))
+        first = pwm.ultrasonic_samples[0]
+        bus.corrupt = [False, False]
+        bus.samples = [(1, 3001), (1, 3000)]
+        pwm.set_percentages((30,) * 6)
+        self.assertEqual(pwm.ultrasonic_samples, (first, (self.clock.now, 1, 3000)))
+        bus.second_present = False
+        legacy = motors.I2CPwm(bus, Message)
+        legacy.set_percentages((30,) * 6)
+        self.assertEqual(legacy.ultrasonic_samples, (None, None))
+        bus.samples = [(1, 1234), (1, 2345)]
+        legacy.set_percentages((30,) * 6)
+        self.assertEqual(legacy.ultrasonic_samples, ((self.clock.now, 1, 1234), None))
+
     def test_invalid_pwm_is_rejected_before_bus_write(self):
         bus = Bus()
         pwm = motors.I2CPwm(bus, Message)

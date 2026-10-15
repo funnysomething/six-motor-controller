@@ -32,3 +32,49 @@ class UnderwaterUartDecoder {
   uint8_t bytes[4] = {};
   uint8_t count = 0;
 };
+
+// One UART and one pending measurement per sensor. No blocking read or delay.
+class UnderwaterUartSensor {
+ public:
+  uint8_t state = 0; // Waiting, valid, no echo/range, or UART timeout.
+  uint16_t distance = 0;
+
+  template <typename Port>
+  bool poll(Port &port, uint32_t now) {
+    bool updated = false;
+    if (waiting && now - requestedAt >= 60) {
+      waiting = false;
+      decoder.reset();
+      state = 3;
+      distance = 0;
+      updated = true;
+    }
+    for (uint8_t budget = 64; budget && port.available(); --budget) {
+      const uint8_t value = port.read();
+      uint16_t mm;
+      if (waiting && decoder.feed(value, mm)) {
+        waiting = false;
+        const bool valid = UnderwaterUartDecoder::inRange(mm);
+        state = valid ? 1 : 2;
+        distance = valid ? mm : 0;
+        updated = true;
+      }
+    }
+    return updated;
+  }
+
+  template <typename Port>
+  void request(Port &port, uint32_t now) {
+    // Do not accept queued/late bytes as a reply to a fresh request.
+    if (waiting || port.available()) return;
+    decoder.reset();
+    port.write(static_cast<uint8_t>(0x55));
+    requestedAt = now;
+    waiting = true;
+  }
+
+ private:
+  UnderwaterUartDecoder decoder;
+  uint32_t requestedAt = 0;
+  bool waiting = false;
+};

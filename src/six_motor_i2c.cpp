@@ -10,9 +10,14 @@ constexpr uint8_t PWM_PINS[] = {4, 13, 12, 16, 17, 18};
 constexpr size_t MOTOR_COUNT = sizeof(PWM_PINS);
 constexpr uint8_t I2C_ADDRESS = 0x32, I2C_SDA = 23, I2C_SCL = 22;
 constexpr uint32_t WATCHDOG_MS = 1000;
-constexpr size_t COMMAND_SIZE = 13, STATUS_SIZE = 19;
+constexpr size_t COMMAND_SIZE = 13, STATUS_SIZE = 24;
 constexpr uint8_t ULTRASONIC_TX = 1, ULTRASONIC_RX = 3; // TX0, RX0.
-constexpr uint32_t ULTRASONIC_INTERVAL_MS = 100, UART_REPLY_TIMEOUT_MS = 60;
+constexpr uint8_t ULTRASONIC_2_TX = 19, ULTRASONIC_2_RX = 21;
+constexpr size_t SENSOR_COUNT = 2;
+// Alternate pings to reduce interference: each sensor is requested at 5 Hz.
+constexpr uint32_t ULTRASONIC_SLOT_MS = 100;
+HardwareSerial *const sensorPorts[] = {&Serial, &Serial2};
+UnderwaterUartSensor sensors[SENSOR_COUNT];
 constexpr uint8_t VERSION = 1, COMMAND_MAGIC = 0xA5, STATUS_MAGIC = 0x5A;
 constexpr uint8_t NEEDS_STOP = 1, TIMED_OUT = 2;
 
@@ -21,9 +26,9 @@ uint8_t percentages[MOTOR_COUNT] = {};
 uint8_t sequence[4] = {};
 uint8_t flags = NEEDS_STOP;
 uint32_t lastCommandAt = 0;
-uint16_t distanceMm = 0;
+uint16_t distanceMm[SENSOR_COUNT] = {};
 // 0 = waiting, 1 = valid, 2 = no underwater echo/range, 3 = no valid UART reply.
-uint8_t ultrasonicState = 0;
+uint8_t ultrasonicState[SENSOR_COUNT] = {};
 
 uint8_t checksum(const uint8_t *data, size_t count) {
   uint8_t result = 0;
@@ -47,52 +52,43 @@ void makeStatus(uint8_t *reply) {
   reply[6] = flags;
   memcpy(reply + 7, percentages, MOTOR_COUNT);
   reply[14] = 0xD1; // Optional distance extension; keep the v1 motor prefix.
-  reply[15] = ultrasonicState;
-  reply[16] = distanceMm & 0xFF;
-  reply[17] = distanceMm >> 8;
+  reply[15] = ultrasonicState[0];
+  reply[16] = distanceMm[0] & 0xFF;
+  reply[17] = distanceMm[0] >> 8;
+  reply[19] = 0xD2;
+  reply[20] = ultrasonicState[1];
+  reply[21] = distanceMm[1] & 0xFF;
+  reply[22] = distanceMm[1] >> 8;
   xSemaphoreGive(stateMutex);
   reply[13] = checksum(reply, 13);
   reply[18] = checksum(reply, 18);
+  reply[23] = checksum(reply + 19, 4); // Independently checked sensor 2 block.
 }
 
-void publishUltrasonic(uint8_t state, uint16_t mm = 0) {
+void publishUltrasonic(size_t sensor) {
   xSemaphoreTake(stateMutex, portMAX_DELAY);
-  distanceMm = mm;
-  ultrasonicState = state;
+  distanceMm[sensor] = sensors[sensor].distance;
+  ultrasonicState[sensor] = sensors[sensor].state;
   xSemaphoreGive(stateMutex);
 }
 
 void sampleUltrasonic() {
-  static UnderwaterUartDecoder decoder;
   static uint32_t requestedAt = 0;
-  static bool waiting = false, started = false;
+  static size_t nextSensor = 0;
+  static bool started = false;
   const uint32_t now = millis();
   // The sensor needs up to 500 ms after power-on before accepting requests.
   if (!started) {
     if (now < 500) return;
     started = true;
   }
-  if (waiting && now - requestedAt >= UART_REPLY_TIMEOUT_MS) {
-    waiting = false;
-    decoder.reset();
-    publishUltrasonic(3);
+  for (size_t sensor = 0; sensor < SENSOR_COUNT; ++sensor) {
+    if (sensors[sensor].poll(*sensorPorts[sensor], now)) publishUltrasonic(sensor);
   }
-  // A bounded, nonblocking read leaves the motor watchdog running even with
-  // a disconnected sensor or a noisy UART. Ignore unsolicited/late bytes.
-  for (uint8_t budget = 64; budget && Serial.available(); --budget) {
-    const uint8_t value = Serial.read();
-    uint16_t mm;
-    if (waiting && decoder.feed(value, mm)) {
-      waiting = false;
-      const bool valid = UnderwaterUartDecoder::inRange(mm);
-      publishUltrasonic(valid ? 1 : 2, valid ? mm : 0);
-    }
-  }
-  if (!waiting && now - requestedAt >= ULTRASONIC_INTERVAL_MS && !Serial.available()) {
-    decoder.reset();
-    Serial.write(static_cast<uint8_t>(0x55));
+  if (now - requestedAt >= ULTRASONIC_SLOT_MS) {
+    sensors[nextSensor].request(*sensorPorts[nextSensor], now);
+    nextSensor = (nextSensor + 1) % SENSOR_COUNT;
     requestedAt = now;
-    waiting = true;
   }
 }
 
@@ -136,6 +132,8 @@ void requestStatus() {
 void setup() {
   // UART0 belongs exclusively to the underwater sensor, with no debug logs.
   Serial.begin(115200, SERIAL_8N1, ULTRASONIC_RX, ULTRASONIC_TX);
+  // Explicit mapping avoids Serial2's default GPIO16/17 motor PWM pins.
+  Serial2.begin(115200, SERIAL_8N1, ULTRASONIC_2_RX, ULTRASONIC_2_TX);
   for (size_t motor = 0; motor < MOTOR_COUNT; ++motor) {
     pinMode(PWM_PINS[motor], OUTPUT);
     digitalWrite(PWM_PINS[motor], LOW);

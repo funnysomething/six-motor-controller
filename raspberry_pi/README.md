@@ -109,7 +109,7 @@ Use the six sliders or number boxes to select signed speeds, then click **Apply 
 
 The GUI keeps responding during I2C transactions and reversal pauses, and shows link failures while disabling further motion controls. Sliders only edit the pending speeds; they do not start motors until Apply is clicked. Bus/address options still work with `--gui`. Run it on the Pi's desktop or through SSH with X forwarding; an ordinary headless SSH session can use the default terminal mode. Only run one controller at a time.
 
-The ultrasonic display receives distance from the ESP32 in the same I2C heartbeat, including when motors are stopped. It shows centimeters, no underwater echo/outside 2-300 cm, no valid UART response, stale readings, or link failure. It does not issue automatic motor stops. Both the firmware and Pi script must be updated to display distance.
+The GUI shows **Ultrasonic 1** and **Ultrasonic 2** using the same I2C heartbeat, including when motors are stopped. Sensor 1 uses ESP32 RX0/GPIO3 and TX0/GPIO1; sensor 2 uses ESP32 RX/GPIO21 and TX/GPIO19. Connect each sensor TX to its ESP32 RX, and sensor RX to ESP32 TX, with the voltage translation described in the main wiring guide. Each reading independently shows centimeters, no underwater echo/outside 2-300 cm, no valid UART response, or stale readings. An I2C link failure marks both unavailable. It does not issue automatic motor stops. Update both the firmware and Pi script for two readings; older single-sensor firmware leaves sensor 2 unavailable.
 
 ### Terminal commands
 

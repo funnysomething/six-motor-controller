@@ -331,9 +331,13 @@ class I2CPwm:
         self.message = message_factory
         self.address = address
         self.sequence = secrets.randbits(32)
-        # Atomic snapshot (receipt time, sensor state, millimeters), updated
+        # Atomic pair of (receipt time, sensor state, millimeters), updated
         # only by acknowledged motor transactions. Tk never touches the bus.
-        self.ultrasonic_sample = None
+        self.ultrasonic_samples = (None, None)
+
+    @property
+    def ultrasonic_sample(self):
+        return self.ultrasonic_samples[0]
 
     def set_percentages(self, values):
         values = tuple(values)
@@ -349,19 +353,25 @@ class I2CPwm:
             # Separate write/read transactions give the ESP32 callback time to
             # apply all six channels. Its first read may contain old status.
             time.sleep(0.005)
-            reply = self.message.read(self.address, 19)
+            reply = self.message.read(self.address, 24)
             self.bus.i2c_rdwr(reply)
             status = bytes(reply)
             if (len(status) >= 14 and status[:2] == b"\x5a\x01"
                     and status[2:6] == sequence and status[6] == 0
                     and status[7:13] == bytes(values)
                     and status[13] == checksum(status[:13])):
-                if (len(status) == 19 and status[14] == 0xD1
-                        and status[15] in (0, 1, 2, 3)
-                        and status[18] == checksum(status[:18])):
-                    mm = int.from_bytes(status[16:18], "little")
-                    if status[15] != 1 or 20 <= mm <= 3000:
-                        self.ultrasonic_sample = (time.monotonic(), status[15], mm)
+                samples = list(self.ultrasonic_samples)
+                received_at = time.monotonic()
+                for sensor, offset, magic, check_start in ((0, 14, 0xD1, 0),
+                                                          (1, 19, 0xD2, 19)):
+                    if (len(status) >= offset + 5 and status[offset] == magic
+                            and status[offset + 1] in (0, 1, 2, 3)
+                            and status[offset + 4] == checksum(status[check_start:offset + 4])):
+                        state = status[offset + 1]
+                        mm = int.from_bytes(status[offset + 2:offset + 4], "little")
+                        if state != 1 or 20 <= mm <= 3000:
+                            samples[sensor] = (received_at, state, mm)
+                self.ultrasonic_samples = tuple(samples)
                 return
         raise OSError("ESP32 did not acknowledge applied PWM; check I2C/firmware")
 
@@ -410,6 +420,10 @@ class MotorController:
     @property
     def ultrasonic_sample(self):
         return self.pwm.ultrasonic_sample
+
+    @property
+    def ultrasonic_samples(self):
+        return self.pwm.ultrasonic_samples
 
     def _fail(self, error):
         # Latch the error so a background heartbeat can never restart motion.
@@ -552,7 +566,9 @@ class MotorGui:
         self.group_value = tk.StringVar(root, value="0")
         self.applied = [tk.StringVar(root, value="0%") for _ in range(MOTOR_COUNT)]
         self.status = tk.StringVar(root, value="Ready. All motors stopped.")
-        self.distance = tk.StringVar(root, value="Ultrasonic: waiting for ESP32 readings...")
+        self.distances = [tk.StringVar(root, value=f"Ultrasonic {sensor + 1}: waiting for ESP32...")
+                          for sensor in range(2)]
+        self.distance = self.distances[0]
         root.title("Six motor control")
         root.minsize(620, 450)
         frame = ttk.Frame(root, padding=16)
@@ -611,8 +627,10 @@ class MotorGui:
         ttk.Button(buttons, text="Close", command=self.close).pack(side="right")
         ttk.Label(frame, textvariable=self.status, wraplength=580).grid(
             row=12, column=0, columnspan=4, sticky="w", pady=6)
-        ttk.Label(frame, textvariable=self.distance, font=("TkDefaultFont", 14)).grid(
-            row=13, column=0, columnspan=4, sticky="w", pady=6)
+        for sensor, variable in enumerate(self.distances):
+            ttk.Label(frame, textvariable=variable, font=("TkDefaultFont", 14),
+                      wraplength=580).grid(
+                row=13 + sensor, column=0, columnspan=4, sticky="w", pady=6)
         root.protocol("WM_DELETE_WINDOW", self.close)
         root.bind("<Escape>", lambda event: self.stop())
         root.after(50, self.poll)
@@ -707,24 +725,30 @@ class MotorGui:
         self.root.after(50, self.poll)
 
     def update_distance(self):
-        sample = getattr(self.controller, "ultrasonic_sample", None)
+        samples = getattr(self.controller, "ultrasonic_samples",
+                          (getattr(self.controller, "ultrasonic_sample", None), None))
+        for sensor, sample in enumerate(samples):
+            text = self.distance_text(sample)
+            self.distances[sensor].set(f"Ultrasonic {sensor + 1}: {text}")
+
+    def distance_text(self, sample):
         if self.controller.fault is not None:
-            text = "Ultrasonic: unavailable (motor link failed)"
+            text = "unavailable (motor link failed)"
         elif sample is None:
-            text = "Ultrasonic: unavailable (waiting for sensor firmware)"
+            text = "unavailable (waiting for sensor firmware)"
         else:
             received_at, state, mm = sample
             if time.monotonic() - received_at > 1.0:
-                text = "Ultrasonic: stale (no recent readings)"
+                text = "stale (no recent readings)"
             elif state == 1:
-                text = f"Ultrasonic: {mm / 10:.1f} cm"
+                text = f"{mm / 10:.1f} cm"
             elif state == 2:
-                text = "Ultrasonic: no underwater echo / outside 2-300 cm range"
+                text = "no underwater echo / outside 2-300 cm range"
             elif state == 3:
-                text = "Ultrasonic: no valid UART response (check RX/TX, power and baud rate)"
+                text = "no valid UART response (check RX/TX, power and baud rate)"
             else:
-                text = "Ultrasonic: waiting for first measurement..."
-        self.distance.set(text)
+                text = "waiting for first measurement..."
+        return text
 
     def close(self):
         self.closing = True

@@ -1,5 +1,21 @@
 #include <assert.h>
+#include <deque>
+#include <vector>
 #include "underwater_uart.h"
+
+struct FakePort {
+  std::deque<uint8_t> input;
+  std::vector<uint8_t> output;
+  unsigned reads = 0;
+  bool available() { return !input.empty(); }
+  uint8_t read() {
+    const uint8_t value = input.front();
+    input.pop_front();
+    ++reads;
+    return value;
+  }
+  void write(uint8_t value) { output.push_back(value); }
+};
 
 int main() {
   UnderwaterUartDecoder decoder;
@@ -54,4 +70,61 @@ int main() {
   assert(UnderwaterUartDecoder::inRange(3000));
   assert(!UnderwaterUartDecoder::inRange(19));
   assert(!UnderwaterUartDecoder::inRange(3001));
+
+  // Each physical UART owns its decoder and timeout. A disconnected second
+  // sensor must not prevent fresh readings from the first.
+  UnderwaterUartSensor first, second;
+  FakePort firstPort, secondPort;
+  first.request(firstPort, 500);
+  assert(firstPort.output == std::vector<uint8_t>({0x55}));
+  firstPort.input = {0xFF, 0x07};
+  assert(!first.poll(firstPort, 510));
+  assert(first.state == 0);
+  firstPort.input = {0xA1, 0xA7};
+  assert(first.poll(firstPort, 514));
+  assert(first.state == 1 && first.distance == 1953);
+  second.request(secondPort, 600);
+  assert(!second.poll(secondPort, 659));
+  assert(second.poll(secondPort, 660));
+  assert(second.state == 3 && second.distance == 0);
+  assert(first.state == 1 && first.distance == 1953);
+
+  // Late replies are ignored; a later request can recover a timed-out sensor.
+  secondPort.input = {0xFF, 0x07, 0xA1, 0xA7};
+  assert(!second.poll(secondPort, 670));
+  assert(second.state == 3);
+  second.request(secondPort, 800);
+  secondPort.input = {0xFF, 0x0B, 0xB8, 0xC2};
+  assert(second.poll(secondPort, 814));
+  assert(second.state == 1 && second.distance == 3000);
+  assert(first.distance == 1953);
+
+  // A zero reply means no underwater echo, not missing UART communication.
+  first.request(firstPort, 900);
+  firstPort.input = {0xFF, 0x00, 0x00, 0xFF};
+  assert(first.poll(firstPort, 914));
+  assert(first.state == 2 && first.distance == 0);
+  // Invalid checksum times out and clears the previous measured value.
+  second.request(secondPort, 1000);
+  secondPort.input = {0xFF, 0x07, 0xA1, 0xA6};
+  assert(!second.poll(secondPort, 1014));
+  assert(second.poll(secondPort, 1060));
+  assert(second.state == 3 && second.distance == 0);
+
+  // Continuous noise cannot starve motor watchdog work.
+  firstPort.input.assign(1000, 0x12);
+  const unsigned reads = firstPort.reads;
+  assert(!first.poll(firstPort, 1100));
+  assert(firstPort.reads - reads == 64);
+  const auto writes = firstPort.output.size();
+  first.request(firstPort, 1100);
+  assert(firstPort.output.size() == writes);
+
+  // Timeout subtraction still works across the millis() wraparound.
+  UnderwaterUartSensor wrap;
+  FakePort wrapPort;
+  wrap.request(wrapPort, 0xFFFFFFF0U);
+  assert(!wrap.poll(wrapPort, 0x20U));
+  assert(wrap.poll(wrapPort, 0x2CU));
+  assert(wrap.state == 3);
 }
