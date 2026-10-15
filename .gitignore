@@ -5,6 +5,7 @@
 .vscode/ipch
 __pycache__/
 camera_results/
+raspberry_pi/dataset_capture/sessions/
 raspberry_pi/.venv/
 raspberry_pi/.venv-pi4/
 *.py[cod]

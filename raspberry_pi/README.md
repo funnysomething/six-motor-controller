@@ -1,5 +1,8 @@
 # Raspberry Pi 4 B programs
 
+For Testudo training images, use the separate [dataset capture program](dataset_capture/README.md).
+It supports the same Picamera2/IMX500 camera, desktop preview, and timed collection over SSH.
+
 ## Ultrasonic distance sensor on the Pi
 
 For the GUI sensor connected to **ESP32 TX0/GPIO1 and RX0/GPIO3 over I2C**, follow [Ultrasonic sensor in the GUI](../README.md#ultrasonic-sensor-in-the-gui). That section covers the SEN0598 300 cm underwater UART sensor, signal voltage levels, and UART0 programming connections. Upload the updated firmware and copy the updated motor controller script; the GUI displays distance automatically. The direct-Pi HC-SR04 instructions below do not apply to the underwater UART sensor.
