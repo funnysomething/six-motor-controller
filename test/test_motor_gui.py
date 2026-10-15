@@ -137,6 +137,22 @@ class GuiTests(unittest.TestCase):
         self.wait_until(lambda: all("link failed" in variable.get()
                                     for variable in self.app.distances))
 
+    def test_third_sensor_display_timeout_and_older_firmware(self):
+        now = time.monotonic()
+        self.controller.ultrasonic_samples = ((now, 1, 321), (now, 1, 1234), (now, 1, 2345))
+        self.wait_until(lambda: "234.5 cm" in self.app.distances[2].get())
+        self.assertEqual(self.app.distances[2].get(), "Ultrasonic 3: 234.5 cm")
+        self.controller.ultrasonic_samples = ((now, 1, 321), (now, 1, 1234), (now, 3, 0))
+        self.wait_until(lambda: "no valid UART response" in self.app.distances[2].get())
+        self.assertIn("32.1 cm", self.app.distances[0].get())
+        self.assertIn("123.4 cm", self.app.distances[1].get())
+        self.controller.ultrasonic_samples = ((now, 1, 321), (now, 1, 1234),
+                                              (now - 2, 1, 2345))
+        self.wait_until(lambda: "stale" in self.app.distances[2].get())
+        self.controller.ultrasonic_samples = ((now, 1, 321), (now, 1, 1234))
+        self.wait_until(lambda: "unavailable" in self.app.distances[2].get())
+        self.assertIn("123.4 cm", self.app.distances[1].get())
+
     def test_close_waits_for_active_request_before_leaving_mainloop(self):
         self.controller.release.clear()
         self.app.values[0].set(60)

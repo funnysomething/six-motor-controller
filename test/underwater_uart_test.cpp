@@ -127,4 +127,19 @@ int main() {
   assert(!wrap.poll(wrapPort, 0x20U));
   assert(wrap.poll(wrapPort, 0x2CU));
   assert(wrap.state == 3);
+
+  // The third UART has its own partial packet and timeout state as well.
+  UnderwaterUartSensor third;
+  FakePort thirdPort;
+  third.request(thirdPort, 1200);
+  thirdPort.input = {0xFF, 0x04};
+  assert(!third.poll(thirdPort, 1210));
+  assert(!second.poll(secondPort, 1210));
+  thirdPort.input = {0xD2, 0xD5}; // 1234 mm.
+  assert(third.poll(thirdPort, 1214));
+  assert(third.state == 1 && third.distance == 1234);
+  assert(second.state == 3 && second.distance == 0);
+  third.request(thirdPort, 1500);
+  assert(third.poll(thirdPort, 1560));
+  assert(third.state == 3 && third.distance == 0);
 }

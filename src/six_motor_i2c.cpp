@@ -10,13 +10,14 @@ constexpr uint8_t PWM_PINS[] = {4, 13, 12, 16, 17, 18};
 constexpr size_t MOTOR_COUNT = sizeof(PWM_PINS);
 constexpr uint8_t I2C_ADDRESS = 0x32, I2C_SDA = 23, I2C_SCL = 22;
 constexpr uint32_t WATCHDOG_MS = 1000;
-constexpr size_t COMMAND_SIZE = 13, STATUS_SIZE = 24;
+constexpr size_t COMMAND_SIZE = 13, STATUS_SIZE = 29;
 constexpr uint8_t ULTRASONIC_TX = 1, ULTRASONIC_RX = 3; // TX0, RX0.
 constexpr uint8_t ULTRASONIC_2_TX = 19, ULTRASONIC_2_RX = 21;
-constexpr size_t SENSOR_COUNT = 2;
-// Alternate pings to reduce interference: each sensor is requested at 5 Hz.
+constexpr uint8_t ULTRASONIC_3_TX = 26, ULTRASONIC_3_RX = 25;
+constexpr size_t SENSOR_COUNT = 3;
+// Rotate pings to reduce interference: each sensor is requested every 300 ms.
 constexpr uint32_t ULTRASONIC_SLOT_MS = 100;
-HardwareSerial *const sensorPorts[] = {&Serial, &Serial2};
+HardwareSerial *const sensorPorts[] = {&Serial, &Serial2, &Serial1};
 UnderwaterUartSensor sensors[SENSOR_COUNT];
 constexpr uint8_t VERSION = 1, COMMAND_MAGIC = 0xA5, STATUS_MAGIC = 0x5A;
 constexpr uint8_t NEEDS_STOP = 1, TIMED_OUT = 2;
@@ -59,10 +60,15 @@ void makeStatus(uint8_t *reply) {
   reply[20] = ultrasonicState[1];
   reply[21] = distanceMm[1] & 0xFF;
   reply[22] = distanceMm[1] >> 8;
+  reply[24] = 0xD3;
+  reply[25] = ultrasonicState[2];
+  reply[26] = distanceMm[2] & 0xFF;
+  reply[27] = distanceMm[2] >> 8;
   xSemaphoreGive(stateMutex);
   reply[13] = checksum(reply, 13);
   reply[18] = checksum(reply, 18);
   reply[23] = checksum(reply + 19, 4); // Independently checked sensor 2 block.
+  reply[28] = checksum(reply + 24, 4); // Independently checked sensor 3 block.
 }
 
 void publishUltrasonic(size_t sensor) {
@@ -134,6 +140,8 @@ void setup() {
   Serial.begin(115200, SERIAL_8N1, ULTRASONIC_RX, ULTRASONIC_TX);
   // Explicit mapping avoids Serial2's default GPIO16/17 motor PWM pins.
   Serial2.begin(115200, SERIAL_8N1, ULTRASONIC_2_RX, ULTRASONIC_2_TX);
+  // Remap UART1 away from the classic ESP32's flash-connected default pins.
+  Serial1.begin(115200, SERIAL_8N1, ULTRASONIC_3_RX, ULTRASONIC_3_TX);
   for (size_t motor = 0; motor < MOTOR_COUNT; ++motor) {
     pinMode(PWM_PINS[motor], OUTPUT);
     digitalWrite(PWM_PINS[motor], LOW);

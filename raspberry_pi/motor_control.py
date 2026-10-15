@@ -331,9 +331,9 @@ class I2CPwm:
         self.message = message_factory
         self.address = address
         self.sequence = secrets.randbits(32)
-        # Atomic pair of (receipt time, sensor state, millimeters), updated
+        # Atomic tuple of (receipt time, sensor state, millimeters), updated
         # only by acknowledged motor transactions. Tk never touches the bus.
-        self.ultrasonic_samples = (None, None)
+        self.ultrasonic_samples = (None, None, None)
 
     @property
     def ultrasonic_sample(self):
@@ -353,7 +353,7 @@ class I2CPwm:
             # Separate write/read transactions give the ESP32 callback time to
             # apply all six channels. Its first read may contain old status.
             time.sleep(0.005)
-            reply = self.message.read(self.address, 24)
+            reply = self.message.read(self.address, 29)
             self.bus.i2c_rdwr(reply)
             status = bytes(reply)
             if (len(status) >= 14 and status[:2] == b"\x5a\x01"
@@ -363,7 +363,8 @@ class I2CPwm:
                 samples = list(self.ultrasonic_samples)
                 received_at = time.monotonic()
                 for sensor, offset, magic, check_start in ((0, 14, 0xD1, 0),
-                                                          (1, 19, 0xD2, 19)):
+                                                          (1, 19, 0xD2, 19),
+                                                          (2, 24, 0xD3, 24)):
                     if (len(status) >= offset + 5 and status[offset] == magic
                             and status[offset + 1] in (0, 1, 2, 3)
                             and status[offset + 4] == checksum(status[check_start:offset + 4])):
@@ -572,7 +573,7 @@ class MotorGui:
         self.applied = [tk.StringVar(root, value="0%") for _ in range(MOTOR_COUNT)]
         self.status = tk.StringVar(root, value="Ready. All motors stopped.")
         self.distances = [tk.StringVar(root, value=f"Ultrasonic {sensor + 1}: waiting for ESP32...")
-                          for sensor in range(2)]
+                          for sensor in range(3)]
         self.distance = self.distances[0]
         self.imu_values = {group: tk.StringVar(root, value=f"{label}: waiting for IMU...")
                            for group, label in (("accel", "Acceleration"),
@@ -643,7 +644,8 @@ class MotorGui:
                       wraplength=580).grid(
                 row=13 + sensor, column=0, columnspan=4, sticky="w", pady=6)
         imu_frame = ttk.LabelFrame(frame, text="SEN0140 V2 IMU", padding=8)
-        imu_frame.grid(row=15, column=0, columnspan=4, sticky="ew", pady=(8, 0))
+        imu_frame.grid(row=13 + len(self.distances), column=0, columnspan=4,
+                       sticky="ew", pady=(8, 0))
         for row, variable in enumerate((*self.imu_values.values(), self.imu_tilt)):
             ttk.Label(imu_frame, textvariable=variable, wraplength=560).grid(
                 row=row, column=0, sticky="w", pady=2)
@@ -744,7 +746,8 @@ class MotorGui:
     def update_distance(self):
         samples = getattr(self.controller, "ultrasonic_samples",
                           (getattr(self.controller, "ultrasonic_sample", None), None))
-        for sensor, sample in enumerate(samples):
+        for sensor in range(len(self.distances)):
+            sample = samples[sensor] if sensor < len(samples) else None
             text = self.distance_text(sample)
             self.distances[sensor].set(f"Ultrasonic {sensor + 1}: {text}")
 
