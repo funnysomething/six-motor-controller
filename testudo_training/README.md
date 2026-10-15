@@ -1,5 +1,9 @@
 # Train the Testudo detector
 
+To use the IMX500 camera's AI processor, follow [the YOLO11n camera workflow](IMX500.md).
+`train.py --model yolo11n.pt` trains its supported architecture. The default
+YOLO26n/NCNN workflow below runs inference on the Pi CPU.
+
 `train.py` fine-tunes pretrained YOLO26n weights using labeled images and can export
 the resulting best weights to NCNN. Run training on your laptop, desktop, or a GPU
 machine. The Raspberry Pi captures images and runs the deployed model; CPU training

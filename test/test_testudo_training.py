@@ -20,7 +20,7 @@ class TestudoTrainingTests(unittest.TestCase):
             best = root / "weights" / "best.pt"
             best.parent.mkdir()
             best.write_bytes(b"simulated weights")
-            args = train.parse_args(["--data", str(data), "--test", "--export-ncnn",
+            args = train.parse_args(["--data", str(data), "--model", "yolo11n.pt", "--test", "--export-ncnn",
                                      "--export-imgsz", "320"])
             initial, trained = Mock(), Mock()
             initial.trainer = SimpleNamespace(best=best)
@@ -29,6 +29,7 @@ class TestudoTrainingTests(unittest.TestCase):
             with contextlib.redirect_stdout(io.StringIO()):
                 self.assertEqual(train.run(args, factory, check), 0)
             check.assert_called_once_with(str(data.resolve()), autodownload=False)
+            self.assertEqual(factory.call_args_list[0].args[0], "yolo11n.pt")
             self.assertEqual(factory.call_args_list[1].args[0], str(best))
             trained.export.assert_called_once_with(format="ncnn", imgsz=320, device="cpu")
             self.assertEqual(trained.val.call_args.kwargs["split"], "test")

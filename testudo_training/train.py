@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Fine-tune YOLO26n on a labeled Testudo dataset and optionally export NCNN."""
+"""Train a Testudo detector for Pi CPU or IMX500 deployment."""
 
 import argparse
 from pathlib import Path
@@ -16,6 +16,8 @@ def positive_int(value):
 def parse_args(argv=None):
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--data", required=True, type=Path, help="labeled dataset's data.yaml")
+    parser.add_argument("--model", choices=("yolo26n.pt", "yolo11n.pt"), default="yolo26n.pt",
+                        help="YOLO26n for NCNN/Pi CPU; YOLO11n for IMX500 camera AI")
     parser.add_argument("--epochs", type=positive_int, default=100)
     parser.add_argument("--imgsz", type=positive_int, default=640)
     parser.add_argument("--batch", type=positive_int, default=8)
@@ -44,7 +46,7 @@ def run(args, YOLO, check_dataset):
         raise ValueError("Expected exactly one class: names: {0: testudo}. Check your label export.")
     if args.test and not dataset.get("test"):
         raise ValueError("--test needs a held-out test split in data.yaml")
-    model = YOLO("yolo26n.pt", task="detect")
+    model = YOLO(args.model, task="detect")
     model.train(
         data=str(args.data), epochs=args.epochs, imgsz=args.imgsz, batch=args.batch,
         device=args.device, workers=args.workers, project=str(args.project.expanduser().resolve()),

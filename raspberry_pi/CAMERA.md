@@ -1,5 +1,9 @@
 # Raspberry Pi 4B AI Camera test
 
+For your custom Testudo detector on the camera AI processor, use
+[`imx500_detect.py` and the YOLO11n workflow](../testudo_training/IMX500.md).
+It requires retraining YOLO11n and an IMX export, rather than your YOLO26n NCNN model.
+
 `camera_test.py` is a separate Python program that runs on the Pi. It uses Picamera2 for the CSI camera and OpenCV for images and optional preview. No PlatformIO build or ESP32 is involved.
 
 Start with camera capture, then test the IMX500's bundled detector, then benchmark YOLO26n on the Pi CPU. These tests answer different questions. A working image does not prove the AI processor works, and a detector finding no objects does not mean the camera is broken.
