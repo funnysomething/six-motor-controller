@@ -6,6 +6,7 @@ import unittest
 from unittest.mock import patch
 
 from raspberry_pi.motor_control import MotorGui
+from raspberry_pi.sen0140 import ImuReading, Sen0140
 
 try:
     import tkinter as tk
@@ -147,6 +148,30 @@ class GuiTests(unittest.TestCase):
             self.controller.release.set()
             self.wait_until(lambda: destroy.called)
         self.assertFalse(self.app.busy)
+
+    def test_imu_units_tilt_errors_and_stale_data(self):
+        self.controller.imu = Sen0140(None)
+        now = time.monotonic()
+        self.controller.imu.readings = {
+            "accel": ImuReading(now, (0.0, 0.0, 1.0)),
+            "gyro": ImuReading(now, (1.0, -2.0, 3.0)),
+            "mag": ImuReading(now, (123, -456, 789)),
+            "barometer": ImuReading(now, (25.08, 1006.53)),
+        }
+        self.wait_until(lambda: "1006.53 hPa" in self.app.imu_values["barometer"].get())
+        self.assertIn("Z +1.000 g", self.app.imu_values["accel"].get())
+        self.assertIn("deg/s", self.app.imu_values["gyro"].get())
+        self.assertIn("raw counts", self.app.imu_values["mag"].get())
+        self.assertIn("roll +0.0 deg", self.app.imu_tilt.get())
+        self.controller.imu.readings["mag"] = ImuReading(now, error="No response")
+        self.controller.imu.readings["accel"] = ImuReading(now - 4, (0, 0, 1))
+        self.wait_until(lambda: "No response" in self.app.imu_values["mag"].get())
+        self.assertIn("stale", self.app.imu_values["accel"].get())
+        self.assertIn("unavailable", self.app.imu_tilt.get())
+        self.assertIn("1006.53 hPa", self.app.imu_values["barometer"].get())
+        self.controller.fault = OSError("link lost")
+        self.wait_until(lambda: all("polling stopped" in variable.get()
+                                    for variable in self.app.imu_values.values()))
 
     def test_failed_request_is_reported_and_motion_controls_disabled(self):
         def fail(values):

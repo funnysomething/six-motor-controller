@@ -379,8 +379,9 @@ class I2CPwm:
 class MotorController:
     """Serialize direction changes and heartbeat writes for all six motors."""
 
-    def __init__(self, pwm, output_factory, start_heartbeat=True):
+    def __init__(self, pwm, output_factory, start_heartbeat=True, imu=None):
         self.pwm = pwm
+        self.imu = imu
         self.outputs = []
         self.speeds = (0,) * MOTOR_COUNT
         self.last_directions = [0] * MOTOR_COUNT
@@ -447,6 +448,10 @@ class MotorController:
                     self._fail(error)
                     print(f"\nMotor link failed; all directions disabled: {error}", file=sys.stderr)
                     return
+                if self.imu is not None:
+                    # Same worker and controller lock as PWM writes: no bus
+                    # transactions from Tk, and one IMU component per cycle.
+                    self.imu.poll_next()
 
     def set_speeds(self, values):
         """Set all six signed percentages; unchanged motors keep running."""
@@ -569,6 +574,12 @@ class MotorGui:
         self.distances = [tk.StringVar(root, value=f"Ultrasonic {sensor + 1}: waiting for ESP32...")
                           for sensor in range(2)]
         self.distance = self.distances[0]
+        self.imu_values = {group: tk.StringVar(root, value=f"{label}: waiting for IMU...")
+                           for group, label in (("accel", "Acceleration"),
+                                                ("gyro", "Rotation rate"),
+                                                ("mag", "Magnetic field"),
+                                                ("barometer", "Temperature / pressure"))}
+        self.imu_tilt = tk.StringVar(root, value="Tilt: waiting for acceleration...")
         root.title("Six motor control")
         root.minsize(620, 450)
         frame = ttk.Frame(root, padding=16)
@@ -631,6 +642,11 @@ class MotorGui:
             ttk.Label(frame, textvariable=variable, font=("TkDefaultFont", 14),
                       wraplength=580).grid(
                 row=13 + sensor, column=0, columnspan=4, sticky="w", pady=6)
+        imu_frame = ttk.LabelFrame(frame, text="SEN0140 V2 IMU", padding=8)
+        imu_frame.grid(row=15, column=0, columnspan=4, sticky="ew", pady=(8, 0))
+        for row, variable in enumerate((*self.imu_values.values(), self.imu_tilt)):
+            ttk.Label(imu_frame, textvariable=variable, wraplength=560).grid(
+                row=row, column=0, sticky="w", pady=2)
         root.protocol("WM_DELETE_WINDOW", self.close)
         root.bind("<Escape>", lambda event: self.stop())
         root.after(50, self.poll)
@@ -721,6 +737,7 @@ class MotorGui:
         if self.controller.fault is not None:
             self.status.set(f"Motor link failed; directions disabled: {self.controller.fault}")
         self.update_distance()
+        self.update_imu()
         self.set_controls(not self.busy and not self.closing and self.controller.fault is None)
         self.root.after(50, self.poll)
 
@@ -749,6 +766,44 @@ class MotorGui:
             else:
                 text = "waiting for first measurement..."
         return text
+
+    def update_imu(self):
+        imu = getattr(self.controller, "imu", None)
+        labels = {"accel": "Acceleration", "gyro": "Rotation rate",
+                  "mag": "Magnetic field", "barometer": "Temperature / pressure"}
+        acceleration = None
+        for group, variable in self.imu_values.items():
+            reading = imu.readings[group] if imu is not None else None
+            if self.controller.fault is not None:
+                text = "unavailable (motor link failed; polling stopped)"
+            elif imu is None:
+                text = "disabled"
+            elif reading is None:
+                text = "waiting for sensor detection..."
+            elif reading.error:
+                text = f"unavailable ({reading.error})"
+            elif time.monotonic() - reading.at > imu.STALE_SECONDS:
+                text = "stale (no recent reading)"
+            elif group == "barometer":
+                temperature, pressure = reading.values
+                text = f"{temperature:.2f} C / {pressure:.2f} hPa"
+            else:
+                x, y, z = reading.values
+                if group == "mag":
+                    text = f"X {x:d}  Y {y:d}  Z {z:d} raw counts"
+                else:
+                    unit = "g" if group == "accel" else "deg/s"
+                    text = f"X {x:+.3f}  Y {y:+.3f}  Z {z:+.3f} {unit}"
+                if group == "accel":
+                    acceleration = reading.values
+            variable.set(f"{labels[group]}: {text}")
+        tilt = imu.tilt(acceleration) if acceleration is not None else None
+        if tilt is None:
+            self.imu_tilt.set("Tilt: unavailable (requires fresh acceleration)")
+        else:
+            roll, pitch = tilt
+            self.imu_tilt.set(f"Tilt from acceleration: roll {roll:+.1f} deg, "
+                              f"pitch {pitch:+.1f} deg (valid when nearly stationary)")
 
     def close(self):
         self.closing = True
@@ -797,6 +852,7 @@ def main():
     parser.add_argument("--address", type=lambda value: int(value, 0), default=I2C_ADDRESS,
                         help="ESP32 7-bit I2C address (default: 0x32)")
     parser.add_argument("--gui", action="store_true", help="open the optional six-motor desktop GUI")
+    parser.add_argument("--no-imu", action="store_true", help="disable SEN0140 polling in the GUI")
     parser.add_argument("--gpiochip", type=int, help="header GPIO chip index (default: detect by label)")
     parser.add_argument("--diagnose", action="store_true", help="inspect GPIO chips/pin owners without changing pins")
     args = parser.parse_args()
@@ -822,8 +878,16 @@ def main():
     try:
         pin_factory = make_gpio_factory(args.gpiochip)
         with SMBus(args.bus) as bus:
+            imu = None
+            if args.gui and not args.no_imu:
+                if __package__:
+                    from .sen0140 import Sen0140
+                else:
+                    from sen0140 import Sen0140
+                imu = Sen0140(bus)
             controller = MotorController(I2CPwm(bus, i2c_msg, args.address),
-                                         make_output_factory(pin_factory, DigitalOutputDevice))
+                                         make_output_factory(pin_factory, DigitalOutputDevice),
+                                         imu=imu)
             try:
                 if args.gui:
                     run_gui(controller)

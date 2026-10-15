@@ -80,6 +80,20 @@ class ControllerTests(unittest.TestCase):
             self.assertEqual((self.pins[pair[0]].value, self.pins[pair[1]].value),
                              (value > 0, value < 0))
 
+    def test_missing_imu_does_not_interrupt_pwm_heartbeat(self):
+        from raspberry_pi.sen0140 import Sen0140
+        from test.test_sen0140 import Bus
+
+        bus = Bus()
+        bus.failed.update((0x53, 0x68, 0x0C, 0x77))
+        self.controller.imu = Sen0140(bus)
+        with patch.object(self.controller.done, "wait", side_effect=[False] * 4 + [True]):
+            self.controller._heartbeat()
+        self.assertEqual(len(self.events), 4)
+        self.assertTrue(all(event == ("pwm", (0,) * 6) for event in self.events))
+        self.assertIsNone(self.controller.fault)
+        self.assertTrue(all(reading.error for reading in self.controller.imu.readings.values()))
+
     def test_single_motor_change_keeps_five_running(self):
         self.controller.set_speeds((60,) * 6)
         self.events.clear()

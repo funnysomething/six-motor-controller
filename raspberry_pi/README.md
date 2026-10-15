@@ -45,7 +45,7 @@ Follow the [complete motor and I2C wiring table](../README.md#pin-map-from-the-s
 From the project directory on your development computer:
 
 ```sh
-scp raspberry_pi/motor_control.py YOUR_USER@PI_ADDRESS:~/motor_control.py
+scp raspberry_pi/motor_control.py raspberry_pi/sen0140.py YOUR_USER@PI_ADDRESS:~/
 ssh YOUR_USER@PI_ADDRESS
 ```
 
@@ -110,6 +110,10 @@ Use the six sliders or number boxes to select signed speeds, then click **Apply 
 The GUI keeps responding during I2C transactions and reversal pauses, and shows link failures while disabling further motion controls. Sliders only edit the pending speeds; they do not start motors until Apply is clicked. Bus/address options still work with `--gui`. Run it on the Pi's desktop or through SSH with X forwarding; an ordinary headless SSH session can use the default terminal mode. Only run one controller at a time.
 
 The GUI shows **Ultrasonic 1** and **Ultrasonic 2** using the same I2C heartbeat, including when motors are stopped. Sensor 1 uses ESP32 RX0/GPIO3 and TX0/GPIO1; sensor 2 uses ESP32 RX/GPIO21 and TX/GPIO19. Connect each sensor TX to its ESP32 RX, and sensor RX to ESP32 TX, with the voltage translation described in the main wiring guide. Each reading independently shows centimeters, no underwater echo/outside 2-300 cm, no valid UART response, or stale readings. An I2C link failure marks both unavailable. It does not issue automatic motor stops. Update both the firmware and Pi script for two readings; older single-sensor firmware leaves sensor 2 unavailable.
+
+### SEN0140 V2 IMU readings
+
+The GUI automatically reads the SEN0140 V2 on the same I2C bus as the ESP32. Copy `sen0140.py` alongside `motor_control.py`, then run with `--gui`. No firmware update is needed. Acceleration, gyro rotation rate, magnetic raw counts, barometer temperature/pressure, and acceleration-based roll/pitch appear below the ultrasonic readings. Each missing component reports its own error and retries, and stale values are cleared from the display. Use `--gui --no-imu` to disable it. See the [IMU wiring and component addresses](../README.md#sen0140-v2-imu-on-the-shared-i2c-bus). Keep the board dry; the barometer does not measure underwater depth.
 
 ### Terminal commands
 

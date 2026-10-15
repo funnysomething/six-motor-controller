@@ -43,6 +43,18 @@ After a 500 ms startup wait, the ESP32 sends `0x55` at 115200 baud, 8N1, alterna
 
 Manufacturer references: [SEN0598 specifications and wire colors](https://wiki.dfrobot.com/sen0598/), [UART protocol](https://wiki.dfrobot.com/sen0598/docs/18120), [request command and underwater testing](https://wiki.dfrobot.com/sen0598/docs/18121).
 
+## SEN0140 V2 IMU on the shared I2C bus
+
+The Pi GUI reads the DFRobot SEN0140 V2 directly as additional I2C devices alongside the ESP32 at `0x32`. Connect IMU SDA to the existing SDA line, IMU SCL to SCL, and share ground. Use a 3.3 V-compatible supply and keep all bus pull-ups at 3.3 V. The SEN0140 board must stay dry, for example inside the vehicle enclosure; its BMP280 is an air barometer, not an underwater depth sensor.
+
+Copy both `raspberry_pi/motor_control.py` and `raspberry_pi/sen0140.py` into the same directory on the Pi, then run `python3 ~/motor_control.py --gui`. No ESP32 firmware update is needed for the IMU. The GUI adds XYZ acceleration in g, XYZ angular rate in degrees/second, XYZ magnetic raw counts, BMP280 temperature in Celsius and pressure in hPa, and acceleration-based roll/pitch. Tilt is useful when nearly stationary. Magnetic readings are uncalibrated chip-axis counts; this interface does not claim fused yaw, velocity or position.
+
+The driver detects ADXL345 at `0x53` or `0x1D`, ITG3200/3205 at `0x68` or `0x69`, VCM5883L at `0x0C` with QMC5883L/HMC5883L alternatives at `0x0D`/`0x1E`, and BMP280 at `0x76` or `0x77`. Each component is identified/configured independently. The older V1 BMP085 barometer is not supported. Missing components show unavailable and retry; readings without updates become stale after three seconds. Missing IMU components do not latch a motor fault. A failure of the shared bus that also prevents ESP32 acknowledgement still stops the motors.
+
+The controller reads one IMU component after each 200 ms motor heartbeat, so each component normally refreshes about every 0.8 seconds after initialization. Motor commands and IMU access share the controller lock and worker; Tk only displays cached data. Use `--gui --no-imu` to disable IMU polling. Standalone terminal motor control does not initialize the IMU.
+
+References: [DFRobot SEN0140 V2](https://wiki.dfrobot.com/sen0140), [DFRobot magnetometer driver](https://github.com/DFRobot/DFRobot_QMC5883), [ADXL345 datasheet](https://www.analog.com/media/en/technical-documentation/data-sheets/adxl345.pdf), and [BMP280 compensation and specifications](https://www.bosch-sensortec.com/media/boschsensortec/downloads/datasheets/bst-bmp280-ds001.pdf).
+
 ## Build and run
 
 Upload from the development computer:
