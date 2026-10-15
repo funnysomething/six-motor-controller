@@ -277,6 +277,19 @@ class ProtocolTests(unittest.TestCase):
         bus.state, bus.mm = 2, 0
         pwm.set_percentages((30,) * 6)
         self.assertEqual(pwm.ultrasonic_sample, (self.clock.now, 2, 0))
+        bus.state = 3
+        pwm.set_percentages((30,) * 6)
+        self.assertEqual(pwm.ultrasonic_sample, (self.clock.now, 3, 0))
+        bus.state = 1
+        for mm in (20, 3000):
+            bus.mm = mm
+            pwm.set_percentages((30,) * 6)
+            self.assertEqual(pwm.ultrasonic_sample, (self.clock.now, 1, mm))
+        previous = pwm.ultrasonic_sample
+        for mm in (0, 19, 3001, 4000):
+            bus.mm = mm
+            pwm.set_percentages((30,) * 6)
+            self.assertEqual(pwm.ultrasonic_sample, previous)
         legacy = motors.I2CPwm(Bus(), Message)
         legacy.set_percentages((30,) * 6)
         self.assertIsNone(legacy.ultrasonic_sample)

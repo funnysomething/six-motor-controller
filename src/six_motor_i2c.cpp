@@ -1,5 +1,6 @@
 #include <Arduino.h>
 #include <Wire.h>
+#include "underwater_uart.h"
 #include <freertos/FreeRTOS.h>
 #include <freertos/semphr.h>
 
@@ -10,8 +11,8 @@ constexpr size_t MOTOR_COUNT = sizeof(PWM_PINS);
 constexpr uint8_t I2C_ADDRESS = 0x32, I2C_SDA = 23, I2C_SCL = 22;
 constexpr uint32_t WATCHDOG_MS = 1000;
 constexpr size_t COMMAND_SIZE = 13, STATUS_SIZE = 19;
-constexpr uint8_t ULTRASONIC_TRIGGER = 1, ULTRASONIC_ECHO = 3; // TX0, RX0.
-constexpr uint32_t ULTRASONIC_INTERVAL_MS = 100, ECHO_TIMEOUT_US = 25000;
+constexpr uint8_t ULTRASONIC_TX = 1, ULTRASONIC_RX = 3; // TX0, RX0.
+constexpr uint32_t ULTRASONIC_INTERVAL_MS = 100, UART_REPLY_TIMEOUT_MS = 60;
 constexpr uint8_t VERSION = 1, COMMAND_MAGIC = 0xA5, STATUS_MAGIC = 0x5A;
 constexpr uint8_t NEEDS_STOP = 1, TIMED_OUT = 2;
 
@@ -21,7 +22,8 @@ uint8_t sequence[4] = {};
 uint8_t flags = NEEDS_STOP;
 uint32_t lastCommandAt = 0;
 uint16_t distanceMm = 0;
-uint8_t ultrasonicState = 0; // 0 = waiting, 1 = valid, 2 = no echo/out of range.
+// 0 = waiting, 1 = valid, 2 = no underwater echo/range, 3 = no valid UART reply.
+uint8_t ultrasonicState = 0;
 
 uint8_t checksum(const uint8_t *data, size_t count) {
   uint8_t result = 0;
@@ -53,22 +55,45 @@ void makeStatus(uint8_t *reply) {
   reply[18] = checksum(reply, 18);
 }
 
-void sampleUltrasonic() {
-  static uint32_t lastSampleAt = 0;
-  if (millis() - lastSampleAt < ULTRASONIC_INTERVAL_MS) return;
-  lastSampleAt = millis();
-  digitalWrite(ULTRASONIC_TRIGGER, HIGH);
-  delayMicroseconds(10);
-  digitalWrite(ULTRASONIC_TRIGGER, LOW);
-  // Bound the wait to 25 ms. Wire callbacks run in a separate task and PWM
-  // continues in hardware; the one-second watchdog still runs every loop.
-  const uint32_t duration = pulseIn(ULTRASONIC_ECHO, HIGH, ECHO_TIMEOUT_US);
-  const uint32_t mm = (duration * 343U + 1000U) / 2000U;
-  const bool valid = duration != 0 && mm >= 20 && mm <= 4000;
+void publishUltrasonic(uint8_t state, uint16_t mm = 0) {
   xSemaphoreTake(stateMutex, portMAX_DELAY);
-  distanceMm = valid ? mm : 0;
-  ultrasonicState = valid ? 1 : 2;
+  distanceMm = mm;
+  ultrasonicState = state;
   xSemaphoreGive(stateMutex);
+}
+
+void sampleUltrasonic() {
+  static UnderwaterUartDecoder decoder;
+  static uint32_t requestedAt = 0;
+  static bool waiting = false, started = false;
+  const uint32_t now = millis();
+  // The sensor needs up to 500 ms after power-on before accepting requests.
+  if (!started) {
+    if (now < 500) return;
+    started = true;
+  }
+  if (waiting && now - requestedAt >= UART_REPLY_TIMEOUT_MS) {
+    waiting = false;
+    decoder.reset();
+    publishUltrasonic(3);
+  }
+  // A bounded, nonblocking read leaves the motor watchdog running even with
+  // a disconnected sensor or a noisy UART. Ignore unsolicited/late bytes.
+  for (uint8_t budget = 64; budget && Serial.available(); --budget) {
+    const uint8_t value = Serial.read();
+    uint16_t mm;
+    if (waiting && decoder.feed(value, mm)) {
+      waiting = false;
+      const bool valid = UnderwaterUartDecoder::inRange(mm);
+      publishUltrasonic(valid ? 1 : 2, valid ? mm : 0);
+    }
+  }
+  if (!waiting && now - requestedAt >= ULTRASONIC_INTERVAL_MS && !Serial.available()) {
+    decoder.reset();
+    Serial.write(static_cast<uint8_t>(0x55));
+    requestedAt = now;
+    waiting = true;
+  }
 }
 
 void receiveCommand(int count) {
@@ -109,10 +134,8 @@ void requestStatus() {
 } // namespace
 
 void setup() {
-  // UART0 pins now belong to the sensor. Do not initialize Serial here.
-  pinMode(ULTRASONIC_TRIGGER, OUTPUT);
-  digitalWrite(ULTRASONIC_TRIGGER, LOW);
-  pinMode(ULTRASONIC_ECHO, INPUT);
+  // UART0 belongs exclusively to the underwater sensor, with no debug logs.
+  Serial.begin(115200, SERIAL_8N1, ULTRASONIC_RX, ULTRASONIC_TX);
   for (size_t motor = 0; motor < MOTOR_COUNT; ++motor) {
     pinMode(PWM_PINS[motor], OUTPUT);
     digitalWrite(PWM_PINS[motor], LOW);

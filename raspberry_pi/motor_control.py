@@ -357,10 +357,10 @@ class I2CPwm:
                     and status[7:13] == bytes(values)
                     and status[13] == checksum(status[:13])):
                 if (len(status) == 19 and status[14] == 0xD1
-                        and status[15] in (0, 1, 2)
+                        and status[15] in (0, 1, 2, 3)
                         and status[18] == checksum(status[:18])):
                     mm = int.from_bytes(status[16:18], "little")
-                    if status[15] != 1 or 20 <= mm <= 4000:
+                    if status[15] != 1 or 20 <= mm <= 3000:
                         self.ultrasonic_sample = (time.monotonic(), status[15], mm)
                 return
         raise OSError("ESP32 did not acknowledge applied PWM; check I2C/firmware")
@@ -719,7 +719,9 @@ class MotorGui:
             elif state == 1:
                 text = f"Ultrasonic: {mm / 10:.1f} cm"
             elif state == 2:
-                text = "Ultrasonic: no echo / outside 2-400 cm range"
+                text = "Ultrasonic: no underwater echo / outside 2-300 cm range"
+            elif state == 3:
+                text = "Ultrasonic: no valid UART response (check RX/TX, power and baud rate)"
             else:
                 text = "Ultrasonic: waiting for first measurement..."
         self.distance.set(text)

@@ -2,7 +2,7 @@
 
 ## Ultrasonic distance sensor on the Pi
 
-For the GUI sensor connected to **ESP32 TX0/GPIO1 and RX0/GPIO3 over I2C**, follow [Ultrasonic sensor in the GUI](../README.md#ultrasonic-sensor-in-the-gui). That section covers the required ECHO divider and UART0 programming connections. Upload the updated firmware and copy the updated motor controller script; the GUI displays distance automatically. The direct-Pi instructions below are a separate wiring option.
+For the GUI sensor connected to **ESP32 TX0/GPIO1 and RX0/GPIO3 over I2C**, follow [Ultrasonic sensor in the GUI](../README.md#ultrasonic-sensor-in-the-gui). That section covers the SEN0598 300 cm underwater UART sensor, signal voltage levels, and UART0 programming connections. Upload the updated firmware and copy the updated motor controller script; the GUI displays distance automatically. The direct-Pi HC-SR04 instructions below do not apply to the underwater UART sensor.
 
 `ultrasonic_test.py` reads a four-pin HC-SR04-style sensor directly from the Pi. It needs no ESP32 firmware or serial link. The default BCM GPIO pins do not overlap the six-motor direction GPIOs below.
 
@@ -106,7 +106,7 @@ Use the six sliders or number boxes to select signed speeds, then click **Apply 
 
 The GUI keeps responding during I2C transactions and reversal pauses, and shows link failures while disabling further motion controls. Sliders only edit the pending speeds; they do not start motors until Apply is clicked. Bus/address options still work with `--gui`. Run it on the Pi's desktop or through SSH with X forwarding; an ordinary headless SSH session can use the default terminal mode. Only run one controller at a time.
 
-The ultrasonic display receives distance from the ESP32 in the same I2C heartbeat, including when motors are stopped. It shows centimeters, no echo/outside 2-400 cm, stale readings, or link failure. It does not issue automatic motor stops. Both the firmware and Pi script must be updated to display distance.
+The ultrasonic display receives distance from the ESP32 in the same I2C heartbeat, including when motors are stopped. It shows centimeters, no underwater echo/outside 2-300 cm, no valid UART response, stale readings, or link failure. It does not issue automatic motor stops. Both the firmware and Pi script must be updated to display distance.
 
 ### Terminal commands
 

@@ -25,15 +25,21 @@ The direction map occupies Pi SPI0 pins GPIO9/10/11; disable SPI and any overlay
 
 ## Ultrasonic sensor in the GUI
 
-The HC-SR04 connects to the ESP32; its readings travel to the Pi over the existing I2C link. Wire with power off:
+The DFRobot SEN0598 IP68 underwater UART sensor connects to the ESP32; its readings travel to the Pi over the existing I2C link. The firmware supports the 300 cm model, with a 2-300 cm range. The 6 m SEN0599 uses the same UART format but has different range limits. Wire with power off:
 
-- HC-SR04 VCC to a regulated 5 V supply and GND to the shared ground.
-- TRIG to ESP32 TX0/GPIO1.
-- ECHO through a 330 ohm resistor to ESP32 RX0/GPIO3, with a 470 ohm resistor from RX0/GPIO3 to GND. This divides 5 V to about 2.94 V. Never connect 5 V ECHO directly to an ESP32 GPIO.
+- Red VCC wire to a regulated 5 V supply and black GND wire to shared ground. The sensor's specified supply range is 5-24 V; that is its power input, not an allowable ESP32 GPIO voltage.
+- Yellow sensor RX wire to ESP32 TX0/GPIO1 through any required UART level translation.
+- White sensor TX wire to ESP32 RX0/GPIO3 through any required UART level translation. UART is crossed TX-to-RX, not TX-to-TX.
 
-TX0/RX0 are UART0 pins. Firmware serial logging is disabled, but the ESP32 may still emit boot messages on TX0. On NodeMCU boards RX0 is also connected to the onboard USB-to-serial transmitter: isolate that connection before letting the sensor drive RX0. Disconnect sensor ECHO when uploading firmware, and restore the programming connection if isolated. Closing a serial monitor alone does not electrically disconnect the USB-to-serial chip. See the [Espressif GPIO reference](https://docs.espressif.com/projects/esp-idf/en/stable/esp32/api-reference/peripherals/gpio.html) and [HC-SR04 voltage-divider wiring](https://gpiozero.readthedocs.io/en/stable/api_input.html#distancesensor-hc-sr04).
+The manufacturer's linked specifications do not state the UART logic voltage. Verify it before connecting: ESP32 GPIO accepts 3.3 V signals. For a 5 V UART, use a suitable 5 V/3.3 V UART level translator on both signal paths. The old HC-SR04 TRIG/ECHO wiring instructions do not apply. A resistor divider on an already 3.3 V sensor TX can make its signal too low to receive.
 
-Upload the updated `six-motor-i2c` firmware and copy the updated `raspberry_pi/motor_control.py` to the Pi. Run `python3 ~/motor_control.py --gui`. Distance appears automatically in centimeters, including while motors are stopped. The ESP32 samples every 100 ms with an echo wait limited to 25 ms; the Pi receives readings through its 200 ms motor heartbeat. The display distinguishes no echo/outside 2-400 cm, stale data, and a failed link. This is a distance display; it does not automatically stop motors near obstacles. The separate Pi GPIO test script remains available for direct Pi wiring.
+TX0/RX0 are UART0 pins. Serial debug logging is disabled, but ESP32 boot messages may still appear on TX0. On NodeMCU boards RX0 also connects to the onboard USB-to-serial transmitter: isolate that connection before letting the sensor drive RX0. Disconnect sensor TX/RX for firmware uploads and restore the programming connection if isolated. Closing the serial monitor does not electrically disconnect the USB-to-serial chip. GPIO16/17 remain motor PWM outputs and cannot be used for the sensor. See the [Espressif GPIO reference](https://docs.espressif.com/projects/esp-idf/en/stable/esp32/api-reference/peripherals/gpio.html).
+
+Upload the updated `six-motor-i2c` firmware and copy the updated `raspberry_pi/motor_control.py` to the Pi. Run `python3 ~/motor_control.py --gui`. Distance appears automatically in centimeters, including while motors are stopped. Test with the sensor underwater, aimed at a submerged obstacle within 2-300 cm; the manufacturer says readings in air are zero. The separate Pi GPIO test script is only for HC-SR04 sensors and cannot read this UART sensor.
+
+After a 500 ms startup wait, the ESP32 sends `0x55` every 100 ms at 115200 baud, 8N1. It parses `0xFF`, distance high byte, distance low byte, and the low byte of their sum. Distances are already millimeters, so no sound-speed conversion is needed. Replies are read without blocking the motor watchdog, with a 60 ms timeout and checksum validation. The Pi receives readings through its 200 ms motor heartbeat. The display distinguishes no underwater echo/outside 2-300 cm, no valid UART response, stale data, and a failed I2C link. This display does not automatically stop motors near obstacles.
+
+Manufacturer references: [SEN0598 specifications and wire colors](https://wiki.dfrobot.com/sen0598/), [UART protocol](https://wiki.dfrobot.com/sen0598/docs/18120), [request command and underwater testing](https://wiki.dfrobot.com/sen0598/docs/18121).
 
 ## Build and run
 
@@ -82,7 +88,7 @@ The Pi uses raw `smbus2.i2c_rdwr` write and read operations with STOP between th
 | Command, 13 bytes | `0xA5`, version `1`, 32-bit little-endian sequence, six percentages `0..100` in Motor1-6 order, XOR of the preceding 12 bytes |
 | Status, 14 bytes | `0x5A`, version `1`, applied sequence, flags, six applied percentages, XOR of the preceding 13 bytes |
 
-The updated firmware appends a five-byte ultrasonic extension to status, giving 19 bytes total. Byte 14 is `0xD1`; byte 15 is sensor state `0` waiting, `1` valid, or `2` no echo/outside range. Bytes 16-17 hold unsigned little-endian distance in millimeters, zero when invalid. Byte 18 is the XOR of bytes 0-17. The original motor prefix and its checksum are unchanged. The Pi validates the motor acknowledgement before caching the extension, and a missing or corrupt extension cannot acknowledge an invalid motor frame. Older firmware can still acknowledge motors; the GUI reports sensor firmware unavailable. Cached readings expire after one second without valid telemetry.
+The updated firmware appends a five-byte ultrasonic extension to status, giving 19 bytes total. Byte 14 is `0xD1`; byte 15 is sensor state `0` waiting, `1` valid, `2` no underwater echo/outside 2-300 cm, or `3` no valid UART reply before timeout. Bytes 16-17 hold unsigned little-endian distance in millimeters, zero when invalid. Byte 18 is the XOR of bytes 0-17. The original motor prefix and its checksum are unchanged. The Pi validates the motor acknowledgement before caching the extension, and a missing or corrupt extension cannot acknowledge an invalid motor frame. Older firmware can still acknowledge motors; the GUI reports sensor firmware unavailable. Cached readings expire after one second without valid telemetry.
 
 Flag bit 0 means an all-zero command is required; bit 1 means watchdog timeout. Invalid size, version, checksum, or percentage rejects the entire command without refreshing the watchdog. Status is published after all six PWM writes. The Pi polls until sequence, flags and magnitudes match, handling the classic ESP32's possibly stale first response. Acknowledgement confirms applied PWM settings, not physical motion.
 
