@@ -331,6 +331,9 @@ class I2CPwm:
         self.message = message_factory
         self.address = address
         self.sequence = secrets.randbits(32)
+        # Atomic snapshot (receipt time, sensor state, millimeters), updated
+        # only by acknowledged motor transactions. Tk never touches the bus.
+        self.ultrasonic_sample = None
 
     def set_percentages(self, values):
         values = tuple(values)
@@ -346,13 +349,19 @@ class I2CPwm:
             # Separate write/read transactions give the ESP32 callback time to
             # apply all six channels. Its first read may contain old status.
             time.sleep(0.005)
-            reply = self.message.read(self.address, 14)
+            reply = self.message.read(self.address, 19)
             self.bus.i2c_rdwr(reply)
             status = bytes(reply)
-            if (len(status) == 14 and status[:2] == b"\x5a\x01"
+            if (len(status) >= 14 and status[:2] == b"\x5a\x01"
                     and status[2:6] == sequence and status[6] == 0
                     and status[7:13] == bytes(values)
                     and status[13] == checksum(status[:13])):
+                if (len(status) == 19 and status[14] == 0xD1
+                        and status[15] in (0, 1, 2)
+                        and status[18] == checksum(status[:18])):
+                    mm = int.from_bytes(status[16:18], "little")
+                    if status[15] != 1 or 20 <= mm <= 4000:
+                        self.ultrasonic_sample = (time.monotonic(), status[15], mm)
                 return
         raise OSError("ESP32 did not acknowledge applied PWM; check I2C/firmware")
 
@@ -397,6 +406,10 @@ class MotorController:
     def _direction_off(self):
         for output in self.outputs:
             output.off()
+
+    @property
+    def ultrasonic_sample(self):
+        return self.pwm.ultrasonic_sample
 
     def _fail(self, error):
         # Latch the error so a background heartbeat can never restart motion.
@@ -539,6 +552,7 @@ class MotorGui:
         self.group_value = tk.StringVar(root, value="0")
         self.applied = [tk.StringVar(root, value="0%") for _ in range(MOTOR_COUNT)]
         self.status = tk.StringVar(root, value="Ready. All motors stopped.")
+        self.distance = tk.StringVar(root, value="Ultrasonic: waiting for ESP32 readings...")
         root.title("Six motor control")
         root.minsize(620, 450)
         frame = ttk.Frame(root, padding=16)
@@ -597,6 +611,8 @@ class MotorGui:
         ttk.Button(buttons, text="Close", command=self.close).pack(side="right")
         ttk.Label(frame, textvariable=self.status, wraplength=580).grid(
             row=12, column=0, columnspan=4, sticky="w", pady=6)
+        ttk.Label(frame, textvariable=self.distance, font=("TkDefaultFont", 14)).grid(
+            row=13, column=0, columnspan=4, sticky="w", pady=6)
         root.protocol("WM_DELETE_WINDOW", self.close)
         root.bind("<Escape>", lambda event: self.stop())
         root.after(50, self.poll)
@@ -686,8 +702,27 @@ class MotorGui:
             variable.set(f"{speed:+d}%")
         if self.controller.fault is not None:
             self.status.set(f"Motor link failed; directions disabled: {self.controller.fault}")
+        self.update_distance()
         self.set_controls(not self.busy and not self.closing and self.controller.fault is None)
         self.root.after(50, self.poll)
+
+    def update_distance(self):
+        sample = getattr(self.controller, "ultrasonic_sample", None)
+        if self.controller.fault is not None:
+            text = "Ultrasonic: unavailable (motor link failed)"
+        elif sample is None:
+            text = "Ultrasonic: unavailable (waiting for sensor firmware)"
+        else:
+            received_at, state, mm = sample
+            if time.monotonic() - received_at > 1.0:
+                text = "Ultrasonic: stale (no recent readings)"
+            elif state == 1:
+                text = f"Ultrasonic: {mm / 10:.1f} cm"
+            elif state == 2:
+                text = "Ultrasonic: no echo / outside 2-400 cm range"
+            else:
+                text = "Ultrasonic: waiting for first measurement..."
+        self.distance.set(text)
 
     def close(self):
         self.closing = True

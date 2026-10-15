@@ -21,7 +21,19 @@ Connect Pi GPIO2 SDA1 (physical pin 3) to **ESP32 GPIO23 SDA**, and Pi GPIO3 SCL
 
 Remove **both ENA and ENB jumpers on each of the three modules** so the ESP32 can control the enable inputs. Connect channel A motors to OUT1/OUT2 and channel B motors to OUT3/OUT4. Add a 10 kohm pull-down on each ENA/ENB input to keep the motors disabled during ESP32 reset. Use an external motor supply and follow the module's instructions for its separate 5 V logic/regulator jumper. GPIO signals are 3.3 V; do not connect motor power or the L298N 5 V terminal to a GPIO/3V3 rail.
 
-The direction map occupies Pi SPI0 pins GPIO9/10/11; disable SPI and any overlays claiming those pins. The existing ultrasonic sensor's GPIO23/24 defaults do not overlap this motor map. The six-motor runtime uses ESP32 GPIO16/17 for PWM, so do not leave the old UART2 wiring connected there. It does not initialize the accelerometer or accept USB/UART motor commands. The diagram's other serial labels are unused.
+The direction map occupies Pi SPI0 pins GPIO9/10/11; disable SPI and any overlays claiming those pins. The six-motor runtime uses ESP32 GPIO16/17 for PWM, so do not leave the old UART2 wiring connected there. It does not initialize the accelerometer or accept USB/UART motor commands. TX0/GPIO1 and RX0/GPIO3 now read the ultrasonic sensor as described below.
+
+## Ultrasonic sensor in the GUI
+
+The HC-SR04 connects to the ESP32; its readings travel to the Pi over the existing I2C link. Wire with power off:
+
+- HC-SR04 VCC to a regulated 5 V supply and GND to the shared ground.
+- TRIG to ESP32 TX0/GPIO1.
+- ECHO through a 330 ohm resistor to ESP32 RX0/GPIO3, with a 470 ohm resistor from RX0/GPIO3 to GND. This divides 5 V to about 2.94 V. Never connect 5 V ECHO directly to an ESP32 GPIO.
+
+TX0/RX0 are UART0 pins. Firmware serial logging is disabled, but the ESP32 may still emit boot messages on TX0. On NodeMCU boards RX0 is also connected to the onboard USB-to-serial transmitter: isolate that connection before letting the sensor drive RX0. Disconnect sensor ECHO when uploading firmware, and restore the programming connection if isolated. Closing a serial monitor alone does not electrically disconnect the USB-to-serial chip. See the [Espressif GPIO reference](https://docs.espressif.com/projects/esp-idf/en/stable/esp32/api-reference/peripherals/gpio.html) and [HC-SR04 voltage-divider wiring](https://gpiozero.readthedocs.io/en/stable/api_input.html#distancesensor-hc-sr04).
+
+Upload the updated `six-motor-i2c` firmware and copy the updated `raspberry_pi/motor_control.py` to the Pi. Run `python3 ~/motor_control.py --gui`. Distance appears automatically in centimeters, including while motors are stopped. The ESP32 samples every 100 ms with an echo wait limited to 25 ms; the Pi receives readings through its 200 ms motor heartbeat. The display distinguishes no echo/outside 2-400 cm, stale data, and a failed link. This is a distance display; it does not automatically stop motors near obstacles. The separate Pi GPIO test script remains available for direct Pi wiring.
 
 ## Build and run
 
@@ -69,6 +81,8 @@ The Pi uses raw `smbus2.i2c_rdwr` write and read operations with STOP between th
 | --- | --- |
 | Command, 13 bytes | `0xA5`, version `1`, 32-bit little-endian sequence, six percentages `0..100` in Motor1-6 order, XOR of the preceding 12 bytes |
 | Status, 14 bytes | `0x5A`, version `1`, applied sequence, flags, six applied percentages, XOR of the preceding 13 bytes |
+
+The updated firmware appends a five-byte ultrasonic extension to status, giving 19 bytes total. Byte 14 is `0xD1`; byte 15 is sensor state `0` waiting, `1` valid, or `2` no echo/outside range. Bytes 16-17 hold unsigned little-endian distance in millimeters, zero when invalid. Byte 18 is the XOR of bytes 0-17. The original motor prefix and its checksum are unchanged. The Pi validates the motor acknowledgement before caching the extension, and a missing or corrupt extension cannot acknowledge an invalid motor frame. Older firmware can still acknowledge motors; the GUI reports sensor firmware unavailable. Cached readings expire after one second without valid telemetry.
 
 Flag bit 0 means an all-zero command is required; bit 1 means watchdog timeout. Invalid size, version, checksum, or percentage rejects the entire command without refreshing the watchdog. Status is published after all six PWM writes. The Pi polls until sequence, flags and magnitudes match, handling the classic ESP32's possibly stale first response. Acknowledgement confirms applied PWM settings, not physical motion.
 

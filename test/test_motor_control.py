@@ -250,6 +250,50 @@ class ProtocolTests(unittest.TestCase):
             motors.I2CPwm(bus, Message).set_percentages((60,) * 6)
         self.assertLess(self.clock.now, 10.32)
 
+    def test_distance_extension_is_cached_with_ack_and_legacy_still_works(self):
+        class SensorBus(Bus):
+            state = 1
+            mm = 1234
+            corrupt = False
+
+            def i2c_rdwr(self, message):
+                super().i2c_rdwr(message)
+                if message.is_read:
+                    message.extend(bytes((0xD1, self.state)) + self.mm.to_bytes(2, "little"))
+                    message.append(motors.checksum(message) ^ int(self.corrupt))
+
+        bus = SensorBus()
+        pwm = motors.I2CPwm(bus, Message)
+        pwm.set_percentages((30,) * 6)
+        self.assertEqual(pwm.ultrasonic_sample, (self.clock.now, 1, 1234))
+        previous = pwm.ultrasonic_sample
+        bus.corrupt = True
+        pwm.set_percentages((30,) * 6)
+        self.assertEqual(pwm.ultrasonic_sample, previous)
+        bus.corrupt = False
+        bus.mm = 5000  # Invalid distance must not become a displayed reading.
+        pwm.set_percentages((30,) * 6)
+        self.assertEqual(pwm.ultrasonic_sample, previous)
+        bus.state, bus.mm = 2, 0
+        pwm.set_percentages((30,) * 6)
+        self.assertEqual(pwm.ultrasonic_sample, (self.clock.now, 2, 0))
+        legacy = motors.I2CPwm(Bus(), Message)
+        legacy.set_percentages((30,) * 6)
+        self.assertIsNone(legacy.ultrasonic_sample)
+
+    def test_distance_is_not_updated_from_unacknowledged_motor_status(self):
+        class StaleSensorBus(Bus):
+            def i2c_rdwr(self, message):
+                super().i2c_rdwr(message)
+                if message.is_read:
+                    message.extend(b"\xd1\x01\xd2\x04")
+                    message.append(motors.checksum(message))
+
+        pwm = motors.I2CPwm(StaleSensorBus(never_ack=True), Message)
+        with self.assertRaises(OSError):
+            pwm.set_percentages((30,) * 6)
+        self.assertIsNone(pwm.ultrasonic_sample)
+
     def test_invalid_pwm_is_rejected_before_bus_write(self):
         bus = Bus()
         pwm = motors.I2CPwm(bus, Message)

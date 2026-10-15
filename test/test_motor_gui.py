@@ -102,6 +102,16 @@ class GuiTests(unittest.TestCase):
         self.app.apply()
         self.assertEqual(self.controller.calls, [])
 
+    def test_distance_updates_and_invalid_or_stale_readings_clear_value(self):
+        self.controller.ultrasonic_sample = (time.monotonic(), 1, 1234)
+        self.wait_until(lambda: "123.4 cm" in self.app.distance.get())
+        self.controller.ultrasonic_sample = (time.monotonic(), 2, 0)
+        self.wait_until(lambda: "no echo" in self.app.distance.get())
+        self.controller.ultrasonic_sample = (time.monotonic() - 2, 1, 1234)
+        self.wait_until(lambda: "stale" in self.app.distance.get())
+        self.controller.fault = OSError("link lost")
+        self.wait_until(lambda: "link failed" in self.app.distance.get())
+
     def test_close_waits_for_active_request_before_leaving_mainloop(self):
         self.controller.release.clear()
         self.app.values[0].set(60)
