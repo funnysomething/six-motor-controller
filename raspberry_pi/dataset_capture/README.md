@@ -116,6 +116,9 @@ sessions too. Dry images alone do not measure underwater performance.
 
 ## Label, train YOLO26n, then export NCNN
 
+For step-by-step rectangle labeling instructions and the training program, see
+[Testudo training](../../testudo_training/README.md).
+
 The collector intentionally creates **no YOLO label files**. Positive/negative
 session settings are collection notes, not bounding box annotations. In
 particular, an unlabeled positive must never enter training as a background image.
@@ -179,6 +182,29 @@ check accuracy on small/distant targets before choosing the smaller input.
 References: [Picamera2 manual](https://datasheets.raspberrypi.com/camera/picamera2-manual.pdf),
 [Ultralytics dataset guidance](https://docs.ultralytics.com/yolov5/tutorials/tips-for-best-training-results/),
 [NCNN export](https://docs.ultralytics.com/integrations/ncnn/).
+
+## No cameras available
+
+First run `rpicam-hello --list-cameras` on the Pi. If it also reports no cameras,
+the failure is below this capture program. On Raspberry Pi OS, install/update
+`imx500-all`, `python3-picamera2`, and `rpicam-apps`, then reboot and list cameras
+again. Follow the [official AI Camera setup](https://www.raspberrypi.com/documentation/accessories/ai-camera.html).
+
+If detection still fails, shut down the Pi and disconnect power before reseating
+both ribbon ends. On Pi 4, use the CSI camera connector, not the similar display
+connector. Check cable orientation against the official camera installation
+instructions. A connected cable alone does not establish sensor communication.
+
+Inspect `/boot/firmware/config.txt` on current Raspberry Pi OS for a disabled
+`camera_auto_detect` setting or custom camera overlays. Standard official camera
+auto-detection uses `camera_auto_detect=1`. Share the relevant settings and kernel
+logs before adding manual overlays or replacing the OS.
+
+If `rpicam-hello` lists the camera but this script does not, run with the system
+Python outside the virtual environment and compare the Picamera2/libcamera
+installation. If the camera is listed but opening it fails with a resource-busy
+error, close other camera programs. A busy camera and an empty camera list are
+different failures.
 
 ## Local verification
 

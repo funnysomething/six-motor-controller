@@ -23,6 +23,18 @@ class Frame:
 
 
 class DatasetCaptureTests(unittest.TestCase):
+    def test_no_camera_explains_system_check_without_creating_session(self):
+        with tempfile.TemporaryDirectory() as directory:
+            output = Path(directory) / "sessions"
+            args = capture.parse_args(["--output", str(output), "--list-cameras"])
+            factory = Mock()
+            factory.global_camera_info.return_value = []
+            with contextlib.redirect_stdout(io.StringIO()):
+                with self.assertRaisesRegex(RuntimeError, "rpicam-hello --list-cameras"):
+                    capture.run(args, factory, Mock())
+            factory.assert_not_called()
+            self.assertFalse(output.exists())
+
     def run_capture(self, root, *, failure=False, interrupted=False, negative=False):
         args = capture.parse_args([
             "--output", str(root), "--max-images", "2", "--interval", "0.001",

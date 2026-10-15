@@ -6,6 +6,9 @@
 __pycache__/
 camera_results/
 raspberry_pi/dataset_capture/sessions/
+testudo_training/.venv/
+testudo_training/runs/
+/yolo26n.pt
 raspberry_pi/.venv/
 raspberry_pi/.venv-pi4/
 *.py[cod]

@@ -1,0 +1,7 @@
+# Copy to your dataset folder as data.yaml and set its absolute path.
+path: /absolute/path/to/testudo_dataset
+train: images/train
+val: images/val
+test: images/test
+names:
+  0: testudo

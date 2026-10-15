@@ -70,10 +70,18 @@ def write_json(path, value):
 def run(args, Picamera2, cv2):
     cameras = Picamera2.global_camera_info()
     print("Detected cameras:", json.dumps(cameras, default=str), flush=True)
+    if not cameras:
+        raise RuntimeError(
+            "Picamera2 detected no CSI cameras. Run rpicam-hello --list-cameras on the Pi. "
+            "If that also reports no cameras, check the IMX500 packages, boot configuration, "
+            "and ribbon connection with power disconnected. If rpicam lists a camera, "
+            "compare with system python3 outside your virtual environment. "
+            "See dataset_capture/README.md troubleshooting."
+        )
     if args.list_cameras:
-        return 0 if cameras else 1
+        return 0
     if args.camera >= len(cameras):
-        raise RuntimeError("Camera not found. Run rpicam-hello --list-cameras and check CAMERA.md.")
+        raise RuntimeError(f"Camera index {args.camera} is unavailable; choose an index from the list above.")
 
     session_id = datetime.now(timezone.utc).strftime("%Y%m%dT%H%M%S_%fZ") + "_" + uuid4().hex[:8]
     session = args.output.expanduser().resolve() / f"{session_id}_{args.environment}_{args.kind}"
