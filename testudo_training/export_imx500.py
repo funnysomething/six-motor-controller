@@ -2,8 +2,10 @@
 """Export trained YOLO11n weights on Linux for the IMX500 camera processor."""
 
 import argparse
+import importlib.util
 from pathlib import Path
 import platform
+import shlex
 import subprocess
 import sys
 import traceback
@@ -36,6 +38,12 @@ def main(argv=None):
     try:
         print(f"Export host: {platform.platform()}, architecture={platform.machine()}, "
               f"Python={sys.version.split()[0]}", flush=True)
+        print(f"Export Python: {sys.executable}", flush=True)
+        if importlib.util.find_spec("onnx") is None:
+            install = shlex.join([sys.executable, "-m", "pip", "install", "--only-binary=:all:", "onnx"])
+            raise RuntimeError("ONNX is missing from the EXPORT environment. "
+                               f"Install using this exact interpreter: {install}. "
+                               "Installing ONNX in .venv-imx500 does not install it here.")
         for package in ("ultralytics", "torch", "model-compression-toolkit", "imx500-converter"):
             try:
                 installed = version(package)
