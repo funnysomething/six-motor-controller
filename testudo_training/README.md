@@ -83,8 +83,8 @@ testudo_dataset/
   labels/test/    # matching test .txt files
 ```
 
-Copy `data.example.yaml` to this dataset directory as `data.yaml`, and change
-`path` to its absolute location on the training computer. The only class must be
+Copy `data.example.yaml` to this dataset directory as `data.yaml`, and omit
+`path` so directories resolve relative to the YAML file on each machine. The only class must be
 `0: testudo`. Keep all three groups representative, with different views, sizes,
 backgrounds, and negatives. The test split is optional unless you request `--test`.
 
@@ -102,7 +102,7 @@ From this repository's root on the training computer:
 python3 -m venv testudo_training/.venv
 source testudo_training/.venv/bin/activate
 python -m pip install -r testudo_training/requirements.txt
-python testudo_training/train.py --data /absolute/path/to/testudo_dataset/data.yaml
+python testudo_training/train.py --data datasets/testudo/data.yaml
 ```
 
 The default is 100 epochs at image size 640, batch size 8, on the CPU. The first
@@ -114,7 +114,7 @@ Use `--workers 0` if your environment has multiprocessing problems.
 To also evaluate the held-out test split and export NCNN:
 
 ```sh
-python testudo_training/train.py --data /absolute/path/to/testudo_dataset/data.yaml --device mps --test --export-ncnn
+python testudo_training/train.py --data datasets/testudo/data.yaml --device mps --test --export-ncnn
 ```
 
 Replace `mps` with your device. Leave out `--test` until a separate labeled test
@@ -122,9 +122,10 @@ split exists. Tune using validation results, then evaluate the test split after
 choosing the model. Inspect misses and false positives on fresh images too.
 
 Runs are saved under `testudo_training/runs/`, with new run names to preserve
-earlier results. The script prints the actual `weights/best.pt` path. Model
-downloads and default runs are gitignored. `--project` can choose another output
-parent; keep that directory outside git or add an ignore rule.
+earlier results. The script prints the actual `weights/best.pt` path. Keep datasets,
+trained weights, model exports, and capture sessions in this repository and in Git.
+Use an in-repository directory if selecting a custom `--project`. Python virtual
+environments and disposable caches remain ignored. See [dataset locations](../datasets/README.md).
 
 NCNN export uses your trained `best.pt`, runs on CPU, and may install export
 dependencies. If export fails, your trained weights remain available. You can

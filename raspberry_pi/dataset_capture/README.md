@@ -64,9 +64,8 @@ python3 raspberry_pi/dataset_capture/capture.py --preview --manual --kind negati
 ```
 
 Every invocation creates a unique directory under `sessions/` beside the script,
-regardless of the terminal's current directory. That default output is gitignored.
-Use `--output /path/to/dataset-sessions` to select another parent directory.
-Keep custom output directories outside git or add your own ignore entry.
+regardless of the terminal's current directory. Keep these sessions in Git.
+Use `--output` to select another parent directory within this repository.
 
 Each session contains:
 
@@ -145,10 +144,10 @@ testudo_dataset/
   labels/test/
 ```
 
-Create `data.yaml` with an absolute dataset path on the machine doing training:
+The prepared dataset is at `datasets/testudo/data.yaml` in the repo. Omit `path`
+so images resolve relative to the YAML file on both Mac and Linux:
 
 ```yaml
-path: /absolute/path/to/testudo_dataset
 train: images/train
 val: images/val
 test: images/test
@@ -159,8 +158,8 @@ names:
 On your training computer with a YOLO26-capable Ultralytics installation:
 
 ```sh
-yolo detect train model=yolo26n.pt data=/absolute/path/to/testudo_dataset/data.yaml imgsz=640 epochs=100 project=runs/testudo name=dry_v1
-yolo detect val model=runs/testudo/dry_v1/weights/best.pt data=/absolute/path/to/testudo_dataset/data.yaml split=test imgsz=640
+yolo detect train model=yolo26n.pt data=datasets/testudo/data.yaml imgsz=640 epochs=100 project=runs/testudo name=dry_v1
+yolo detect val model=runs/testudo/dry_v1/weights/best.pt data=datasets/testudo/data.yaml split=test imgsz=640
 yolo export model=runs/testudo/dry_v1/weights/best.pt format=ncnn imgsz=640
 ```
 

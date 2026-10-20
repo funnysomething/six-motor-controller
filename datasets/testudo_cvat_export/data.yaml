@@ -1,0 +1,4 @@
+names:
+  0: Testudo
+path: .
+train: train.txt

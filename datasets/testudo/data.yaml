@@ -1,0 +1,5 @@
+# No path key: resolve images relative to this YAML file.
+train: images/train
+val: images/val
+names:
+  0: testudo

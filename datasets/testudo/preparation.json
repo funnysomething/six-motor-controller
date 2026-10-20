@@ -1,0 +1,14 @@
+{
+  "original_export": "datasets/testudo_cvat_export",
+  "source_images": "raspberry_pi/dataset_capture/sessions/20261015T195945_518017Z_8fe98195_dry_positive/images",
+  "train": 116,
+  "val": 30,
+  "excluded_boundary_images": [
+    "20261015T195945_518017Z_8fe98195_000117.jpg",
+    "20261015T195945_518017Z_8fe98195_000118.jpg",
+    "20261015T195945_518017Z_8fe98195_000119.jpg",
+    "20261015T195945_518017Z_8fe98195_000120.jpg",
+    "20261015T195945_518017Z_8fe98195_000121.jpg"
+  ],
+  "split_note": "Single session, chronological holdout with five-frame gap. Collect separate sessions for independent evaluation."
+}

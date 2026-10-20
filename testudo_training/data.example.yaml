@@ -1,5 +1,5 @@
-# Copy to your dataset folder as data.yaml and set its absolute path.
-path: /absolute/path/to/testudo_dataset
+# Copy to your dataset folder as data.yaml.
+# Omit path so images resolve relative to this file on Mac and Linux.
 train: images/train
 val: images/val
 test: images/test

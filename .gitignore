@@ -6,8 +6,6 @@
 __pycache__/
 camera_results/
 testudo_training/.venv/
-/yolo26n.pt
-/yolo11n.pt
 raspberry_pi/.venv-imx500/
 raspberry_pi/.venv/
 raspberry_pi/.venv-pi4/
