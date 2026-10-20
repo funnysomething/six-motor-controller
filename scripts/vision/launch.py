@@ -2,10 +2,12 @@
 """Launch repository vision configurations without manually activating environments."""
 
 import argparse
+from datetime import datetime, timezone
 import os
 from pathlib import Path
 import platform
 import shlex
+import signal
 import subprocess
 import sys
 
@@ -151,18 +153,66 @@ def build_command(profile, extra, dry_run=False):
             "--preview", "--seconds", "120", *extra]
 
 
-def execute(command, dry_run):
+def execute(command, dry_run, log_path=None):
     print(f"Working directory: {ROOT}\n{shlex.join(map(str, command))}", flush=True)
     if dry_run:
         return 0
     environment = os.environ.copy()
+    environment["PYTHONUNBUFFERED"] = "1"
+    environment["PYTHONFAULTHANDLER"] = "1"
     # Respect the existing Pi compatibility environment's dependency pins.
     constraints = Path(command[0]).parent.parent / "vision-constraints.txt"
     if constraints.is_file():
         environment["PIP_CONSTRAINT"] = str(constraints)
     else:
         environment.pop("PIP_CONSTRAINT", None)
-    return subprocess.call(command, cwd=ROOT, env=environment)
+    if log_path is None:
+        result = subprocess.call(command, cwd=ROOT, env=environment)
+    else:
+        log_path.parent.mkdir(parents=True, exist_ok=True)
+        print(f"Saving export output to {log_path}", flush=True)
+        with log_path.open("x") as log:
+            log.write(f"Working directory: {ROOT}\n{shlex.join(map(str, command))}\n")
+            log.flush()
+            with subprocess.Popen(command, cwd=ROOT, env=environment, stdout=subprocess.PIPE,
+                                  stderr=subprocess.STDOUT, text=True, errors="replace", bufsize=1) as process:
+                try:
+                    for line in process.stdout:
+                        print(line, end="", flush=True)
+                        log.write(line)
+                        log.flush()
+                    result = process.wait()
+                except KeyboardInterrupt:
+                    # The terminal sends Ctrl+C to the whole foreground group. Give
+                    # Python time to finish, then terminate a stuck converter.
+                    try:
+                        process.wait(timeout=5)
+                    except subprocess.TimeoutExpired:
+                        process.terminate()
+                        try:
+                            process.wait(timeout=5)
+                        except subprocess.TimeoutExpired:
+                            process.kill()
+                            process.wait()
+                    raise
+            log.write(f"\nProcess return code: {result}\n")
+    if result < 0:
+        number = -result
+        try:
+            name = signal.Signals(number).name
+        except ValueError:
+            name = str(number)
+        print(f"Process terminated by {name} (signal {number}).", file=sys.stderr, flush=True)
+        if number == signal.SIGKILL:
+            print("SIGKILL may mean the kernel ran out of memory, or another process killed it. "
+                  "Check: sudo dmesg -T | tail -n 80", file=sys.stderr, flush=True)
+        elif number in (signal.SIGSEGV, signal.SIGILL, signal.SIGABRT):
+            print("A native dependency crashed. Preserve the export log and check the package "
+                  "versions and CPU architecture before reinstalling anything.", file=sys.stderr, flush=True)
+        return 128 + number
+    if result:
+        print(f"Process exited with status {result}.", file=sys.stderr, flush=True)
+    return result
 
 
 def setup(profile, dry_run):
@@ -213,7 +263,11 @@ def main(argv=None):
             if extra:
                 parser.error("setup profiles do not accept extra arguments")
             return setup(args.profile, args.dry_run)
-        return execute(build_command(args.profile, extra, args.dry_run), args.dry_run)
+        log_path = None
+        if args.profile.startswith("export-"):
+            stamp = datetime.now(timezone.utc).strftime("%Y%m%dT%H%M%S_%fZ")
+            log_path = ROOT / "testudo_training/export_logs" / f"{args.profile}_{stamp}.log"
+        return execute(build_command(args.profile, extra, args.dry_run), args.dry_run, log_path)
     except KeyboardInterrupt:
         return 130
     except (OSError, RuntimeError) as error:

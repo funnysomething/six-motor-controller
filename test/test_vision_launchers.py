@@ -2,6 +2,7 @@
 
 from pathlib import Path
 import subprocess
+import sys
 import tempfile
 import unittest
 from unittest.mock import patch
@@ -10,6 +11,26 @@ from scripts.vision import launch
 
 
 class VisionLauncherTests(unittest.TestCase):
+    def test_process_output_and_exit_status_are_saved_for_export(self):
+        with tempfile.TemporaryDirectory() as directory:
+            log = Path(directory) / "export.log"
+            result = launch.execute([sys.executable, "-c",
+                                     "import sys; print('export stage', flush=True); sys.exit(3)"],
+                                    False, log)
+            self.assertEqual(result, 3)
+            self.assertIn("export stage", log.read_text())
+            self.assertIn("Process return code: 3", log.read_text())
+
+    def test_native_signal_is_reported_with_conventional_exit_status(self):
+        import contextlib
+        import io
+        output = io.StringIO()
+        with patch.object(launch.subprocess, "call", return_value=-9), \
+                contextlib.redirect_stderr(output):
+            self.assertEqual(launch.execute(["/fake/python"], False), 137)
+        self.assertIn("SIGKILL", output.getvalue())
+        self.assertIn("out of memory", output.getvalue())
+
     def test_every_shell_profile_can_be_dry_run_from_another_directory(self):
         with tempfile.TemporaryDirectory() as directory:
             for profile in launch.PROFILES:

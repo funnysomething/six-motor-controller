@@ -140,6 +140,11 @@ Use `--weights` to select a newer YOLO11n run. Export creates `best_imx_model`
 beside the selected weights; point `detect-imx500.sh --model-dir ...` there when
 using another run. See `testudo_training/IMX500.md` for conversion prerequisites.
 
+Export launchers save complete output and return codes under
+`testudo_training/export_logs/` and report native crashes or signals. If an export
+stops silently, retain that log. For Pi memory failures and kernel checks, see
+[IMX500 export troubleshooting](../../testudo_training/IMX500.md#export-stops-after-the-int8-warning).
+
 ## Benchmark generic models
 
 ```sh

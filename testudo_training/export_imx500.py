@@ -4,7 +4,10 @@
 import argparse
 from pathlib import Path
 import platform
+import subprocess
 import sys
+import traceback
+from importlib.metadata import PackageNotFoundError, version
 
 
 def parse_args(argv=None):
@@ -31,19 +34,47 @@ def main(argv=None):
               "See testudo_training/IMX500.md.", file=sys.stderr)
         return 1
     try:
+        print(f"Export host: {platform.platform()}, architecture={platform.machine()}, "
+              f"Python={sys.version.split()[0]}", flush=True)
+        for package in ("ultralytics", "torch", "model-compression-toolkit", "imx500-converter"):
+            try:
+                installed = version(package)
+            except PackageNotFoundError:
+                installed = "not installed"
+            print(f"{package}: {installed}", flush=True)
+        try:
+            java = subprocess.run(["java", "-version"], capture_output=True, text=True,
+                                  timeout=10, check=True)
+        except (OSError, subprocess.SubprocessError) as error:
+            raise RuntimeError("Java could not run. IMX500 export needs Java 17+. "
+                               "On Raspberry Pi OS: sudo apt install openjdk-17-jre-headless") from error
+        print((java.stdout + java.stderr).strip(), flush=True)
+        memory = Path("/proc/meminfo")
+        if memory.exists():
+            print("Memory before export:\n" + "\n".join(line for line in memory.read_text().splitlines()
+                                                       if line.startswith(("MemTotal:", "MemAvailable:", "SwapFree:"))),
+                  flush=True)
         from ultralytics import YOLO
         from ultralytics.data.utils import check_det_dataset
+        from ultralytics.cfg import DEFAULT_CFG_DICT
         check_det_dataset(str(args.data), autodownload=False)
         model = YOLO(str(args.weights), task="detect")
         print("Exporting for the camera AI processor. YOLO26 and NCNN are unsupported here. "
               "Conversion may install additional dependencies and take time.", flush=True)
+        # Newer releases use quantize; older supported releases use int8.
+        quantization = {"quantize": 8} if "quantize" in DEFAULT_CFG_DICT else {"int8": True}
         exported = model.export(format="imx", data=str(args.data), imgsz=args.imgsz,
-                                device="cpu", nms=True)
+                                device="cpu", nms=True, **quantization)
+        result_dir = Path(exported)
+        missing = [name for name in ("packerOut.zip", "labels.txt") if not (result_dir / name).is_file()]
+        if missing:
+            raise RuntimeError(f"Export returned {result_dir}, but required files are missing: {', '.join(missing)}")
         print(f"IMX500 export: {exported}\nCopy the complete export directory to the Pi.", flush=True)
         return 0
     except KeyboardInterrupt:
         return 130
     except Exception as error:
+        traceback.print_exc()
         print(f"IMX500 export failed: {error}\nUse trained YOLO11n weights on Linux with Java 17+.",
               file=sys.stderr)
         return 1
