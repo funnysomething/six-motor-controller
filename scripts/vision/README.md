@@ -102,6 +102,20 @@ selected. Share the failing probe. Do not delete your working NCNN environment.
 
 ## Raspberry Pi camera AI detection
 
+If `detect-imx500.sh` fails with Matplotlib's missing `dedent_interpd` attribute:
+
+```sh
+./scripts/vision/repair-imx500-plotting.sh
+./scripts/vision/detect-imx500.sh
+```
+
+The repair installs Matplotlib 3.9.4 locally in `.venv-imx500`, tests an offscreen
+render, and checks Sony's annotation import. Version 3.9.4 retains this legacy
+attribute. No dependency upgrades or OS package removals are performed. The
+Torch repair and NCNN environments are not changed. If a check fails, retain the
+full traceback; an attribute error alone cannot identify every incompatible
+caller or mixed package path.
+
 ```sh
 ./scripts/vision/setup-imx500.sh
 ./scripts/vision/detect-imx500.sh

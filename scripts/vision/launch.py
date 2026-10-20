@@ -19,7 +19,7 @@ CPU_REPAIR_ENV = ROOT / "raspberry_pi/.venv-pi4-cpu"
 DATA = ROOT / "datasets/testudo/data.yaml"
 RUNS = ROOT / "testudo_training/runs"
 PROFILES = (
-    "setup-training", "setup-pi-cpu", "repair-pi-torch", "setup-imx500", "preview", "capture", "capture-negatives",
+    "setup-training", "setup-pi-cpu", "repair-pi-torch", "repair-imx500-plotting", "setup-imx500", "preview", "capture", "capture-negatives",
     "train-yolo26", "train-yolo26-fast", "train-yolo11", "export-ncnn", "export-imx500",
     "detect-ncnn", "detect-yolo26", "detect-yolo11", "detect-imx500", "benchmark", "diagnose-export",
 )
@@ -98,6 +98,11 @@ def ncnn_size(directory):
 
 def build_command(profile, extra, dry_run=False):
     system_python = "/usr/bin/python3" if platform.system() == "Linux" else "python3"
+    if profile == "repair-imx500-plotting":
+        if extra:
+            raise RuntimeError("repair-imx500-plotting takes only --dry-run")
+        return [str(environment_python("imx", dry_run)),
+                str(ROOT / "raspberry_pi/repair_imx500_plotting.py")]
     if profile == "repair-pi-torch":
         if not dry_run and (platform.system() != "Linux" or platform.machine() != "aarch64"):
             raise RuntimeError("Run repair-pi-torch on the 64-bit Raspberry Pi.")
