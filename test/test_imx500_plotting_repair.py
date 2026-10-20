@@ -26,3 +26,4 @@ class PlotRepairTests(unittest.TestCase):
         run.assert_called_once()
         self.assertIn("--no-deps", run.call_args.args[0])
         self.assertIn("matplotlib==3.9.4", run.call_args.args[0])
+        self.assertIn("pyparsing>=2.3.1", run.call_args.args[0])

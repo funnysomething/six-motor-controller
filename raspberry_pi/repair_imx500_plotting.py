@@ -25,6 +25,7 @@ def main():
         subprocess.run([
             sys.executable, "-m", "pip", "install", "--ignore-installed", "--no-deps",
             "--only-binary=:all:", "--index-url", "https://pypi.org/simple", "matplotlib==3.9.4",
+            "pyparsing>=2.3.1",
         ], check=True)
         checks = [
             ("Matplotlib render", "import matplotlib; matplotlib.use('Agg'); "
