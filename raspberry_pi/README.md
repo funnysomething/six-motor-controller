@@ -1,5 +1,9 @@
 # Raspberry Pi 4 B programs
 
+Use the [computer vision launcher scripts](../scripts/vision/README.md) to select
+camera preview, capture, NCNN/PyTorch CPU detection, or IMX500 camera AI detection.
+The launchers select the Python environment automatically.
+
 For Testudo training images, use the separate [dataset capture program](dataset_capture/README.md).
 It supports the same Picamera2/IMX500 camera, desktop preview, and timed collection over SSH.
 

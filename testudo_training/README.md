@@ -1,5 +1,8 @@
 # Train the Testudo detector
 
+For ready-to-run setup, training, export, and detection commands, use the
+[computer vision launcher scripts](../scripts/vision/README.md).
+
 To use the IMX500 camera's AI processor, follow [the YOLO11n camera workflow](IMX500.md).
 `train.py --model yolo11n.pt` trains its supported architecture. The default
 YOLO26n/NCNN workflow below runs inference on the Pi CPU.

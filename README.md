@@ -1,5 +1,8 @@
 # Six motors with Raspberry Pi direction and ESP32 PWM
 
+For camera preview, dataset capture, training, model export, and detection, use
+the [computer vision launcher scripts](scripts/vision/README.md).
+
 The default `six-motor-i2c` firmware controls six brushed DC motors through three L298N modules. The Pi sets twelve direction GPIO outputs and sends all six PWM percentages to the ESP32 in one I2C command. Each motor has its own 1 kHz, 8-bit PWM channel, so all six can run together at independent speeds and directions.
 
 ## Pin map from the supplied diagrams
