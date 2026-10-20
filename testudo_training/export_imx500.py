@@ -47,7 +47,8 @@ def main(argv=None):
                                   timeout=10, check=True)
         except (OSError, subprocess.SubprocessError) as error:
             raise RuntimeError("Java could not run. IMX500 export needs Java 17+. "
-                               "On Raspberry Pi OS: sudo apt install openjdk-17-jre-headless") from error
+                               "On Raspberry Pi OS: sudo apt install default-jre-headless; "
+                               "then verify java -version reports 17 or newer") from error
         print((java.stdout + java.stderr).strip(), flush=True)
         memory = Path("/proc/meminfo")
         if memory.exists():
