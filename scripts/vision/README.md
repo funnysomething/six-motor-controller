@@ -145,6 +145,10 @@ Export launchers save complete output and return codes under
 stops silently, retain that log. For Pi memory failures and kernel checks, see
 [IMX500 export troubleshooting](../../testudo_training/IMX500.md#export-stops-after-the-int8-warning).
 
+Use `./scripts/vision/diagnose-export.sh` to check native dependencies with the
+exact Python interpreter selected for export. It does not install packages or
+access the camera. Missing NCNN is unrelated to IMX export; report other failures.
+
 ## Benchmark generic models
 
 ```sh

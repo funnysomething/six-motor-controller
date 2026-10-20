@@ -31,6 +31,22 @@ class VisionLauncherTests(unittest.TestCase):
         self.assertIn("SIGKILL", output.getvalue())
         self.assertIn("out of memory", output.getvalue())
 
+    def test_illegal_instruction_is_reported_as_132_instead_of_wrapping_to_252(self):
+        import contextlib
+        import io
+        output = io.StringIO()
+        with patch.object(launch.subprocess, "call", return_value=-4), \
+                contextlib.redirect_stderr(output):
+            self.assertEqual(launch.execute(["/fake/python"], False), 132)
+        self.assertIn("SIGILL", output.getvalue())
+
+    def test_export_diagnostic_uses_the_export_interpreter(self):
+        with patch.object(launch, "environment_python", return_value=Path("/export-env/bin/python")) as select:
+            command = launch.build_command("diagnose-export", [])
+        select.assert_called_once_with("export", False)
+        self.assertEqual(command[0], "/export-env/bin/python")
+        self.assertTrue(command[1].endswith("check_vision_install.py"))
+
     def test_every_shell_profile_can_be_dry_run_from_another_directory(self):
         with tempfile.TemporaryDirectory() as directory:
             for profile in launch.PROFILES:

@@ -20,7 +20,7 @@ RUNS = ROOT / "testudo_training/runs"
 PROFILES = (
     "setup-training", "setup-pi-cpu", "setup-imx500", "preview", "capture", "capture-negatives",
     "train-yolo26", "train-yolo26-fast", "train-yolo11", "export-ncnn", "export-imx500",
-    "detect-ncnn", "detect-yolo26", "detect-yolo11", "detect-imx500", "benchmark",
+    "detect-ncnn", "detect-yolo26", "detect-yolo11", "detect-imx500", "benchmark", "diagnose-export",
 )
 
 
@@ -93,6 +93,9 @@ def ncnn_size(directory):
 
 def build_command(profile, extra, dry_run=False):
     system_python = "/usr/bin/python3" if platform.system() == "Linux" else "python3"
+    if profile == "diagnose-export":
+        return [str(environment_python("export", dry_run)),
+                str(ROOT / "raspberry_pi/check_vision_install.py"), *extra]
     if profile == "preview":
         return [system_python, str(ROOT / "raspberry_pi/camera_test.py"), "--mode", "camera",
                 "--preview", "--seconds", "120", *extra]
