@@ -121,7 +121,7 @@ caller or mixed package path.
 ./scripts/vision/detect-imx500.sh
 ```
 
-Setup installs camera packages and Sony modlib into the separate `.venv-imx500`.
+Setup installs camera packages, Sony modlib, and ONNX into the separate `.venv-imx500`.
 Detection defaults to `testudo_training/runs/testudo_imx500/weights/best_imx_model`.
 This must contain `packerOut.zip` and `labels.txt`. Those are produced by the
 Linux export below. The launcher cannot turn your existing NCNN export into an

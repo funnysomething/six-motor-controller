@@ -255,6 +255,7 @@ def setup(profile, dry_run):
             [str(IMX_ENV / "bin/python"), "-m", "pip", "install", "--upgrade", "pip"],
             [str(IMX_ENV / "bin/python"), "-m", "pip", "install",
              "git+https://github.com/SonySemiconductorSolutions/aitrios-rpi-application-module-library.git"],
+            [str(IMX_ENV / "bin/python"), "-m", "pip", "install", "--only-binary=:all:", "onnx"],
         ]
     else:
         commands = [
