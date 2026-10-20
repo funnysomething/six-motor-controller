@@ -15,10 +15,11 @@ ROOT = Path(__file__).resolve().parents[2]
 TRAIN_ENV = ROOT / "testudo_training/.venv"
 PI_ENVS = [ROOT / "raspberry_pi/.venv-pi4", ROOT / "raspberry_pi/.venv"]
 IMX_ENV = ROOT / "raspberry_pi/.venv-imx500"
+CPU_REPAIR_ENV = ROOT / "raspberry_pi/.venv-pi4-cpu"
 DATA = ROOT / "datasets/testudo/data.yaml"
 RUNS = ROOT / "testudo_training/runs"
 PROFILES = (
-    "setup-training", "setup-pi-cpu", "setup-imx500", "preview", "capture", "capture-negatives",
+    "setup-training", "setup-pi-cpu", "repair-pi-torch", "setup-imx500", "preview", "capture", "capture-negatives",
     "train-yolo26", "train-yolo26-fast", "train-yolo11", "export-ncnn", "export-imx500",
     "detect-ncnn", "detect-yolo26", "detect-yolo11", "detect-imx500", "benchmark", "diagnose-export",
 )
@@ -41,12 +42,16 @@ def repo_path(value):
 
 
 def environment_python(role, dry_run):
+    repaired = (platform.system() == "Linux" and platform.machine() == "aarch64"
+                and (CPU_REPAIR_ENV / "vision-ready.txt").is_file())
     if role == "training":
         candidates = [TRAIN_ENV]
     elif role == "imx":
         candidates = [IMX_ENV]
     elif role == "export":
-        candidates = [TRAIN_ENV, *PI_ENVS]
+        candidates = ([CPU_REPAIR_ENV] if repaired else []) + [TRAIN_ENV, *PI_ENVS]
+    elif role == "pi-torch":
+        candidates = ([CPU_REPAIR_ENV] if repaired else []) + PI_ENVS
     else:
         candidates = PI_ENVS
     for env in candidates:
@@ -93,6 +98,11 @@ def ncnn_size(directory):
 
 def build_command(profile, extra, dry_run=False):
     system_python = "/usr/bin/python3" if platform.system() == "Linux" else "python3"
+    if profile == "repair-pi-torch":
+        if not dry_run and (platform.system() != "Linux" or platform.machine() != "aarch64"):
+            raise RuntimeError("Run repair-pi-torch on the 64-bit Raspberry Pi.")
+        return [system_python, str(ROOT / "raspberry_pi/setup_pi4_vision.py"),
+                "--environment", str(CPU_REPAIR_ENV), "--cpu-only", *extra]
     if profile == "diagnose-export":
         return [str(environment_python("export", dry_run)),
                 str(ROOT / "raspberry_pi/check_vision_install.py"), *extra]
@@ -151,7 +161,8 @@ def build_command(profile, extra, dry_run=False):
     if size and str(size) != requested_size:
         raise RuntimeError(f"NCNN export input is {size}; --imgsz {requested_size} does not match. "
                            "Re-export at the desired size into a separate model directory.")
-    return [str(environment_python("pi", dry_run)), str(ROOT / "raspberry_pi/camera_test.py"),
+    role = "pi" if profile == "detect-ncnn" else "pi-torch"
+    return [str(environment_python(role, dry_run)), str(ROOT / "raspberry_pi/camera_test.py"),
             "--mode", "yolo", "--model", str(model), "--imgsz", requested_size,
             "--preview", "--seconds", "120", *extra]
 

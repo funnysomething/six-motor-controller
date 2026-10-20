@@ -11,6 +11,25 @@ from scripts.vision import launch
 
 
 class VisionLauncherTests(unittest.TestCase):
+    def test_repair_selected_only_when_ready_and_does_not_change_ncnn_environment(self):
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            repair = root / "repair"
+            original = root / "original"
+            for env in (repair, original):
+                (env / "bin").mkdir(parents=True)
+                (env / "bin/python").touch()
+            with patch.object(launch, "CPU_REPAIR_ENV", repair), \
+                    patch.object(launch, "PI_ENVS", [original]), \
+                    patch.object(launch, "TRAIN_ENV", root / "missing"), \
+                    patch.object(launch.platform, "system", return_value="Linux"), \
+                    patch.object(launch.platform, "machine", return_value="aarch64"):
+                self.assertEqual(launch.environment_python("export", False), original / "bin/python")
+                (repair / "vision-ready.txt").write_text("checks passed")
+                self.assertEqual(launch.environment_python("export", False), repair / "bin/python")
+                self.assertEqual(launch.environment_python("pi-torch", False), repair / "bin/python")
+                self.assertEqual(launch.environment_python("pi", False), original / "bin/python")
+
     def test_process_output_and_exit_status_are_saved_for_export(self):
         with tempfile.TemporaryDirectory() as directory:
             log = Path(directory) / "export.log"

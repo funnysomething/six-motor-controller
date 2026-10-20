@@ -66,6 +66,40 @@ Model paths are relative to the repo root. Copy/clone the complete repo onto the
 Pi so these assets are available. Missing files produce an error rather than
 silently choosing pretrained generic weights.
 
+## Repair a PyTorch CPU convolution crash
+
+If diagnostics report `CRASH: SIGILL` during PyTorch CPU convolution, run on your
+64-bit Pi with Python 3.13:
+
+```sh
+./scripts/vision/repair-pi-torch.sh
+```
+
+This creates `raspberry_pi/.venv-pi4-cpu` using Torch 2.7.1 and torchvision 0.22.1
+from the official CPU wheel index. It pins Ultralytics to 8.4.174 and preserves
+all previous environments. These versions are a compatibility trial, not a
+guarantee of a hardware fix. The installer stops on another Python version or a
+failed native operation. It does not fall back to a source build.
+
+Only after import, CPU convolution, NMS, and Ultralytics import checks pass does
+it write `vision-ready.txt`. On the Pi, PyTorch detection and export launchers then
+prefer this environment. NCNN detection keeps its original environment. Rerun:
+
+```sh
+./scripts/vision/diagnose-export.sh
+./scripts/vision/detect-yolo11.sh
+./scripts/vision/export-imx500.sh
+```
+
+Export dependencies must still be compatible with the pinned Torch version.
+The existing constraints prevent silently replacing that build. If an export
+reports a dependency conflict or another native crash, preserve the log before
+choosing a different package set or a Linux conversion machine. Do not assume a
+passing convolution test proves full model export works.
+
+If repair stops, the partial directory is preserved and is not automatically
+selected. Share the failing probe. Do not delete your working NCNN environment.
+
 ## Raspberry Pi camera AI detection
 
 ```sh

@@ -9,6 +9,7 @@ testudo_training/.venv/
 raspberry_pi/.venv-imx500/
 raspberry_pi/.venv/
 raspberry_pi/.venv-pi4/
+raspberry_pi/.venv-pi4-cpu/
 *.py[cod]
 .DS_Store
 .env
