@@ -385,6 +385,28 @@ class ControllerTests(unittest.TestCase):
 
 
 class DepthControlTests(unittest.TestCase):
+    def test_custom_distance_limits_are_independent_and_clamp_to_zero_or_max_speed(self):
+        settings = motors.DepthControl((100, -80, 60), min_distances_cm=(2, 5, 10),
+                                       max_distances_cm=(8, 15, 30))
+        self.assertEqual(settings.speeds(((10, 1, 50), (10, 1, 100), (10, 1, 200)), 10),
+                         (50, 50, -40, -40, 30, 30))
+        self.assertEqual(settings.speeds(((10, 1, 20), (10, 1, 50), (10, 1, 80)), 10),
+                         (100, 100, -80, -80, 60, 60))
+        self.assertEqual(settings.speeds(((10, 1, 80), (10, 1, 150), (10, 1, 400)), 10),
+                         (0,) * 6)
+        self.assertEqual(settings.speeds(((8, 1, 20), (10, 3, 0), None), 10), (0,) * 6)
+
+    def test_distance_limits_reject_invalid_ranges_before_control_starts(self):
+        for limits in ((3, 3), (1, 3, 3), (3, 3, 301), (3, float("nan"), 3),
+                       (3, float("inf"), 3), (3, True, 3), (3, "4", 3)):
+            with self.subTest(limits=limits):
+                for field in ("min_distances_cm", "max_distances_cm"):
+                    with self.assertRaises(ValueError):
+                        motors.DepthControl(**{field: limits})
+        for low, high in ((10, 10), (15, 10)):
+            with self.assertRaises(ValueError):
+                motors.DepthControl(min_distances_cm=(3, low, 3), max_distances_cm=(10, high, 10))
+
     def test_proportional_range_endpoints_and_signed_pair_directions(self):
         settings = motors.DepthControl((100, -80, 60))
         self.assertEqual(settings.speeds(((10, 1, 30), (10, 1, 65), (10, 1, 100)), 10),

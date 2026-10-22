@@ -3,6 +3,7 @@
 
 import argparse
 from dataclasses import dataclass
+import math
 from pathlib import Path
 import platform
 import queue
@@ -412,15 +413,24 @@ class I2CPwm:
 
 @dataclass(frozen=True)
 class DepthControl:
-    """Proportional pair speeds: maximum at 3 cm, stopped at 10 cm."""
+    """Each pair scales from its maximum speed to zero over its distance range."""
 
     pair_speeds: tuple = (100, 100, 100)
+    min_distances_cm: tuple = (DEPTH_FULL_SPEED_CM,) * 3
+    max_distances_cm: tuple = (DEPTH_STOP_CM,) * 3
 
     def __post_init__(self):
         if (len(self.pair_speeds) != 3 or any(
                 type(value) is not int or not -100 <= value <= 100
                 for value in self.pair_speeds)):
             raise ValueError("Use three integer pair speeds from -100 to 100.")
+        for distances in (self.min_distances_cm, self.max_distances_cm):
+            if len(distances) != 3 or any(
+                    type(value) not in (int, float) or not math.isfinite(value)
+                    or not 2 <= value <= 300 for value in distances):
+                raise ValueError("Use three finite distances from 2 to 300 cm for each limit.")
+        if any(low >= high for low, high in zip(self.min_distances_cm, self.max_distances_cm)):
+            raise ValueError("Each minimum distance must be less than its maximum distance.")
 
     def speeds(self, samples, now):
         values = [0] * MOTOR_COUNT
@@ -431,8 +441,8 @@ class DepthControl:
             at, state, mm = sample
             if state != 1 or not 0 <= now - at <= ULTRASONIC_STALE_SECONDS or not 20 <= mm <= 3000:
                 continue
-            fraction = max(0.0, min(1.0, (DEPTH_STOP_CM - mm / 10) /
-                                        (DEPTH_STOP_CM - DEPTH_FULL_SPEED_CM)))
+            low, high = self.min_distances_cm[sensor], self.max_distances_cm[sensor]
+            fraction = max(0.0, min(1.0, (high - mm / 10) / (high - low)))
             speed = round(self.pair_speeds[sensor] * fraction)
             for motor in pair:
                 values[motor] = speed
@@ -757,6 +767,10 @@ class MotorGui:
         self.controls = []
         self.auto_enabled = tk.BooleanVar(root, value=False)
         self.depth_speeds = [tk.StringVar(root, value="100") for _ in DEPTH_MOTOR_PAIRS]
+        self.depth_min_distances = [tk.StringVar(root, value=f"{DEPTH_FULL_SPEED_CM:g}")
+                                    for _ in DEPTH_MOTOR_PAIRS]
+        self.depth_max_distances = [tk.StringVar(root, value=f"{DEPTH_STOP_CM:g}")
+                                    for _ in DEPTH_MOTOR_PAIRS]
         self.values = [tk.StringVar(root, value="0") for _ in range(MOTOR_COUNT)]
         self.group_value = tk.StringVar(root, value="0")
         self.applied = [tk.StringVar(root, value="0%") for _ in range(MOTOR_COUNT)]
@@ -835,24 +849,28 @@ class MotorGui:
                 row=13 + sensor, column=0, columnspan=4, sticky="w", pady=6)
         ttk.Label(frame, textvariable=self.output_status, wraplength=580).grid(
             row=16, column=0, columnspan=4, sticky="w", pady=(6, 0))
-        auto_frame = ttk.LabelFrame(frame, text="Automatic depth control (3-10 cm)", padding=8)
+        auto_frame = ttk.LabelFrame(frame, text="Automatic depth control", padding=8)
         auto_frame.grid(row=2, column=4, rowspan=10, sticky="new", padx=(18, 0))
         self.auto_toggle = ttk.Checkbutton(auto_frame, text="Enable automatic control",
                                            variable=self.auto_enabled, command=self.toggle_auto)
-        self.auto_toggle.grid(row=0, column=0, columnspan=2, sticky="w")
-        ttk.Label(auto_frame, text="Sensor / motor pair").grid(row=1, column=0, sticky="w")
-        ttk.Label(auto_frame, text="Max speed (%)").grid(row=1, column=1)
+        self.auto_toggle.grid(row=0, column=0, columnspan=4, sticky="w")
+        for column, label in enumerate(("Sensor / motors", "Min (cm)", "Max (cm)", "Max speed (%)")):
+            ttk.Label(auto_frame, text=label).grid(row=1, column=column, sticky="w", padx=4)
         for sensor, pair in enumerate(DEPTH_MOTOR_PAIRS):
-            ttk.Label(auto_frame, text=f"Ultrasonic {sensor + 1} / motors {pair[0] + 1}, {pair[1] + 1}").grid(
-                row=sensor + 2, column=0, sticky="w", padx=(0, 12))
-            entry = ttk.Spinbox(auto_frame, from_=-100, to=100,
-                                textvariable=self.depth_speeds[sensor], width=8)
-            entry.grid(row=sensor + 2, column=1, padx=6, pady=2)
-            self.controls.append(entry)
-        ttk.Label(auto_frame, text="3 cm or closer = max speed; 10 cm or farther = stop. "
+            ttk.Label(auto_frame, text=f"Ultrasonic {sensor + 1} / {pair[0] + 1}, {pair[1] + 1}").grid(
+                row=sensor + 2, column=0, sticky="w", padx=4)
+            for column, variable, low, high, step in (
+                    (1, self.depth_min_distances[sensor], 2, 300, 0.1),
+                    (2, self.depth_max_distances[sensor], 2, 300, 0.1),
+                    (3, self.depth_speeds[sensor], -100, 100, 1)):
+                entry = ttk.Spinbox(auto_frame, from_=low, to=high, increment=step,
+                                    textvariable=variable, width=7)
+                entry.grid(row=sensor + 2, column=column, padx=4, pady=2)
+                self.controls.append(entry)
+        ttk.Label(auto_frame, text="At or below min distance = max speed; at or above max distance = 0%. "
                   "Speed decreases linearly between them. Negative max speed = reverse. "
-                  "No good reading = pair stopped.",
-                  wraplength=330).grid(row=5, column=0, columnspan=2, sticky="w", pady=(4, 0))
+                  "Set limits before enabling. No good reading = pair stopped.",
+                  wraplength=420).grid(row=5, column=0, columnspan=4, sticky="w", pady=(4, 0))
         imu_frame = ttk.LabelFrame(frame, text="SEN0140 V2 IMU", padding=8)
         imu_frame.grid(row=12, column=4, rowspan=4, sticky="new", padx=(18, 0), pady=(8, 0))
         for row, variable in enumerate((*self.imu_values.values(), self.imu_tilt)):
@@ -898,7 +916,10 @@ class MotorGui:
             self.stop()
             return
         try:
-            settings = DepthControl(tuple(int(value.get()) for value in self.depth_speeds))
+            settings = DepthControl(
+                tuple(int(value.get()) for value in self.depth_speeds),
+                min_distances_cm=tuple(float(value.get()) for value in self.depth_min_distances),
+                max_distances_cm=tuple(float(value.get()) for value in self.depth_max_distances))
         except ValueError as error:
             self.auto_enabled.set(False)
             self.status.set(f"Automatic control: {error}")
@@ -978,7 +999,7 @@ class MotorGui:
         elif not self.closing and getattr(self.controller, "link_notice", ""):
             self.status.set(self.controller.link_notice)
         elif self.auto_enabled.get() and not self.busy and not self.closing:
-            self.status.set("Automatic control active: proportional speed over 3-10 cm; no good reading stops its pair.")
+            self.status.set("Automatic control active: speed scales over each pair's distance limits; no good reading stops its pair.")
         self.update_distance()
         self.update_imu()
         output_problem = self.update_outputs()

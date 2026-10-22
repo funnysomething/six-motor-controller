@@ -122,6 +122,31 @@ class GuiTests(unittest.TestCase):
             self.assertFalse(self.app.auto_enabled.get())
         self.assertEqual(self.controller.calls, [])
 
+    def test_custom_distance_limits_and_max_speeds_reach_automatic_controller(self):
+        for sensor, (low, high, speed) in enumerate(((2.5, 8, 90), (5, 15, -80), (10, 30, 60))):
+            self.app.depth_min_distances[sensor].set(str(low))
+            self.app.depth_max_distances[sensor].set(str(high))
+            self.app.depth_speeds[sensor].set(str(speed))
+        self.app.auto_enabled.set(True)
+        self.app.toggle_auto()
+        self.wait_until(lambda: not self.app.busy)
+        settings = self.controller.depth_control
+        self.assertEqual(settings.min_distances_cm, (2.5, 5, 10))
+        self.assertEqual(settings.max_distances_cm, (8, 15, 30))
+        self.assertEqual(settings.pair_speeds, (90, -80, 60))
+        self.assertTrue(all(str(widget.cget("state")) == "disabled" for widget in self.app.controls))
+
+    def test_invalid_distance_limits_leave_automatic_mode_disabled(self):
+        for low, high in (("", "10"), ("nan", "10"), ("3", "inf"),
+                          ("1", "10"), ("3", "301"), ("10", "10"), ("11", "10")):
+            self.app.depth_min_distances[0].set(low)
+            self.app.depth_max_distances[0].set(high)
+            self.app.auto_enabled.set(True)
+            self.app.toggle_auto()
+            self.assertFalse(self.app.auto_enabled.get())
+            self.assertFalse(self.app.busy)
+        self.assertEqual(self.controller.calls, [])
+
     def test_stop_during_enable_cancels_automatic_mode_as_next_request(self):
         self.controller.release.clear()
         self.app.auto_enabled.set(True)

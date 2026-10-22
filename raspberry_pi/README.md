@@ -117,7 +117,7 @@ The GUI shows **Ultrasonic 1**, **Ultrasonic 2**, and **Ultrasonic 3** using the
 
 #### Automatic depth control
 
-Check **Enable automatic control** in the **Automatic depth control (3-10 cm)** panel. It starts disabled each time the GUI opens. Each ultrasonic sensor controls two motors independently:
+Set the limits in the **Automatic depth control** panel, then check **Enable automatic control**. It starts disabled each time the GUI opens. Each ultrasonic sensor controls two motors independently:
 
 | Sensor | Motors |
 | --- | --- |
@@ -125,7 +125,9 @@ Check **Enable automatic control** in the **Automatic depth control (3-10 cm)** 
 | Ultrasonic 2 | 3 and 4 |
 | Ultrasonic 3 | 5 and 6 |
 
-For a valid reading, speed decreases linearly from the pair's maximum at **3 cm** to **zero at 10 cm**: `speed = max_speed * clamp((10 - distance_cm) / 7, 0, 1)`, rounded to an integer percentage. With the default 100% maximum, 3 cm gives 100%, 6.5 cm gives 50%, and 10 cm gives 0%. Valid readings below 3 cm use the maximum; readings above 10 cm stop the pair. Each pair's **Max speed (%)** can be set before enabling; a negative value reverses the pair, and zero disables it.
+Each pair has editable **Min (cm)**, **Max (cm)**, and **Max speed (%)** fields. Minimum speed is always **0%**. For a valid reading at or below the minimum distance, the pair uses its maximum speed; at or above the maximum distance, it stops. Between those limits, speed decreases linearly: `speed = max_speed * clamp((max_distance - distance_cm) / (max_distance - min_distance), 0, 1)`, rounded to an integer percentage.
+
+Defaults remain **3 cm**, **10 cm**, and **100%**: 3 cm gives 100%, 6.5 cm gives 50%, and 10 cm gives 0%. Distance limits can differ for each sensor, accept decimal centimeters within 2-300 cm, and must have minimum less than maximum. Maximum speed is an integer from -100 to 100; a negative value reverses the pair, and zero disables it. Edit settings with automatic mode disabled, then enable it to apply them. Invalid settings leave automatic mode disabled and display an error.
 
 Missing sensors, waiting responses, no echo, invalid UART responses, out-of-range readings, or telemetry older than one second command **zero** for that pair. Fresh valid readings resume automatic control. The other pairs continue responding to their own sensors. Control runs in the background I2C heartbeat about every 0.2 seconds, with the existing reversal coast interval preserved. An I2C interruption stops all motors while the controller retries the connection. Automatic control resumes only from fresh sensor telemetry after recovery; exhausted retries latch a fault and require restarting the program.
 
@@ -141,9 +143,9 @@ For a trace in the terminal, run the updated script with:
 python3 ~/motor_control.py --gui --trace-motors
 ```
 
-Enable automatic mode with a valid reading at 3 cm or closer. With the default maximum speeds, the affected pair should report `100` in `applied`, `10` for each motor's `GPIO IN1/IN2`, and a recent `PWM ack age`. The trace prints on state changes and about once per second while the worker runs. Compare it with a manual command at the same percentage and direction, and include any reconnect or worker error messages when diagnosing a failure. Use `--no-imu` alongside these options to isolate a suspected IMU polling stall.
+Enable automatic mode with a valid reading at or below that pair's minimum distance (3 cm by default). With the default maximum speeds, the affected pair should report `100` in `applied`, `10` for each motor's `GPIO IN1/IN2`, and a recent `PWM ack age`. The trace prints on state changes and about once per second while the worker runs. Compare it with a manual command at the same percentage and direction, and include any reconnect or worker error messages when diagnosing a failure. Use `--no-imu` alongside these options to isolate a suspected IMU polling stall.
 
-The 3-10 cm curve still uses the full 0-100% PWM range. If a motor requires 52% to start, for example, a 50% automatic command may leave it stopped; that does not explain a motor staying stopped at 100%. This mode does not add a minimum-speed floor or a starting pulse.
+With the default limits, the 3-10 cm curve still uses the full 0-100% PWM range. If a motor requires 52% to start, for example, a 50% automatic command may leave it stopped; that does not explain a motor staying stopped at 100%. Minimum speed remains zero; this mode does not add a starting pulse.
 
 #### All six motors work together, but subsets do not
 
