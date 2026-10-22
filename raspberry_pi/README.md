@@ -113,7 +113,23 @@ Use the six sliders or number boxes to select signed speeds, then click **Apply 
 
 The GUI keeps responding during I2C transactions and reversal pauses, and shows link failures while disabling further motion controls. Sliders only edit the pending speeds; they do not start motors until Apply is clicked. Bus/address options still work with `--gui`. Run it on the Pi's desktop or through SSH with X forwarding; an ordinary headless SSH session can use the default terminal mode. Only run one controller at a time.
 
-The GUI shows **Ultrasonic 1**, **Ultrasonic 2**, and **Ultrasonic 3** using the same I2C heartbeat, including when motors are stopped. Sensor 1 uses ESP32 RX0/GPIO3 and TX0/GPIO1; sensor 2 uses ESP32 RX/GPIO21 and TX/GPIO19; sensor 3 uses ESP32 RX/GPIO25 and TX/GPIO26. Connect each sensor TX to its ESP32 RX, and sensor RX to ESP32 TX, with the voltage translation described in the main wiring guide. Each reading independently shows centimeters, no underwater echo/outside 2-300 cm, no valid UART response, or stale readings. An I2C link failure marks all three unavailable. It does not issue automatic motor stops. Update both the firmware and Pi script for three readings; older firmware leaves unsupported sensors unavailable.
+The GUI shows **Ultrasonic 1**, **Ultrasonic 2**, and **Ultrasonic 3** using the same I2C heartbeat, including when motors are stopped. Sensor 1 uses ESP32 RX0/GPIO3 and TX0/GPIO1; sensor 2 uses ESP32 RX/GPIO21 and TX/GPIO19; sensor 3 uses ESP32 RX/GPIO25 and TX/GPIO26. Connect each sensor TX to its ESP32 RX, and sensor RX to ESP32 TX, with the voltage translation described in the main wiring guide. Each reading independently shows centimeters, no underwater echo/outside 2-300 cm, no valid UART response, or stale readings. An I2C link failure marks all three unavailable and disables the motor directions. In manual mode, sensor readings do not change motor speeds. Update both the firmware and Pi script for three readings; older firmware leaves unsupported sensors unavailable.
+
+#### Automatic depth control
+
+Check **Enable automatic control** in the **Automatic depth control (3-10 cm)** panel. It starts disabled each time the GUI opens. Each ultrasonic sensor controls two motors independently:
+
+| Sensor | Motors |
+| --- | --- |
+| Ultrasonic 1 | 1 and 2 |
+| Ultrasonic 2 | 3 and 4 |
+| Ultrasonic 3 | 5 and 6 |
+
+For a valid reading, speed decreases linearly from the pair's maximum at **3 cm** to **zero at 10 cm**: `speed = max_speed * clamp((10 - distance_cm) / 7, 0, 1)`, rounded to an integer percentage. With the default 100% maximum, 3 cm gives 100%, 6.5 cm gives 50%, and 10 cm gives 0%. Valid readings below 3 cm use the maximum; readings above 10 cm stop the pair. Each pair's **Max speed (%)** can be set before enabling; a negative value reverses the pair, and zero disables it.
+
+Missing sensors, waiting responses, no echo, invalid UART responses, out-of-range readings, or telemetry older than one second command **zero** for that pair. Fresh valid readings resume automatic control. The other pairs continue responding to their own sensors. Control runs in the background I2C heartbeat about every 0.2 seconds, with the existing reversal coast interval preserved. An I2C interruption stops all motors while the controller retries the connection. Automatic control resumes only from fresh sensor telemetry after recovery; exhausted retries latch a fault and require restarting the program.
+
+Enabling automatic mode first stops any manually running motors. Manual speed editing is disabled while automatic control is active; **Last applied** continues showing actual commanded speeds. Uncheck the option or press **STOP ALL** / Escape to leave automatic mode and stop all six motors. Closing the GUI also stops all motors. Copy the updated `motor_control.py` to the Pi to use this mode; existing three-sensor firmware needs no changes.
 
 ### SEN0140 V2 IMU readings
 
@@ -133,7 +149,15 @@ q                     stop and quit
 
 Speeds are integers from -100 to 100. The controller automatically disables the affected PWM channels before switching direction and waits a 0.5-second coast interval for a reversal. Unchanged motors continue running.
 
-Startup requires an acknowledged all-zero PWM command. A background thread refreshes the six-channel command every 0.2 seconds even while the prompt waits. If communication fails, the Pi lowers all twelve direction outputs, attempts an all-zero command, and refuses further motion until the program is restarted. The ESP32's one-second watchdog independently disables PWM and requires a zero command before rearming. Quit, Ctrl+C, EOF, SIGTERM and SSH hangup attempt to stop and release GPIO resources.
+Startup requires an acknowledged all-zero PWM command. A background thread refreshes the six-channel command every 0.2 seconds even while the prompt waits. Quit, Ctrl+C, EOF, SIGTERM and SSH hangup attempt to stop and release GPIO resources.
+
+### I2C retries and recovery
+
+An I2C read/write error or applied-status timeout immediately lowers all twelve Pi direction outputs and clears cached ultrasonic readings. The controller then makes up to **five recovery attempts**, sending only all-zero PWM commands, with delays of **0.1, 0.2, 0.4, 0.5, and 0.5 seconds** before the attempts. Each command still requires a matching acknowledgement within 0.3 seconds. Startup and shutdown zero commands use the same retry path. Invalid user input is not retried.
+
+The GUI stays responsive and shows **I2C reconnecting** while motion controls are disabled. A successful acknowledged zero command restores the link without restarting the app and rearms an ESP32 that rebooted or tripped its one-second watchdog. Interrupted manual commands are discarded: all motors stay stopped until you click Apply again. Automatic mode remains enabled and resumes on a later heartbeat only when fresh valid sensor telemetry supports motion. A pending STOP exits automatic mode and takes priority over further motion commands.
+
+If all five recovery attempts fail, the Pi latches a fault, keeps directions disabled, makes a final best-effort zero command, and refuses further motion until the program is restarted. The ESP32's one-second watchdog independently disables PWM if commands stop arriving.
 
 Only one process should own the motor outputs. For control from a vision/navigation program, import `I2CPwm` and `MotorController`; call `set_speeds` with six signed percentages, or `set_motor` with a motor number (1-6) and speed. Always call `close()` in `finally` before closing the I2C bus.
 

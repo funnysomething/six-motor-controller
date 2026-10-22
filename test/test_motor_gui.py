@@ -18,17 +18,23 @@ class Controller:
     def __init__(self):
         self.speeds = (0,) * 6
         self.fault = None
+        self.depth_control = None
         self.calls = []
         self.release = threading.Event()
         self.release.set()
         self.started = threading.Event()
 
     def set_speeds(self, speeds):
+        self.depth_control = None
         self.calls.append(speeds)
         self.started.set()
         if not self.release.wait(2):
             raise RuntimeError("Test did not release request")
         self.speeds = speeds
+
+    def enable_depth_control(self, settings):
+        self.set_speeds((0,) * 6)
+        self.depth_control = settings
 
 
 @unittest.skipIf(tk is None, "Optional Tk is not installed")
@@ -79,6 +85,56 @@ class GuiTests(unittest.TestCase):
         self.assertEqual(self.controller.calls, [])
         self.assertFalse(self.app.busy)
 
+    def test_automatic_mode_defaults_pairing_and_stop_returns_to_manual(self):
+        self.assertFalse(self.app.auto_enabled.get())
+        self.app.depth_speeds[1].set(-80)
+        self.app.auto_enabled.set(True)
+        self.app.toggle_auto()
+        self.wait_until(lambda: not self.app.busy)
+        self.assertEqual(self.controller.depth_control.pair_speeds, (100, -80, 100))
+        self.assertTrue(all(str(widget.cget("state")) == "disabled" for widget in self.app.controls))
+        self.assertEqual(str(self.app.auto_toggle.cget("state")), "normal")
+        self.app.apply()
+        self.assertEqual(self.controller.calls, [(0,) * 6])
+        self.app.stop()
+        self.wait_until(lambda: not self.app.busy)
+        self.assertFalse(self.app.auto_enabled.get())
+        self.assertIsNone(self.controller.depth_control)
+        self.assertEqual(self.controller.speeds, (0,) * 6)
+        self.assertTrue(all(str(widget.cget("state")) == "normal" for widget in self.app.controls))
+
+    def test_disabling_automatic_mode_stops_all_motors(self):
+        self.app.auto_enabled.set(True)
+        self.app.toggle_auto()
+        self.wait_until(lambda: not self.app.busy)
+        self.controller.speeds = (60,) * 6
+        self.app.auto_enabled.set(False)
+        self.app.toggle_auto()
+        self.wait_until(lambda: not self.app.busy)
+        self.assertIsNone(self.controller.depth_control)
+        self.assertEqual(self.controller.speeds, (0,) * 6)
+
+    def test_invalid_automatic_settings_do_not_enable_motion(self):
+        for value in ("oops", "101", "1.5", ""):
+            self.app.depth_speeds[0].set(value)
+            self.app.auto_enabled.set(True)
+            self.app.toggle_auto()
+            self.assertFalse(self.app.auto_enabled.get())
+        self.assertEqual(self.controller.calls, [])
+
+    def test_stop_during_enable_cancels_automatic_mode_as_next_request(self):
+        self.controller.release.clear()
+        self.app.auto_enabled.set(True)
+        self.app.toggle_auto()
+        self.assertTrue(self.controller.started.wait(1))
+        self.app.stop()
+        self.assertTrue(self.app.stop_requested)
+        self.controller.release.set()
+        self.wait_until(lambda: not self.app.busy)
+        self.assertFalse(self.app.auto_enabled.get())
+        self.assertIsNone(self.controller.depth_control)
+        self.assertEqual(self.controller.calls, [(0,) * 6, (0,) * 6])
+
     def test_apply_keeps_ui_responsive_and_stop_is_next_command(self):
         self.controller.release.clear()
         for value in self.app.values:
@@ -102,6 +158,21 @@ class GuiTests(unittest.TestCase):
         self.assertTrue(all(str(widget.cget("state")) == "disabled" for widget in self.app.controls))
         self.app.apply()
         self.assertEqual(self.controller.calls, [])
+
+    def test_reconnecting_status_disables_motion_then_recovers_without_restart(self):
+        self.controller.ultrasonic_samples = ((time.monotonic(), 1, 30),) * 3
+        self.controller.recovering = True
+        self.controller.link_notice = "I2C reconnecting (1/5); all motors stopped."
+        self.wait_until(lambda: "reconnecting" in self.app.status.get())
+        self.assertTrue(all(str(widget.cget("state")) == "disabled" for widget in self.app.controls))
+        self.assertTrue(all("reconnecting" in variable.get() for variable in self.app.distances))
+        self.app.apply()
+        self.assertEqual(self.controller.calls, [])
+        self.controller.recovering = False
+        self.controller.link_notice = "I2C recovered; all motors stopped."
+        self.wait_until(lambda: "recovered" in self.app.status.get())
+        self.assertTrue(all(str(widget.cget("state")) == "normal" for widget in self.app.controls))
+        self.assertIsNone(self.controller.fault)
 
     def test_distance_updates_and_invalid_or_stale_readings_clear_value(self):
         self.controller.ultrasonic_sample = (time.monotonic(), 1, 1234)

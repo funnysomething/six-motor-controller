@@ -2,6 +2,7 @@
 """Control six L298N motors: Pi direction GPIO, ESP32 PWM over I2C."""
 
 import argparse
+from dataclasses import dataclass
 from pathlib import Path
 import platform
 import queue
@@ -21,6 +22,13 @@ I2C_ADDRESS = 0x32
 REVERSE_PAUSE = 0.5
 HEARTBEAT_INTERVAL = 0.2
 ACK_TIMEOUT = 0.3
+I2C_RECOVERY_ATTEMPTS = 5
+I2C_RETRY_DELAY = 0.1
+I2C_RETRY_MAX_DELAY = 0.5
+ULTRASONIC_STALE_SECONDS = 1.0
+DEPTH_MOTOR_PAIRS = ((0, 1), (2, 3), (4, 5))
+DEPTH_FULL_SPEED_CM = 3.0
+DEPTH_STOP_CM = 10.0
 HEADER_CHIP_LABELS = {"pinctrl-bcm2835", "pinctrl-bcm2711", "pinctrl-rp1"}
 MOTOR_GPIO_PINS = sorted({pin for pair in DIRECTION_PINS for pin in pair})
 
@@ -377,6 +385,35 @@ class I2CPwm:
         raise OSError("ESP32 did not acknowledge applied PWM; check I2C/firmware")
 
 
+@dataclass(frozen=True)
+class DepthControl:
+    """Proportional pair speeds: maximum at 3 cm, stopped at 10 cm."""
+
+    pair_speeds: tuple = (100, 100, 100)
+
+    def __post_init__(self):
+        if (len(self.pair_speeds) != 3 or any(
+                type(value) is not int or not -100 <= value <= 100
+                for value in self.pair_speeds)):
+            raise ValueError("Use three integer pair speeds from -100 to 100.")
+
+    def speeds(self, samples, now):
+        values = [0] * MOTOR_COUNT
+        for sensor, pair in enumerate(DEPTH_MOTOR_PAIRS):
+            sample = samples[sensor] if sensor < len(samples) else None
+            if sample is None:
+                continue
+            at, state, mm = sample
+            if state != 1 or not 0 <= now - at <= ULTRASONIC_STALE_SECONDS or not 20 <= mm <= 3000:
+                continue
+            fraction = max(0.0, min(1.0, (DEPTH_STOP_CM - mm / 10) /
+                                        (DEPTH_STOP_CM - DEPTH_FULL_SPEED_CM)))
+            speed = round(self.pair_speeds[sensor] * fraction)
+            for motor in pair:
+                values[motor] = speed
+        return tuple(values)
+
+
 class MotorController:
     """Serialize direction changes and heartbeat writes for all six motors."""
 
@@ -388,6 +425,9 @@ class MotorController:
         self.last_directions = [0] * MOTOR_COUNT
         self.stopped_at = [0.0] * MOTOR_COUNT
         self.fault = None
+        self.recovering = False
+        self.link_notice = ""
+        self.depth_control = None
         self.lock = threading.RLock()
         self.done = threading.Event()
         self.worker = None
@@ -396,7 +436,7 @@ class MotorController:
             for pair in DIRECTION_PINS:
                 for pin in pair:
                     self.outputs.append(output_factory(pin, initial_value=False))
-            self.pwm.set_percentages(self.speeds)
+            self._write_pwm(self.speeds)
             if start_heartbeat:
                 self.worker = threading.Thread(target=self._heartbeat, daemon=True)
                 self.worker.start()
@@ -427,9 +467,49 @@ class MotorController:
     def ultrasonic_samples(self):
         return self.pwm.ultrasonic_samples
 
+    def _write_pwm(self, values):
+        """Return False if recovery stopped an interrupted motion command."""
+        try:
+            self.pwm.set_percentages(values)
+        except OSError as error:
+            self._recover_link(error)
+            return False
+        return True
+
+    def _recover_link(self, error):
+        # A write may have reached the ESP32 even if its acknowledgement was
+        # lost. Drop Pi directions immediately and retry ONLY all-zero frames.
+        # This also rearms an ESP32 that rebooted or tripped its watchdog.
+        self.recovering = True
+        now = time.monotonic()
+        self._direction_off()
+        self.stopped_at = [now] * MOTOR_COUNT
+        self.speeds = (0,) * MOTOR_COUNT
+        self.pwm.ultrasonic_samples = (None, None, None)
+        print(f"\nI2C interrupted; motors stopped, retrying: {error}", file=sys.stderr)
+        try:
+            for attempt in range(I2C_RECOVERY_ATTEMPTS):
+                self.link_notice = (f"I2C reconnecting ({attempt + 1}/{I2C_RECOVERY_ATTEMPTS}); "
+                                    "all motors stopped.")
+                time.sleep(min(I2C_RETRY_DELAY * 2 ** attempt, I2C_RETRY_MAX_DELAY))
+                try:
+                    self.pwm.set_percentages(self.speeds)
+                except OSError as retry_error:
+                    error = retry_error
+                else:
+                    self.link_notice = "I2C recovered; all motors stopped."
+                    print(self.link_notice, file=sys.stderr)
+                    return
+            failure = OSError(f"I2C recovery failed after {I2C_RECOVERY_ATTEMPTS} retries: {error}")
+            self._fail(failure)
+            raise failure from error
+        finally:
+            self.recovering = False
+
     def _fail(self, error):
         # Latch the error so a background heartbeat can never restart motion.
         self.fault = error
+        self.depth_control = None
         self.done.set()
         self._direction_off()
         self.speeds = (0,) * MOTOR_COUNT
@@ -444,9 +524,13 @@ class MotorController:
                 if self.done.is_set():
                     return
                 try:
-                    self.pwm.set_percentages(tuple(abs(v) for v in self.speeds))
+                    if not self._write_pwm(tuple(abs(v) for v in self.speeds)):
+                        continue  # Recovered at zero; defer automatic control to the next heartbeat.
+                    if self.depth_control is not None:
+                        self._update_depth_control()
                 except OSError as error:
-                    self._fail(error)
+                    if self.fault is None:
+                        self._fail(error)
                     print(f"\nMotor link failed; all directions disabled: {error}", file=sys.stderr)
                     return
                 if self.imu is not None:
@@ -454,7 +538,38 @@ class MotorController:
                     # transactions from Tk, and one IMU component per cycle.
                     self.imu.poll_next()
 
+    def enable_depth_control(self, settings):
+        if not isinstance(settings, DepthControl):
+            raise ValueError("Provide DepthControl settings")
+        with self.lock:
+            self.set_speeds((0,) * MOTOR_COUNT)
+            self.depth_control = settings
+
+    def _update_depth_control(self):
+        # Called under the controller lock after receiving fresh telemetry.
+        # Coast over successive heartbeats instead of sleeping on a reversal,
+        # so sensors continue updating and STOP can acquire the lock promptly.
+        now = time.monotonic()
+        requested = self.depth_control.speeds(self.ultrasonic_samples, now)
+        values = list(requested)
+        for motor, value in enumerate(values):
+            direction = (value > 0) - (value < 0)
+            if direction and self.last_directions[motor] not in (0, direction):
+                if self.speeds[motor] or now - self.stopped_at[motor] < REVERSE_PAUSE:
+                    values[motor] = 0
+        values = tuple(values)
+        if values != self.speeds:
+            if self._set_speeds(values):
+                self.link_notice = ""
+
     def set_speeds(self, values):
+        """A manual command also exits automatic depth control."""
+        with self.lock:
+            self.link_notice = ""
+            self._set_speeds(values)
+            self.depth_control = None
+
+    def _set_speeds(self, values):
         """Set all six signed percentages; unchanged motors keep running."""
         values = tuple(values)
         if len(values) != MOTOR_COUNT or any(
@@ -470,7 +585,8 @@ class MotorController:
                 if changed:
                     gated = tuple(0 if i in changed else abs(v) for i, v in enumerate(self.speeds))
                     # Confirm affected ENA/ENB outputs are zero before touching IN pins.
-                    self.pwm.set_percentages(gated)
+                    if not self._write_pwm(gated):
+                        return False
                     now = time.monotonic()
                     for i in changed:
                         if self.speeds[i] != 0:
@@ -487,13 +603,19 @@ class MotorController:
                             self.outputs[2 * i].on()
                         elif directions[i] < 0:
                             self.outputs[2 * i + 1].on()
-                self.pwm.set_percentages(tuple(abs(v) for v in values))
-                self.speeds = values
+                # A nonzero frame may be applied even when its acknowledgement
+                # fails. Remember its direction before sending it so recovery
+                # still enforces the coast interval on the next reversal.
                 for i, direction in enumerate(directions):
                     if direction:
                         self.last_directions[i] = direction
+                if not self._write_pwm(tuple(abs(v) for v in values)):
+                    return False
+                self.speeds = values
+                return True
             except BaseException as error:
-                self._fail(error)
+                if self.fault is None:
+                    self._fail(error)
                 raise
 
     def set_motor(self, motor, speed):
@@ -509,10 +631,12 @@ class MotorController:
         if self.worker is not None:
             self.worker.join()
         with self.lock:
+            self.depth_control = None
             if self.closed:
                 return
             try:
-                self.pwm.set_percentages((0,) * MOTOR_COUNT)
+                self._direction_off()
+                self._write_pwm((0,) * MOTOR_COUNT)
             finally:
                 self._direction_off()
                 self.speeds = (0,) * MOTOR_COUNT
@@ -568,6 +692,8 @@ class MotorGui:
         self.closing = False
         self.shutdown_requested = threading.Event()
         self.controls = []
+        self.auto_enabled = tk.BooleanVar(root, value=False)
+        self.depth_speeds = [tk.StringVar(root, value="100") for _ in DEPTH_MOTOR_PAIRS]
         self.values = [tk.StringVar(root, value="0") for _ in range(MOTOR_COUNT)]
         self.group_value = tk.StringVar(root, value="0")
         self.applied = [tk.StringVar(root, value="0%") for _ in range(MOTOR_COUNT)]
@@ -582,7 +708,7 @@ class MotorGui:
                                                 ("barometer", "Temperature / pressure"))}
         self.imu_tilt = tk.StringVar(root, value="Tilt: waiting for acceleration...")
         root.title("Six motor control")
-        root.minsize(620, 450)
+        root.minsize(920, 450)
         frame = ttk.Frame(root, padding=16)
         frame.grid(sticky="nsew")
         root.columnconfigure(0, weight=1)
@@ -643,17 +769,36 @@ class MotorGui:
             ttk.Label(frame, textvariable=variable, font=("TkDefaultFont", 14),
                       wraplength=580).grid(
                 row=13 + sensor, column=0, columnspan=4, sticky="w", pady=6)
+        auto_frame = ttk.LabelFrame(frame, text="Automatic depth control (3-10 cm)", padding=8)
+        auto_frame.grid(row=2, column=4, rowspan=10, sticky="new", padx=(18, 0))
+        self.auto_toggle = ttk.Checkbutton(auto_frame, text="Enable automatic control",
+                                           variable=self.auto_enabled, command=self.toggle_auto)
+        self.auto_toggle.grid(row=0, column=0, columnspan=2, sticky="w")
+        ttk.Label(auto_frame, text="Sensor / motor pair").grid(row=1, column=0, sticky="w")
+        ttk.Label(auto_frame, text="Max speed (%)").grid(row=1, column=1)
+        for sensor, pair in enumerate(DEPTH_MOTOR_PAIRS):
+            ttk.Label(auto_frame, text=f"Ultrasonic {sensor + 1} / motors {pair[0] + 1}, {pair[1] + 1}").grid(
+                row=sensor + 2, column=0, sticky="w", padx=(0, 12))
+            entry = ttk.Spinbox(auto_frame, from_=-100, to=100,
+                                textvariable=self.depth_speeds[sensor], width=8)
+            entry.grid(row=sensor + 2, column=1, padx=6, pady=2)
+            self.controls.append(entry)
+        ttk.Label(auto_frame, text="3 cm or closer = max speed; 10 cm or farther = stop. "
+                  "Speed decreases linearly between them. Negative max speed = reverse. "
+                  "No good reading = pair stopped.",
+                  wraplength=330).grid(row=5, column=0, columnspan=2, sticky="w", pady=(4, 0))
         imu_frame = ttk.LabelFrame(frame, text="SEN0140 V2 IMU", padding=8)
-        imu_frame.grid(row=13 + len(self.distances), column=0, columnspan=4,
-                       sticky="ew", pady=(8, 0))
+        imu_frame.grid(row=12, column=4, rowspan=4, sticky="new", padx=(18, 0), pady=(8, 0))
         for row, variable in enumerate((*self.imu_values.values(), self.imu_tilt)):
-            ttk.Label(imu_frame, textvariable=variable, wraplength=560).grid(
+            ttk.Label(imu_frame, textvariable=variable, wraplength=330).grid(
                 row=row, column=0, sticky="w", pady=2)
         root.protocol("WM_DELETE_WINDOW", self.close)
         root.bind("<Escape>", lambda event: self.stop())
         root.after(50, self.poll)
 
     def copy_group(self):
+        if self.auto_enabled.get() or self.busy or self.closing:
+            return
         try:
             value = int(self.group_value.get())
             if not -100 <= value <= 100:
@@ -666,7 +811,8 @@ class MotorGui:
         self.status.set("Group speed copied. Click Apply to send it.")
 
     def apply(self):
-        if self.busy or self.closing or self.controller.fault is not None:
+        if (self.auto_enabled.get() or self.busy or self.closing
+                or getattr(self.controller, "recovering", False) or self.controller.fault is not None):
             return
         try:
             values = tuple(int(variable.get()) for variable in self.values)
@@ -677,14 +823,35 @@ class MotorGui:
             return
         self.send(values)
 
-    def send(self, values):
+    def toggle_auto(self):
+        if (self.busy or self.closing or getattr(self.controller, "recovering", False)
+                or self.controller.fault is not None):
+            self.auto_enabled.set(getattr(self.controller, "depth_control", None) is not None)
+            return
+        if not self.auto_enabled.get():
+            self.stop()
+            return
+        try:
+            settings = DepthControl(tuple(int(value.get()) for value in self.depth_speeds))
+        except ValueError as error:
+            self.auto_enabled.set(False)
+            self.status.set(f"Automatic control: {error}")
+            return
+        for variable in self.values:
+            variable.set(0)
+        self.send((0,) * MOTOR_COUNT, depth_control=settings)
+
+    def send(self, values, depth_control=None):
         self.busy = True
         self.set_controls(False)
         self.status.set("Stopping all motors..." if not any(values) else "Applying speeds...")
 
         def request():
             try:
-                self.controller.set_speeds(values)
+                if depth_control is None:
+                    self.controller.set_speeds(values)
+                else:
+                    self.controller.enable_depth_control(depth_control)
                 self.results.put(None)
             except Exception as error:
                 self.results.put(error)
@@ -693,6 +860,7 @@ class MotorGui:
         self.worker.start()
 
     def stop(self):
+        self.auto_enabled.set(False)
         for variable in self.values:
             variable.set(0)
         self.group_value.set(0)
@@ -708,7 +876,8 @@ class MotorGui:
 
     def set_controls(self, enabled):
         for widget in self.controls:
-            widget.configure(state="normal" if enabled else "disabled")
+            widget.configure(state="normal" if enabled and not self.auto_enabled.get() else "disabled")
+        self.auto_toggle.configure(state="normal" if enabled else "disabled")
 
     def poll(self):
         if self.shutdown_requested.is_set() and not self.closing:
@@ -723,6 +892,7 @@ class MotorGui:
             self.busy = False
             self.worker.join()
             if result is not None:
+                self.auto_enabled.set(False)
                 self.status.set(f"Command failed: {result}")
             else:
                 self.status.set("All motors stopped." if not any(self.controller.speeds)
@@ -737,10 +907,16 @@ class MotorGui:
         for variable, speed in zip(self.applied, self.controller.speeds):
             variable.set(f"{speed:+d}%")
         if self.controller.fault is not None:
+            self.auto_enabled.set(False)
             self.status.set(f"Motor link failed; directions disabled: {self.controller.fault}")
+        elif not self.closing and getattr(self.controller, "link_notice", ""):
+            self.status.set(self.controller.link_notice)
+        elif self.auto_enabled.get() and not self.busy and not self.closing:
+            self.status.set("Automatic control active: proportional speed over 3-10 cm; no good reading stops its pair.")
         self.update_distance()
         self.update_imu()
-        self.set_controls(not self.busy and not self.closing and self.controller.fault is None)
+        self.set_controls(not self.busy and not self.closing and self.controller.fault is None
+                          and not getattr(self.controller, "recovering", False))
         self.root.after(50, self.poll)
 
     def update_distance(self):
@@ -754,11 +930,13 @@ class MotorGui:
     def distance_text(self, sample):
         if self.controller.fault is not None:
             text = "unavailable (motor link failed)"
+        elif getattr(self.controller, "recovering", False):
+            text = "unavailable (I2C reconnecting)"
         elif sample is None:
             text = "unavailable (waiting for sensor firmware)"
         else:
             received_at, state, mm = sample
-            if time.monotonic() - received_at > 1.0:
+            if time.monotonic() - received_at > ULTRASONIC_STALE_SECONDS:
                 text = "stale (no recent readings)"
             elif state == 1:
                 text = f"{mm / 10:.1f} cm"
