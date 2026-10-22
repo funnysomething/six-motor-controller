@@ -18,13 +18,12 @@ import time
 # The screenshot repeats Motor6 on IN1/IN2: those belong to Motor5 here.
 DIRECTION_PINS = ((26, 19), (13, 6), (5, 11), (9, 10), (22, 27), (17, 4))
 MOTOR_COUNT = 6
+PWM_GPIO_PINS = (4, 13, 12, 16, 17, 18)  # ESP32 firmware channel order.
+DEFAULT_PWM_MAP = tuple(range(MOTOR_COUNT))
 I2C_ADDRESS = 0x32
 REVERSE_PAUSE = 0.5
 HEARTBEAT_INTERVAL = 0.2
 ACK_TIMEOUT = 0.3
-I2C_RECOVERY_ATTEMPTS = 5
-I2C_RETRY_DELAY = 0.1
-I2C_RETRY_MAX_DELAY = 0.5
 ULTRASONIC_STALE_SECONDS = 1.0
 DEPTH_MOTOR_PAIRS = ((0, 1), (2, 3), (4, 5))
 DEPTH_FULL_SPEED_CM = 3.0
@@ -331,13 +330,29 @@ def checksum(data):
     return result
 
 
+def parse_pwm_map(value):
+    """CLI channel numbers are 1-based, in Pi direction-motor order."""
+    try:
+        channels = tuple(int(channel.strip()) - 1 for channel in value.split(","))
+    except ValueError as error:
+        raise argparse.ArgumentTypeError("Use six comma-separated channel numbers, 1 through 6.") from error
+    if sorted(channels) != list(DEFAULT_PWM_MAP):
+        raise argparse.ArgumentTypeError("--pwm-map must contain each channel 1 through 6 exactly once.")
+    return channels
+
+
 class I2CPwm:
     """Raw I2C frames; no SMBus register or length bytes are added."""
 
-    def __init__(self, bus, message_factory, address=I2C_ADDRESS):
+    def __init__(self, bus, message_factory, address=I2C_ADDRESS, channel_map=DEFAULT_PWM_MAP):
+        channel_map = tuple(channel_map)
+        if (any(type(channel) is not int for channel in channel_map)
+                or sorted(channel_map) != list(DEFAULT_PWM_MAP)):
+            raise ValueError("PWM channel map must be a permutation of zero-based channels 0 through 5")
         self.bus = bus
         self.message = message_factory
         self.address = address
+        self.channel_map = channel_map
         self.sequence = secrets.randbits(32)
         # Atomic tuple of (receipt time, sensor state, millimeters), updated
         # only by acknowledged motor transactions. Tk never touches the bus.
@@ -352,6 +367,12 @@ class I2CPwm:
         if len(values) != MOTOR_COUNT or any(
                 type(v) is not int or not 0 <= v <= 100 for v in values):
             raise ValueError("PWM needs six integer percentages from 0 to 100")
+        # Direction GPIOs and GUI stay in logical motor order. Only PWM wire
+        # magnitudes are reordered; acknowledgements must match that order too.
+        wire_values = [0] * MOTOR_COUNT
+        for motor, channel in enumerate(self.channel_map):
+            wire_values[channel] = values[motor]
+        values = tuple(wire_values)
         self.sequence = (self.sequence + 1) & 0xFFFFFFFF
         sequence = self.sequence.to_bytes(4, "little")
         frame = bytes((0xA5, 1)) + sequence + bytes(values)
@@ -425,8 +446,6 @@ class MotorController:
         self.last_directions = [0] * MOTOR_COUNT
         self.stopped_at = [0.0] * MOTOR_COUNT
         self.fault = None
-        self.recovering = False
-        self.link_notice = ""
         self.depth_control = None
         self.lock = threading.RLock()
         self.done = threading.Event()
@@ -486,59 +505,21 @@ class MotorController:
         self.output_sample = (self.speeds, directions, error)
         now = time.monotonic()
         mode = "auto" if self.depth_control is not None else "manual"
-        state = (mode, self.output_sample, self.recovering, self.fault is not None)
+        state = (mode, self.output_sample, self.fault is not None)
         if self.trace and (state != self.last_trace_state or now - self.last_trace_at >= 1):
             pins = (" ".join(f"{forward}{reverse}" for forward, reverse in directions)
                     if directions is not None else f"read error: {error}")
             age = (f"{now - self.last_pwm_ack_at:.2f}s" if self.last_pwm_ack_at is not None else "none")
             print(f"Motors {mode}: applied={self.speeds}; GPIO IN1/IN2={pins}; "
-                  f"PWM ack age={age}; recovering={self.recovering}; fault={self.fault}",
+                  f"PWM ack age={age}; fault={self.fault}",
                   file=sys.stderr, flush=True)
             self.last_trace_at = now
             self.last_trace_state = state
 
     def _write_pwm(self, values):
-        """Return False if recovery stopped an interrupted motion command."""
-        try:
-            self.pwm.set_percentages(values)
-        except OSError as error:
-            self._recover_link(error)
-            return False
+        """Send once; communication failures propagate to the caller."""
+        self.pwm.set_percentages(values)
         self.last_pwm_ack_at = time.monotonic()
-        return True
-
-    def _recover_link(self, error):
-        # A write may have reached the ESP32 even if its acknowledgement was
-        # lost. Drop Pi directions immediately and retry ONLY all-zero frames.
-        # This also rearms an ESP32 that rebooted or tripped its watchdog.
-        self.recovering = True
-        now = time.monotonic()
-        self._direction_off()
-        self.stopped_at = [now] * MOTOR_COUNT
-        self.speeds = (0,) * MOTOR_COUNT
-        self.last_pwm_ack_at = None
-        self.pwm.ultrasonic_samples = (None, None, None)
-        self._record_outputs()
-        print(f"\nI2C interrupted; motors stopped, retrying: {error}", file=sys.stderr)
-        try:
-            for attempt in range(I2C_RECOVERY_ATTEMPTS):
-                self.link_notice = (f"I2C reconnecting ({attempt + 1}/{I2C_RECOVERY_ATTEMPTS}); "
-                                    "all motors stopped.")
-                time.sleep(min(I2C_RETRY_DELAY * 2 ** attempt, I2C_RETRY_MAX_DELAY))
-                try:
-                    self.pwm.set_percentages(self.speeds)
-                except OSError as retry_error:
-                    error = retry_error
-                else:
-                    self.last_pwm_ack_at = time.monotonic()
-                    self.link_notice = "I2C recovered; all motors stopped."
-                    print(self.link_notice, file=sys.stderr)
-                    return
-            failure = OSError(f"I2C recovery failed after {I2C_RECOVERY_ATTEMPTS} retries: {error}")
-            self._fail(failure)
-            raise failure from error
-        finally:
-            self.recovering = False
 
     def _fail(self, error):
         # Latch the error so a background heartbeat can never restart motion.
@@ -559,8 +540,7 @@ class MotorController:
                 if self.done.is_set():
                     return
                 try:
-                    if not self._write_pwm(tuple(abs(v) for v in self.speeds)):
-                        continue  # Recovered at zero; defer automatic control to the next heartbeat.
+                    self._write_pwm(tuple(abs(v) for v in self.speeds))
                     if self.depth_control is not None:
                         self._update_depth_control()
                     self._record_outputs()
@@ -597,13 +577,11 @@ class MotorController:
                     values[motor] = 0
         values = tuple(values)
         if values != self.speeds:
-            if self._set_speeds(values):
-                self.link_notice = ""
+            self._set_speeds(values)
 
     def set_speeds(self, values):
         """A manual command also exits automatic depth control."""
         with self.lock:
-            self.link_notice = ""
             self._set_speeds(values)
             self.depth_control = None
 
@@ -623,8 +601,7 @@ class MotorController:
                 if changed:
                     gated = tuple(0 if i in changed else abs(v) for i, v in enumerate(self.speeds))
                     # Confirm affected ENA/ENB outputs are zero before touching IN pins.
-                    if not self._write_pwm(gated):
-                        return False
+                    self._write_pwm(gated)
                     now = time.monotonic()
                     for i in changed:
                         if self.speeds[i] != 0:
@@ -641,14 +618,10 @@ class MotorController:
                             self.outputs[2 * i].on()
                         elif directions[i] < 0:
                             self.outputs[2 * i + 1].on()
-                # A nonzero frame may be applied even when its acknowledgement
-                # fails. Remember its direction before sending it so recovery
-                # still enforces the coast interval on the next reversal.
                 for i, direction in enumerate(directions):
                     if direction:
                         self.last_directions[i] = direction
-                if not self._write_pwm(tuple(abs(v) for v in values)):
-                    return False
+                self._write_pwm(tuple(abs(v) for v in values))
                 self.speeds = values
                 self._record_outputs()
                 return True
@@ -853,8 +826,7 @@ class MotorGui:
         self.status.set("Group speed copied. Click Apply to send it.")
 
     def apply(self):
-        if (self.auto_enabled.get() or self.busy or self.closing
-                or getattr(self.controller, "recovering", False) or self.controller.fault is not None):
+        if self.auto_enabled.get() or self.busy or self.closing or self.controller.fault is not None:
             return
         try:
             values = tuple(int(variable.get()) for variable in self.values)
@@ -866,8 +838,7 @@ class MotorGui:
         self.send(values)
 
     def toggle_auto(self):
-        if (self.busy or self.closing or getattr(self.controller, "recovering", False)
-                or self.controller.fault is not None):
+        if self.busy or self.closing or self.controller.fault is not None:
             self.auto_enabled.set(getattr(self.controller, "depth_control", None) is not None)
             return
         if not self.auto_enabled.get():
@@ -951,18 +922,14 @@ class MotorGui:
         if self.controller.fault is not None:
             self.auto_enabled.set(False)
             self.status.set(f"Motor link failed; directions disabled: {self.controller.fault}")
-        elif not self.closing and getattr(self.controller, "link_notice", ""):
-            self.status.set(self.controller.link_notice)
         elif self.auto_enabled.get() and not self.busy and not self.closing:
             self.status.set("Automatic control active: proportional speed over 3-10 cm; no good reading stops its pair.")
         self.update_distance()
         self.update_imu()
         output_problem = self.update_outputs()
-        if (output_problem and self.controller.fault is None and not self.busy
-                and not self.closing and not getattr(self.controller, "recovering", False)):
+        if output_problem and self.controller.fault is None and not self.busy and not self.closing:
             self.status.set(output_problem)
-        self.set_controls(not self.busy and not self.closing and self.controller.fault is None
-                          and not getattr(self.controller, "recovering", False))
+        self.set_controls(not self.busy and not self.closing and self.controller.fault is None)
         self.root.after(50, self.poll)
 
     def update_outputs(self):
@@ -996,8 +963,6 @@ class MotorGui:
     def distance_text(self, sample):
         if self.controller.fault is not None:
             text = "unavailable (motor link failed)"
-        elif getattr(self.controller, "recovering", False):
-            text = "unavailable (I2C reconnecting)"
         elif sample is None:
             text = "unavailable (waiting for sensor firmware)"
         else:
@@ -1102,6 +1067,9 @@ def main():
     parser.add_argument("--no-imu", action="store_true", help="disable SEN0140 polling in the GUI")
     parser.add_argument("--trace-motors", action="store_true",
                         help="log applied PWM, direction GPIO readback and acknowledgement age")
+    parser.add_argument("--pwm-map", type=parse_pwm_map, default=DEFAULT_PWM_MAP,
+                        metavar="C1,C2,C3,C4,C5,C6",
+                        help="ESP32 PWM channels for Pi motors 1-6 (default: 1,2,3,4,5,6)")
     parser.add_argument("--gpiochip", type=int, help="header GPIO chip index (default: detect by label)")
     parser.add_argument("--diagnose", action="store_true", help="inspect GPIO chips/pin owners without changing pins")
     args = parser.parse_args()
@@ -1134,7 +1102,11 @@ def main():
                 else:
                     from sen0140 import Sen0140
                 imu = Sen0140(bus)
-            controller = MotorController(I2CPwm(bus, i2c_msg, args.address),
+            if args.trace_motors or args.pwm_map != DEFAULT_PWM_MAP:
+                print("Motor PWM mapping: " + ", ".join(
+                    f"M{motor + 1}=ESP32 GPIO{PWM_GPIO_PINS[channel]} (channel {channel + 1})"
+                    for motor, channel in enumerate(args.pwm_map)))
+            controller = MotorController(I2CPwm(bus, i2c_msg, args.address, args.pwm_map),
                                          make_output_factory(pin_factory, DigitalOutputDevice),
                                          imu=imu, trace=args.trace_motors)
             try:
