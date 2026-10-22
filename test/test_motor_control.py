@@ -97,6 +97,45 @@ class ControllerTests(unittest.TestCase):
         self.assertIsNone(self.controller.fault)
         self.assertTrue(all(reading.error for reading in self.controller.imu.readings.values()))
 
+    def test_unexpected_imu_exception_stops_outputs_and_reports_worker_fault(self):
+        self.controller.set_speeds((100,) * 6)
+        self.controller.imu = Mock()
+        self.controller.imu.poll_next.side_effect = RuntimeError("IMU worker crashed")
+        with patch.object(self.controller.done, "wait", return_value=False):
+            self.controller._heartbeat()
+        self.assertIsInstance(self.controller.fault, RuntimeError)
+        self.assertIn("IMU worker crashed", str(self.controller.fault))
+        self.assertEqual(self.controller.speeds, (0,) * 6)
+        self.assertTrue(self.controller.done.is_set())
+        self.assertFalse(any(pin.value for pin in self.pins.values()))
+
+    def test_output_feedback_reads_gpio_rather_than_infer_it_from_requested_speed(self):
+        self.controller.set_speeds((100, 100, -50, -50, 0, 0))
+        speeds, directions, error = self.controller.output_sample
+        self.assertEqual(speeds, self.controller.speeds)
+        self.assertEqual(directions, ((1, 0), (1, 0), (0, 1), (0, 1), (0, 0), (0, 0)))
+        self.assertEqual(error, "")
+        self.pins[motors.DIRECTION_PINS[0][0]].off()
+        self.controller._record_outputs()
+        self.assertEqual(self.controller.output_sample[0][0], 100)
+        self.assertEqual(self.controller.output_sample[1][0], (0, 0))
+
+    def test_trace_contains_automatic_pwm_gpio_readback_and_ack_age(self):
+        import contextlib
+        import io
+
+        self.controller.enable_depth_control(motors.DepthControl())
+        self.pwm.ultrasonic_samples = ((self.clock.now, 1, 30),) * 3
+        self.controller.trace = True
+        output = io.StringIO()
+        with contextlib.redirect_stderr(output), \
+                patch.object(self.controller.done, "wait", side_effect=[False, True]):
+            self.controller._heartbeat()
+        self.assertIn("Motors auto: applied=(100, 100, 100, 100, 100, 100)", output.getvalue())
+        self.assertIn("GPIO IN1/IN2=10 10 10 10 10 10", output.getvalue())
+        self.assertIn("PWM ack age=0.00s", output.getvalue())
+        self.controller.trace = False
+
     def test_single_motor_change_keeps_five_running(self):
         self.controller.set_speeds((60,) * 6)
         self.events.clear()
@@ -290,6 +329,28 @@ class ControllerTests(unittest.TestCase):
         self.pwm.ultrasonic_samples = (None, None, (self.clock.now, 1, 30))
         self.controller._update_depth_control()
         self.assertEqual(self.controller.speeds, (0, 0, 0, 0, 50, 50))
+
+    def test_automatic_heartbeat_matches_manual_pwm_and_direction_outputs(self):
+        values = (100, 100, -50, -50, 20, 20)
+        self.controller.set_speeds(values)
+        manual_events = list(self.events)
+        manual_gpio = tuple(self.pins[pin].value for pair in motors.DIRECTION_PINS for pin in pair)
+        self.controller.set_speeds((0,) * 6)
+        self.clock.now += motors.REVERSE_PAUSE
+        self.controller.enable_depth_control(motors.DepthControl((100, -100, 100)))
+        self.events.clear()
+        self.pwm.ultrasonic_samples = ((self.clock.now, 1, 30),
+                                       (self.clock.now, 1, 65),
+                                       (self.clock.now, 1, 86))
+        with patch.object(self.controller.done, "wait", side_effect=[False, True]):
+            self.controller._heartbeat()
+        # The heartbeat first refreshes the previous (zero) command, then
+        # automatic mode must make the same GPIO/PWM changes as manual Apply.
+        self.assertEqual(self.events[1:], manual_events)
+        self.assertEqual(self.controller.speeds, values)
+        self.assertEqual(self.pwm.values, tuple(abs(value) for value in values))
+        self.assertEqual(tuple(self.pins[pin].value for pair in motors.DIRECTION_PINS for pin in pair),
+                         manual_gpio)
 
     def test_automatic_reversal_keeps_polling_without_blocking_and_rechecks_sensor(self):
         self.controller.set_speeds((-30, -30, 0, 0, 0, 0))

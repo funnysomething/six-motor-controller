@@ -174,6 +174,21 @@ class GuiTests(unittest.TestCase):
         self.assertTrue(all(str(widget.cget("state")) == "normal" for widget in self.app.controls))
         self.assertIsNone(self.controller.fault)
 
+    def test_output_feedback_flags_disabled_gpio_despite_positive_applied_pwm(self):
+        self.controller.speeds = (100,) * 6
+        self.controller.last_pwm_ack_at = time.monotonic()
+        self.controller.output_sample = ((100,) * 6, ((0, 0),) * 6, "")
+        self.wait_until(lambda: "GPIO feedback disagrees" in self.app.status.get())
+        self.assertIn("M1=00", self.app.output_status.get())
+        self.assertEqual([value.get() for value in self.app.applied], ["+100%"] * 6)
+
+    def test_stalled_motor_worker_feedback_warns_that_pwm_may_have_stopped(self):
+        self.controller.speeds = (100,) * 6
+        self.controller.output_sample = ((100,) * 6, ((1, 0),) * 6, "")
+        self.controller.last_pwm_ack_at = time.monotonic() - 2
+        self.wait_until(lambda: "Motor updates stale" in self.app.status.get())
+        self.assertIn("watchdog", self.app.status.get())
+
     def test_distance_updates_and_invalid_or_stale_readings_clear_value(self):
         self.controller.ultrasonic_sample = (time.monotonic(), 1, 1234)
         self.wait_until(lambda: "123.4 cm" in self.app.distance.get())

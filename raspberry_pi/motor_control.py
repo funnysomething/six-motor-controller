@@ -417,7 +417,7 @@ class DepthControl:
 class MotorController:
     """Serialize direction changes and heartbeat writes for all six motors."""
 
-    def __init__(self, pwm, output_factory, start_heartbeat=True, imu=None):
+    def __init__(self, pwm, output_factory, start_heartbeat=True, imu=None, trace=False):
         self.pwm = pwm
         self.imu = imu
         self.outputs = []
@@ -432,11 +432,17 @@ class MotorController:
         self.done = threading.Event()
         self.worker = None
         self.closed = False
+        self.trace = trace
+        self.last_pwm_ack_at = None
+        self.output_sample = None
+        self.last_trace_at = float("-inf")
+        self.last_trace_state = None
         try:
             for pair in DIRECTION_PINS:
                 for pin in pair:
                     self.outputs.append(output_factory(pin, initial_value=False))
             self._write_pwm(self.speeds)
+            self._record_outputs()
             if start_heartbeat:
                 self.worker = threading.Thread(target=self._heartbeat, daemon=True)
                 self.worker.start()
@@ -467,6 +473,30 @@ class MotorController:
     def ultrasonic_samples(self):
         return self.pwm.ultrasonic_samples
 
+    def _record_outputs(self):
+        """Cache actual direction readback on the hardware worker, never Tk."""
+        try:
+            directions = tuple((int(bool(self.outputs[2 * motor].value)),
+                                int(bool(self.outputs[2 * motor + 1].value)))
+                               for motor in range(MOTOR_COUNT))
+            error = ""
+        except Exception as read_error:
+            directions = None
+            error = str(read_error)
+        self.output_sample = (self.speeds, directions, error)
+        now = time.monotonic()
+        mode = "auto" if self.depth_control is not None else "manual"
+        state = (mode, self.output_sample, self.recovering, self.fault is not None)
+        if self.trace and (state != self.last_trace_state or now - self.last_trace_at >= 1):
+            pins = (" ".join(f"{forward}{reverse}" for forward, reverse in directions)
+                    if directions is not None else f"read error: {error}")
+            age = (f"{now - self.last_pwm_ack_at:.2f}s" if self.last_pwm_ack_at is not None else "none")
+            print(f"Motors {mode}: applied={self.speeds}; GPIO IN1/IN2={pins}; "
+                  f"PWM ack age={age}; recovering={self.recovering}; fault={self.fault}",
+                  file=sys.stderr, flush=True)
+            self.last_trace_at = now
+            self.last_trace_state = state
+
     def _write_pwm(self, values):
         """Return False if recovery stopped an interrupted motion command."""
         try:
@@ -474,6 +504,7 @@ class MotorController:
         except OSError as error:
             self._recover_link(error)
             return False
+        self.last_pwm_ack_at = time.monotonic()
         return True
 
     def _recover_link(self, error):
@@ -485,7 +516,9 @@ class MotorController:
         self._direction_off()
         self.stopped_at = [now] * MOTOR_COUNT
         self.speeds = (0,) * MOTOR_COUNT
+        self.last_pwm_ack_at = None
         self.pwm.ultrasonic_samples = (None, None, None)
+        self._record_outputs()
         print(f"\nI2C interrupted; motors stopped, retrying: {error}", file=sys.stderr)
         try:
             for attempt in range(I2C_RECOVERY_ATTEMPTS):
@@ -497,6 +530,7 @@ class MotorController:
                 except OSError as retry_error:
                     error = retry_error
                 else:
+                    self.last_pwm_ack_at = time.monotonic()
                     self.link_notice = "I2C recovered; all motors stopped."
                     print(self.link_notice, file=sys.stderr)
                     return
@@ -513,6 +547,7 @@ class MotorController:
         self.done.set()
         self._direction_off()
         self.speeds = (0,) * MOTOR_COUNT
+        self._record_outputs()
         try:
             self.pwm.set_percentages(self.speeds)
         except OSError:
@@ -528,15 +563,18 @@ class MotorController:
                         continue  # Recovered at zero; defer automatic control to the next heartbeat.
                     if self.depth_control is not None:
                         self._update_depth_control()
-                except OSError as error:
+                    self._record_outputs()
+                    if self.imu is not None:
+                        # Same worker and controller lock as PWM writes: no bus
+                        # transactions from Tk, and one IMU component per cycle.
+                        self.imu.poll_next()
+                except Exception as error:
+                    # Unexpected GPIO/IMU errors must not silently kill this
+                    # thread and leave the GUI showing a frozen nonzero speed.
                     if self.fault is None:
                         self._fail(error)
-                    print(f"\nMotor link failed; all directions disabled: {error}", file=sys.stderr)
+                    print(f"\nMotor worker failed; all directions disabled: {error}", file=sys.stderr)
                     return
-                if self.imu is not None:
-                    # Same worker and controller lock as PWM writes: no bus
-                    # transactions from Tk, and one IMU component per cycle.
-                    self.imu.poll_next()
 
     def enable_depth_control(self, settings):
         if not isinstance(settings, DepthControl):
@@ -612,6 +650,7 @@ class MotorController:
                 if not self._write_pwm(tuple(abs(v) for v in values)):
                     return False
                 self.speeds = values
+                self._record_outputs()
                 return True
             except BaseException as error:
                 if self.fault is None:
@@ -698,6 +737,7 @@ class MotorGui:
         self.group_value = tk.StringVar(root, value="0")
         self.applied = [tk.StringVar(root, value="0%") for _ in range(MOTOR_COUNT)]
         self.status = tk.StringVar(root, value="Ready. All motors stopped.")
+        self.output_status = tk.StringVar(root, value="Output feedback: waiting for motor controller...")
         self.distances = [tk.StringVar(root, value=f"Ultrasonic {sensor + 1}: waiting for ESP32...")
                           for sensor in range(3)]
         self.distance = self.distances[0]
@@ -769,6 +809,8 @@ class MotorGui:
             ttk.Label(frame, textvariable=variable, font=("TkDefaultFont", 14),
                       wraplength=580).grid(
                 row=13 + sensor, column=0, columnspan=4, sticky="w", pady=6)
+        ttk.Label(frame, textvariable=self.output_status, wraplength=580).grid(
+            row=16, column=0, columnspan=4, sticky="w", pady=(6, 0))
         auto_frame = ttk.LabelFrame(frame, text="Automatic depth control (3-10 cm)", padding=8)
         auto_frame.grid(row=2, column=4, rowspan=10, sticky="new", padx=(18, 0))
         self.auto_toggle = ttk.Checkbutton(auto_frame, text="Enable automatic control",
@@ -915,9 +957,33 @@ class MotorGui:
             self.status.set("Automatic control active: proportional speed over 3-10 cm; no good reading stops its pair.")
         self.update_distance()
         self.update_imu()
+        output_problem = self.update_outputs()
+        if (output_problem and self.controller.fault is None and not self.busy
+                and not self.closing and not getattr(self.controller, "recovering", False)):
+            self.status.set(output_problem)
         self.set_controls(not self.busy and not self.closing and self.controller.fault is None
                           and not getattr(self.controller, "recovering", False))
         self.root.after(50, self.poll)
+
+    def update_outputs(self):
+        sample = getattr(self.controller, "output_sample", None)
+        if sample is None:
+            return None
+        speeds, directions, error = sample
+        ack_at = getattr(self.controller, "last_pwm_ack_at", None)
+        age = time.monotonic() - ack_at if ack_at is not None else None
+        ack_text = f"{age:.1f} s ago" if age is not None else "unavailable"
+        pins = (" ".join(f"M{motor + 1}={forward}{reverse}"
+                         for motor, (forward, reverse) in enumerate(directions))
+                if directions is not None else f"read error: {error}")
+        self.output_status.set(f"PWM acknowledged: {ack_text}. Pi direction GPIO: {pins}\n"
+                               "10 = forward; 01 = reverse; 00 = stopped. Feedback does not measure rotation.")
+        if age is None or age > 1.0:
+            return "Motor updates stale; the ESP32 watchdog may have stopped PWM. Check terminal output."
+        expected = tuple((int(speed > 0), int(speed < 0)) for speed in speeds)
+        if directions is None or directions != expected:
+            return "Motor direction GPIO feedback disagrees with applied speeds. Check terminal output."
+        return None
 
     def update_distance(self):
         samples = getattr(self.controller, "ultrasonic_samples",
@@ -1034,6 +1100,8 @@ def main():
                         help="ESP32 7-bit I2C address (default: 0x32)")
     parser.add_argument("--gui", action="store_true", help="open the optional six-motor desktop GUI")
     parser.add_argument("--no-imu", action="store_true", help="disable SEN0140 polling in the GUI")
+    parser.add_argument("--trace-motors", action="store_true",
+                        help="log applied PWM, direction GPIO readback and acknowledgement age")
     parser.add_argument("--gpiochip", type=int, help="header GPIO chip index (default: detect by label)")
     parser.add_argument("--diagnose", action="store_true", help="inspect GPIO chips/pin owners without changing pins")
     args = parser.parse_args()
@@ -1068,7 +1136,7 @@ def main():
                 imu = Sen0140(bus)
             controller = MotorController(I2CPwm(bus, i2c_msg, args.address),
                                          make_output_factory(pin_factory, DigitalOutputDevice),
-                                         imu=imu)
+                                         imu=imu, trace=args.trace_motors)
             try:
                 if args.gui:
                     run_gui(controller)
