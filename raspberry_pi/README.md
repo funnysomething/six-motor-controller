@@ -127,7 +127,7 @@ Check **Enable automatic control** in the **Automatic depth control (3-10 cm)** 
 
 For a valid reading, speed decreases linearly from the pair's maximum at **3 cm** to **zero at 10 cm**: `speed = max_speed * clamp((10 - distance_cm) / 7, 0, 1)`, rounded to an integer percentage. With the default 100% maximum, 3 cm gives 100%, 6.5 cm gives 50%, and 10 cm gives 0%. Valid readings below 3 cm use the maximum; readings above 10 cm stop the pair. Each pair's **Max speed (%)** can be set before enabling; a negative value reverses the pair, and zero disables it.
 
-Missing sensors, waiting responses, no echo, invalid UART responses, out-of-range readings, or telemetry older than one second command **zero** for that pair. Fresh valid readings resume automatic control. The other pairs continue responding to their own sensors. Control runs in the background I2C heartbeat about every 0.2 seconds, with the existing reversal coast interval preserved. The first I2C read/write error or acknowledgement timeout stops all motors, exits automatic mode, and latches a fault requiring a program restart.
+Missing sensors, waiting responses, no echo, invalid UART responses, out-of-range readings, or telemetry older than one second command **zero** for that pair. Fresh valid readings resume automatic control. The other pairs continue responding to their own sensors. Control runs in the background I2C heartbeat about every 0.2 seconds, with the existing reversal coast interval preserved. An I2C interruption stops all motors while the controller retries the connection. Automatic control resumes only from fresh sensor telemetry after recovery; exhausted retries latch a fault and require restarting the program.
 
 Enabling automatic mode first stops any manually running motors. Manual speed editing is disabled while automatic control is active; **Last applied** continues showing actual commanded speeds. Uncheck the option or press **STOP ALL** / Escape to leave automatic mode and stop all six motors. Closing the GUI also stops all motors. Copy the updated `motor_control.py` to the Pi to use this mode; existing three-sensor firmware needs no changes.
 
@@ -162,13 +162,13 @@ The Pi script supports `--pwm-map C1,C2,C3,C4,C5,C6` to correct a confirmed orde
 | 5 | 17 |
 | 6 | 18 |
 
-The default is `--pwm-map 1,2,3,4,5,6`. Every channel must appear exactly once. For example, **only if wire tracing confirms** that Pi motors 1-6 use ESP32 GPIOs 12,16,17,18,4,13 respectively, run:
+The confirmed default is **`4,5,6,1,2,3`**, which connects logical Pi motors 1-6 to ESP32 GPIOs **16,17,18,4,13,12** respectively. Run normally without an override:
 
 ```sh
-python3 ~/motor_control.py --gui --trace-motors --pwm-map 3,4,5,6,1,2
+python3 ~/motor_control.py --gui
 ```
 
-The mapping applies to manual control, automatic pairs, heartbeat, reversals, and stop commands. Status acknowledgement is checked against the mapped PWM frame. The GUI still uses Pi motor order. A map changes channel assignment; it cannot correct enable wires that are electrically connected to each other.
+Use `--pwm-map` only to override this default for different wiring; every channel must appear exactly once. The mapping applies to manual control, automatic pairs, heartbeat, reversals, and stop commands. Status acknowledgement is checked against the mapped PWM frame. The GUI still uses Pi motor order. A map changes channel assignment; it cannot correct enable wires that are electrically connected to each other.
 
 ### SEN0140 V2 IMU readings
 
@@ -190,11 +190,13 @@ Speeds are integers from -100 to 100. The controller automatically disables the 
 
 Startup requires an acknowledged all-zero PWM command. A background thread refreshes the six-channel command every 0.2 seconds even while the prompt waits. Quit, Ctrl+C, EOF, SIGTERM and SSH hangup attempt to stop and release GPIO resources.
 
-### I2C failure behavior
+### I2C retries and recovery
 
-Each PWM command is sent once. The existing acknowledgement polling checks for a matching applied status for up to 0.3 seconds; it does not resend the command. There are no reconnect attempts or retry delays, including during startup and shutdown.
+An I2C read/write error or applied-status timeout immediately lowers all twelve Pi direction outputs and clears cached ultrasonic readings. The controller then makes up to **five recovery attempts**, sending only all-zero PWM commands, with delays of **0.1, 0.2, 0.4, 0.5, and 0.5 seconds** before the attempts. Each command still requires a matching acknowledgement within 0.3 seconds. Startup and shutdown zero commands use the same retry path. Invalid user input is not retried.
 
-On the first I2C read/write error or applied-status timeout, the Pi lowers all twelve direction outputs, exits automatic mode, latches a fault, and makes one best-effort all-zero PWM command. The failed motion command is not retried. Further motion is refused until the program is restarted, and the GUI displays the failure while disabling motion controls. The ESP32's one-second watchdog independently disables PWM if commands stop arriving.
+The GUI stays responsive and shows **I2C reconnecting** while motion controls are disabled. A successful acknowledged zero command restores the link without restarting the app and rearms an ESP32 that rebooted or tripped its one-second watchdog. Interrupted manual commands are discarded: all motors stay stopped until you click Apply again. Automatic mode remains enabled and resumes on a later heartbeat only when fresh valid sensor telemetry supports motion. A pending STOP exits automatic mode and takes priority over further motion commands.
+
+If all five recovery attempts fail, the Pi latches a fault, keeps directions disabled, makes a final best-effort zero command, and refuses further motion until the program is restarted. The ESP32's one-second watchdog independently disables PWM if commands stop arriving.
 
 Only one process should own the motor outputs. For control from a vision/navigation program, import `I2CPwm` and `MotorController`; call `set_speeds` with six signed percentages, or `set_motor` with a motor number (1-6) and speed. Always call `close()` in `finally` before closing the I2C bus.
 

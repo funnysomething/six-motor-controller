@@ -11,12 +11,14 @@ Pi numbers in the code are **BCM GPIO numbers**, not physical header positions. 
 
 | Motor | L298N module/channel | ESP32 PWM GPIO | Pi forward input GPIO (physical pin) | Pi reverse input GPIO (physical pin) |
 | --- | --- | --- | --- | --- |
-| 1 | Module 1, A: ENA / IN1 / IN2 | 4 | 26 (37) | 19 (35) |
-| 2 | Module 1, B: ENB / IN3 / IN4 | 13 | 13 (33) | 6 (31) |
-| 3 | Module 2, A: ENA / IN1 / IN2 | 12 | 5 (29) | 11 (23) |
-| 4 | Module 2, B: ENB / IN3 / IN4 | 16 | 9 (21) | 10 (19) |
-| 5 | Module 3, A: ENA / IN1 / IN2 | 17 | 22 (15) | 27 (13) |
-| 6 | Module 3, B: ENB / IN3 / IN4 | 18 | 17 (11) | 4 (7) |
+| 1 | Module 1, A: ENA / IN1 / IN2 | 16 | 26 (37) | 19 (35) |
+| 2 | Module 1, B: ENB / IN3 / IN4 | 17 | 13 (33) | 6 (31) |
+| 3 | Module 2, A: ENA / IN1 / IN2 | 18 | 5 (29) | 11 (23) |
+| 4 | Module 2, B: ENB / IN3 / IN4 | 4 | 9 (21) | 10 (19) |
+| 5 | Module 3, A: ENA / IN1 / IN2 | 13 | 22 (15) | 27 (13) |
+| 6 | Module 3, B: ENB / IN3 / IN4 | 12 | 17 (11) | 4 (7) |
+
+The table uses the confirmed wiring. The Pi defaults to PWM channel map **4,5,6,1,2,3** for logical Motors 1-6; firmware channels 1-6 remain ESP32 GPIOs 4,13,12,16,17,18. No command-line override or firmware change is needed for this mapping.
 
 **Diagram assumption:** all four direction inputs on module 3 are labeled Motor6 in the Pi screenshot. This implementation assigns its IN1/IN2 pair to Motor5 and IN3/IN4 to Motor6, consistent with the other two modules. If wired oppositely, swap the last two pairs in `DIRECTION_PINS` in `raspberry_pi/motor_control.py`.
 
@@ -92,7 +94,7 @@ Values are integer percentages from -100 to 100. Positive raises the forward inp
 
 Before changing a motor's direction, the Pi requests zero PWM for the affected channels and waits for matching applied-status acknowledgement. It then lowers those direction inputs, waits the remaining part of a 0.5-second coast interval if reversing, selects the new direction, and sends the new six-channel PWM frame. Unaffected motors retain their settings. A 0.5-second interval is not a measurement of mechanical stopping time.
 
-The Pi refreshes PWM every 0.2 seconds while waiting for commands. The ESP32 starts disabled and disables all PWM if no valid command arrives for one second. After reset or timeout it rejects nonzero commands until receiving an all-zero frame. The first I2C error or acknowledgement timeout immediately lowers all direction outputs, exits automatic mode, and latches a fault requiring a controller restart. There are no communication recovery retries; the Pi makes one best-effort all-zero command after the failure. See [I2C failure behavior](raspberry_pi/README.md#i2c-failure-behavior). Quit, Ctrl+C, EOF, SIGTERM and SSH hangup attempt a stop and release the GPIOs. A stop coasts rather than brakes.
+The Pi refreshes PWM every 0.2 seconds while waiting for commands. The ESP32 starts disabled and disables all PWM if no valid command arrives for one second. After reset or timeout it rejects nonzero commands until receiving an all-zero frame. On an I2C error or acknowledgement timeout, the Pi immediately lowers all direction outputs and makes up to five recovery attempts using only all-zero frames. A successful recovery keeps the app running: manual commands must be applied again, while automatic depth control resumes from fresh sensor telemetry. Only exhausted retries latch a fault requiring a controller restart. See [I2C retries and recovery](raspberry_pi/README.md#i2c-retries-and-recovery). Quit, Ctrl+C, EOF, SIGTERM and SSH hangup attempt a stop and release the GPIOs. A stop coasts rather than brakes.
 
 Only run one motor controller at a time. Use the `MotorController.set_speeds((m1, m2, m3, m4, m5, m6))` API for coordinated control from another Pi program, and call `close()` in `finally` when finished.
 
@@ -102,8 +104,10 @@ The Pi uses raw `smbus2.i2c_rdwr` write and read operations with STOP between th
 
 | Frame | Bytes in order |
 | --- | --- |
-| Command, 13 bytes | `0xA5`, version `1`, 32-bit little-endian sequence, six percentages `0..100` in Motor1-6 order, XOR of the preceding 12 bytes |
+| Command, 13 bytes | `0xA5`, version `1`, 32-bit little-endian sequence, six percentages `0..100` in ESP32 PWM-channel order, XOR of the preceding 12 bytes |
 | Status, 14 bytes | `0x5A`, version `1`, applied sequence, flags, six applied percentages, XOR of the preceding 13 bytes |
+
+PWM-channel order on the wire is ESP32 GPIOs 4,13,12,16,17,18. The Pi reorders logical motor commands using its default map 4,5,6,1,2,3 and validates acknowledgements against those reordered values. GUI and terminal motor numbers stay in the direction-pin order shown above.
 
 The updated firmware appends a five-byte ultrasonic extension to status, giving 19 bytes total. Byte 14 is `0xD1`; byte 15 is sensor state `0` waiting, `1` valid, `2` no underwater echo/outside 2-300 cm, or `3` no valid UART reply before timeout. Bytes 16-17 hold unsigned little-endian distance in millimeters, zero when invalid. Byte 18 is the XOR of bytes 0-17. The original motor prefix and its checksum are unchanged. The Pi validates the motor acknowledgement before caching the extension, and a missing or corrupt extension cannot acknowledge an invalid motor frame. Older firmware can still acknowledge motors; the GUI reports sensor firmware unavailable. Cached readings expire after one second without valid telemetry.
 

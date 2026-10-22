@@ -24,12 +24,14 @@ class FakePwm:
         self.events = events
         self.values = (0,) * 6
         self.fail_next = False
+        self.failures_remaining = 0
         self.ultrasonic_samples = (None, None, None)
 
     def set_percentages(self, values):
         self.events.append(("pwm", tuple(values)))
-        if self.fail_next:
+        if self.fail_next or self.failures_remaining:
             self.fail_next = False
+            self.failures_remaining = max(0, self.failures_remaining - 1)
             raise OSError("link lost")
         self.values = tuple(values)
 
@@ -174,7 +176,7 @@ class ControllerTests(unittest.TestCase):
     def test_link_failure_disables_directions_and_latches_fault(self):
         self.controller.set_speeds((60,) * 6)
         self.events.clear()
-        self.pwm.fail_next = True
+        self.pwm.failures_remaining = motors.I2C_RECOVERY_ATTEMPTS + 1
         with self.assertRaises(OSError):
             self.controller.set_speeds((-60,) * 6)
         self.assertFalse(any(pin.value for pin in self.pins.values()))
@@ -183,7 +185,6 @@ class ControllerTests(unittest.TestCase):
         self.assertIsNotNone(self.controller.fault)
         with self.assertRaises(OSError):
             self.controller.set_speeds((60,) * 6)
-
     def test_interrupted_reversal_disables_all_motors(self):
         self.controller.set_speeds((60,) * 6)
         with patch.object(self.clock, "sleep", side_effect=KeyboardInterrupt):
@@ -194,19 +195,11 @@ class ControllerTests(unittest.TestCase):
 
     def test_heartbeat_failure_stops_outputs(self):
         self.controller.set_speeds((60,) * 6)
-        self.events.clear()
-        self.pwm.fail_next = True
+        self.pwm.failures_remaining = motors.I2C_RECOVERY_ATTEMPTS + 1
         with patch.object(self.controller.done, "wait", return_value=False):
             self.controller._heartbeat()
         self.assertTrue(self.controller.done.is_set())
         self.assertFalse(any(pin.value for pin in self.pins.values()))
-        # One failed motion write, followed only by the best-effort safe stop.
-        self.assertEqual([event for event in self.events if event[0] == "pwm"],
-                         [("pwm", (60,) * 6), ("pwm", (0,) * 6)])
-        self.assertEqual(self.clock.pauses, [])
-        with self.assertRaises(OSError):
-            self.controller.set_speeds((60,) * 6)
-
     def test_close_disables_pwm_and_releases_pins(self):
         self.controller.set_speeds((60,) * 6)
         self.controller.close()
@@ -221,19 +214,17 @@ class ControllerTests(unittest.TestCase):
 
     def test_close_failure_still_releases_direction_pins(self):
         self.controller.set_speeds((60,) * 6)
-        self.pwm.fail_next = True
+        self.pwm.failures_remaining = motors.I2C_RECOVERY_ATTEMPTS + 1
         with self.assertRaises(OSError):
             self.controller.close()
         self.assertTrue(all(pin.closed and not pin.value for pin in self.pins.values()))
-
     def test_startup_requires_zero_ack_before_starting_heartbeat(self):
-        self.pwm.fail_next = True
+        self.pwm.failures_remaining = motors.I2C_RECOVERY_ATTEMPTS + 1
         self.events.clear()
         with self.assertRaises(OSError):
             motors.MotorController(self.pwm, self.pins[26].__class__)
         self.assertFalse(any(event[0] == "on" for event in self.events))
         self.assertTrue(all(pin.closed and not pin.value for pin in self.pins.values()))
-
     def test_automatic_pairs_follow_independent_sensors_and_stop_on_bad_readings(self):
         self.controller.set_speeds((80,) * 6)
         settings = motors.DepthControl((100, -80, 50))
@@ -305,12 +296,92 @@ class ControllerTests(unittest.TestCase):
         self.controller.set_speeds((0,) * 6)
         self.assertIsNone(self.controller.depth_control)
         self.controller.enable_depth_control(settings)
-        self.pwm.fail_next = True
+        self.pwm.failures_remaining = motors.I2C_RECOVERY_ATTEMPTS + 1
         with patch.object(self.controller.done, "wait", return_value=False):
             self.controller._heartbeat()
         self.assertIsNone(self.controller.depth_control)
         self.assertEqual(self.controller.speeds, (0,) * 6)
         self.assertFalse(any(pin.value for pin in self.pins.values()))
+
+    def test_automatic_control_waits_for_fresh_readings_after_reconnect(self):
+        settings = motors.DepthControl()
+        self.controller.enable_depth_control(settings)
+        self.pwm.ultrasonic_samples = ((self.clock.now, 1, 30),) * 3
+        self.controller._update_depth_control()
+        self.assertEqual(self.controller.speeds, (100,) * 6)
+        self.pwm.fail_next = True
+        with patch.object(self.controller.done, "wait", side_effect=[False, True]):
+            self.controller._heartbeat()
+        self.assertIs(self.controller.depth_control, settings)
+        self.controller._update_depth_control()
+        self.assertEqual(self.controller.speeds, (0,) * 6)
+        self.pwm.ultrasonic_samples = ((self.clock.now, 1, 65), None, (self.clock.now, 3, 0))
+        with patch.object(self.controller.done, "wait", side_effect=[False, True]):
+            self.controller._heartbeat()
+        self.assertEqual(self.controller.speeds, (50, 50, 0, 0, 0, 0))
+        self.assertIsNone(self.controller.fault)
+
+
+    def test_interrupted_direction_change_recovers_without_replaying_motion(self):
+        self.controller.set_speeds((60,) * 6)
+        self.events.clear()
+        self.pwm.fail_next = True
+        self.controller.set_speeds((-60,) * 6)
+        self.assertIsNone(self.controller.fault)
+        self.assertEqual(self.controller.speeds, (0,) * 6)
+        self.assertFalse(any(event[0] == "on" for event in self.events))
+        self.assertEqual(self.pwm.values, (0,) * 6)
+
+
+    def test_lost_final_ack_remembers_direction_and_coasts_after_recovery(self):
+        with patch.object(self.pwm, "set_percentages", side_effect=[None, OSError("lost ack"), None]):
+            self.controller.set_speeds((60,) * 6)
+        self.assertIsNone(self.controller.fault)
+        self.assertEqual(self.controller.speeds, (0,) * 6)
+        self.assertFalse(any(pin.value for pin in self.pins.values()))
+        self.controller.set_speeds((-60,) * 6)
+        self.assertAlmostEqual(self.clock.pauses[-1], 0.4)
+        self.assertEqual(self.controller.speeds, (-60,) * 6)
+
+
+    def test_startup_transient_disconnect_retries_before_becoming_ready(self):
+        self.controller.close()
+        self.pwm.fail_next = True
+        controller = motors.MotorController(self.pwm, self.pins[26].__class__, start_heartbeat=False)
+        self.addCleanup(controller.close)
+        self.assertIsNone(controller.fault)
+        self.assertEqual(controller.speeds, (0,) * 6)
+        self.assertFalse(any(pin.value for pin in self.pins.values()))
+
+
+    def test_transient_heartbeat_disconnect_retries_zero_and_preserves_controller(self):
+        self.controller.set_speeds((60,) * 6)
+        self.events.clear()
+        self.pwm.ultrasonic_samples = ((self.clock.now, 1, 30),) * 3
+        self.pwm.failures_remaining = 3
+        original_write = self.pwm.set_percentages
+
+        def check_retry(values):
+            if self.controller.recovering:
+                self.assertFalse(any(pin.value for pin in self.pins.values()))
+                self.assertEqual(values, (0,) * 6)
+            original_write(values)
+
+        with patch.object(self.pwm, "set_percentages", side_effect=check_retry), \
+                patch.object(self.controller.done, "wait", side_effect=[False, True]):
+            self.controller._heartbeat()
+        self.assertIsNone(self.controller.fault)
+        self.assertFalse(self.controller.done.is_set())
+        self.assertFalse(self.controller.recovering)
+        self.assertEqual(self.controller.speeds, (0,) * 6)
+        self.assertEqual(self.controller.ultrasonic_samples, (None,) * 3)
+        self.assertEqual([event[1] for event in self.events if event[0] == "pwm"],
+                         [(60,) * 6, (0,) * 6, (0,) * 6, (0,) * 6])
+        self.assertEqual(self.clock.pauses, [0.1, 0.2, 0.4])
+        self.assertIn("recovered", self.controller.link_notice)
+        self.controller.set_speeds((40,) * 6)
+        self.assertEqual(self.controller.speeds, (40,) * 6)
+        self.assertEqual(self.controller.link_notice, "")
 
 
 class DepthControlTests(unittest.TestCase):
@@ -396,13 +467,67 @@ class ProtocolTests(unittest.TestCase):
 
     def test_one_raw_frame_contains_all_six_channels(self):
         bus = Bus()
-        pwm = motors.I2CPwm(bus, Message)
+        pwm = motors.I2CPwm(bus, Message, channel_map=tuple(range(6)))
         pwm.sequence = 0x12345677
         pwm.set_percentages((0, 20, 40, 60, 80, 100))
         frame = bus.frames[0]
         self.assertEqual(frame[:12], b"\xa5\x01\x78\x56\x34\x12\x00\x14\x28\x3c\x50\x64")
         self.assertEqual(len(frame), 13)
         self.assertEqual(frame[12], motors.checksum(frame[:12]))
+
+    def test_confirmed_default_map_routes_each_motor_independently(self):
+        self.assertEqual(motors.DEFAULT_PWM_MAP, (3, 4, 5, 0, 1, 2))
+        bus = Bus()
+        pwm = motors.I2CPwm(bus, Message)
+        for motor, channel in enumerate((3, 4, 5, 0, 1, 2)):
+            values = [0] * 6
+            values[motor] = 100
+            pwm.set_percentages(values)
+            expected = bytearray(6)
+            expected[channel] = 100
+            self.assertEqual(bus.frames[-1][6:12], expected)
+        self.assertEqual(motors.parse_pwm_map("4,5,6,1,2,3"), pwm.channel_map)
+        # Permutation validation must not assume the default itself is sorted.
+        self.assertEqual(motors.parse_pwm_map("1,2,3,4,5,6"), tuple(range(6)))
+        motors.I2CPwm(bus, Message, channel_map=tuple(range(6)))
+
+    def test_automatic_pair_mapping_survives_i2c_reconnection(self):
+        class SensorBus(Bus):
+            fail_next = False
+
+            def i2c_rdwr(self, message):
+                if self.fail_next:
+                    self.fail_next = False
+                    raise OSError("disconnected")
+                super().i2c_rdwr(message)
+                if message.is_read:
+                    for sensor, mm in enumerate((30, 65, 100)):
+                        block = bytes((0xD1 + sensor, 1)) + mm.to_bytes(2, "little")
+                        check = motors.checksum(bytes(message) + block if sensor == 0 else block)
+                        message.extend(block + bytes((check,)))
+
+        bus = SensorBus()
+        controller = motors.MotorController(motors.I2CPwm(bus, Message),
+                                             lambda *args, **kwargs: Mock(), start_heartbeat=False)
+        self.addCleanup(controller.close)
+        controller.enable_depth_control(motors.DepthControl())
+
+        def heartbeat():
+            with patch.object(controller.done, "wait", side_effect=[False, True]):
+                controller._heartbeat()
+
+        heartbeat()
+        self.assertEqual(controller.speeds, (100, 100, 50, 50, 0, 0))
+        self.assertEqual(bus.frames[-1][6:12], bytes((50, 0, 0, 100, 100, 50)))
+        bus.fail_next = True
+        heartbeat()
+        self.assertIsNone(controller.fault)
+        self.assertIsNotNone(controller.depth_control)
+        self.assertEqual(controller.speeds, (0,) * 6)
+        self.assertEqual(bus.frames[-1][6:12], bytes(6))
+        heartbeat()
+        self.assertEqual(controller.speeds, (100, 100, 50, 50, 0, 0))
+        self.assertEqual(bus.frames[-1][6:12], bytes((50, 0, 0, 100, 100, 50)))
 
     def test_pwm_map_routes_each_motor_to_its_enable_and_validates_wire_order_ack(self):
         bus = Bus()
@@ -617,6 +742,65 @@ class ProtocolTests(unittest.TestCase):
         self.assertEqual(motors.parse_command(" S "), ("s", ()))
         for text in ("m", "m 7 60", "m 60 60 60", "m 101", "m x", "m 1 3.5"):
             self.assertIsNone(motors.parse_command(text), text)
+
+
+    def test_controller_recovers_from_read_and_write_oserrors(self):
+        class DisconnectBus(Bus):
+            failures = 0
+            fail_reads = False
+
+            def i2c_rdwr(self, message):
+                if message.is_read == self.fail_reads and self.failures:
+                    self.failures -= 1
+                    raise OSError(121, "Remote I/O error")
+                super().i2c_rdwr(message)
+
+        for fail_reads in (False, True):
+            with self.subTest(fail_reads=fail_reads):
+                bus = DisconnectBus()
+                controller = motors.MotorController(motors.I2CPwm(bus, Message),
+                                                     lambda *args, **kwargs: Mock(),
+                                                     start_heartbeat=False)
+                self.addCleanup(controller.close)
+                controller.set_speeds((60,) * 6)
+                bus.fail_reads = fail_reads
+                bus.failures = 3
+                with patch.object(controller.done, "wait", side_effect=[False, True]):
+                    controller._heartbeat()
+                self.assertIsNone(controller.fault)
+                self.assertFalse(controller.done.is_set())
+                self.assertEqual(controller.speeds, (0,) * 6)
+                self.assertEqual(bus.frames[-1][6:12], bytes(6))
+                controller.set_speeds((40,) * 6)
+                self.assertEqual(controller.speeds, (40,) * 6)
+
+
+    def test_watchdog_or_reboot_ack_timeout_recovers_with_zero_before_motion(self):
+        class RebootBus(Bus):
+            rebooted = False
+
+            def i2c_rdwr(self, message):
+                if not message.is_read and message[6:12] == bytes(6):
+                    self.rebooted = False
+                super().i2c_rdwr(message)
+                if message.is_read and self.rebooted:
+                    message[6] = 3
+                    message[13] = motors.checksum(message[:13])
+
+        bus = RebootBus()
+        controller = motors.MotorController(motors.I2CPwm(bus, Message),
+                                             lambda *args, **kwargs: Mock(), start_heartbeat=False)
+        self.addCleanup(controller.close)
+        controller.set_speeds((60,) * 6)
+        bus.rebooted = True
+        with patch.object(controller.done, "wait", side_effect=[False, True]):
+            controller._heartbeat()
+        self.assertIsNone(controller.fault)
+        self.assertFalse(bus.rebooted)
+        self.assertEqual(controller.speeds, (0,) * 6)
+        self.assertEqual(bus.frames[-1][6:12], bytes(6))
+        controller.set_speeds((30,) * 6)
+        self.assertEqual(controller.speeds, (30,) * 6)
 
 
 if __name__ == "__main__":

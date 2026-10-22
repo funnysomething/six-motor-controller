@@ -279,5 +279,21 @@ class GuiTests(unittest.TestCase):
         self.assertTrue(self.app.closing)
 
 
+    def test_reconnecting_status_disables_motion_then_recovers_without_restart(self):
+        self.controller.ultrasonic_samples = ((time.monotonic(), 1, 30),) * 3
+        self.controller.recovering = True
+        self.controller.link_notice = "I2C reconnecting (1/5); all motors stopped."
+        self.wait_until(lambda: "reconnecting" in self.app.status.get())
+        self.assertTrue(all(str(widget.cget("state")) == "disabled" for widget in self.app.controls))
+        self.assertTrue(all("reconnecting" in variable.get() for variable in self.app.distances))
+        self.app.apply()
+        self.assertEqual(self.controller.calls, [])
+        self.controller.recovering = False
+        self.controller.link_notice = "I2C recovered; all motors stopped."
+        self.wait_until(lambda: "recovered" in self.app.status.get())
+        self.assertTrue(all(str(widget.cget("state")) == "normal" for widget in self.app.controls))
+        self.assertIsNone(self.controller.fault)
+
+
 if __name__ == "__main__":
     unittest.main()
