@@ -4,6 +4,7 @@ import threading
 import time
 import unittest
 from unittest.mock import patch
+from types import SimpleNamespace
 
 from raspberry_pi.motor_control import MotorGui
 from raspberry_pi.sen0140 import ImuReading, Sen0140
@@ -75,6 +76,51 @@ class GuiTests(unittest.TestCase):
         self.wait_until(lambda: not self.app.busy)
         self.assertEqual(self.controller.speeds, (-45,) * 6)
         self.assertEqual([v.get() for v in self.app.applied], ["-45%"] * 6)
+
+    def attach_camera(self):
+        from unittest.mock import Mock
+        camera = SimpleNamespace(running=True, stopping_at=None, status="YOLO11n PyTorch / Pi CPU",
+                                 latest=None, start=Mock(), stop=Mock(), poll=Mock())
+        self.app.camera = camera
+        self.app.tabs.select(self.app.camera_tab)
+        return camera
+
+    def test_camera_preview_displays_real_pixels_without_commanding_motors(self):
+        camera = self.attach_camera()
+        camera.latest = (time.monotonic(), {"image": b"P6\n1 1\n255\n\xff\x00\x00"})
+        self.app.update_camera()
+        self.assertEqual(self.app.camera_image.get(0, 0), (255, 0, 0))
+        self.assertEqual(self.controller.calls, [])
+        self.assertIn("Pi CPU", self.app.camera_status.get())
+
+    def test_camera_error_keeps_manual_motion_and_stop_available(self):
+        camera = self.attach_camera()
+        camera.running = False
+        camera.status = "Camera failed: unplugged"
+        self.app.update_camera()
+        self.assertIn("unplugged", self.app.camera_status.get())
+        self.app.values[0].set(40)
+        self.app.apply()
+        self.wait_until(lambda: not self.app.busy)
+        self.assertEqual(self.controller.speeds, (40, 0, 0, 0, 0, 0))
+        self.app.stop()
+        self.wait_until(lambda: not self.app.busy)
+        self.assertEqual(self.controller.speeds, (0,) * 6)
+
+    def test_stale_camera_frame_is_cleared_without_changing_motor_settings(self):
+        camera = self.attach_camera()
+        camera.latest = (time.monotonic() - 4, {"image": b"old frame"})
+        self.controller.speeds = (50,) * 6
+        self.app.update_camera()
+        self.assertIn("stale", self.app.camera_status.get())
+        self.assertIsNone(self.app.camera_image)
+        self.assertEqual(self.controller.speeds, (50,) * 6)
+
+    def test_closing_gui_requests_camera_stop(self):
+        camera = self.attach_camera()
+        with patch.object(self.root, "destroy"):
+            self.app.close()
+        camera.stop.assert_called_once()
 
     def test_invalid_input_never_reaches_hardware(self):
         for value in ("oops", "101", "1.5", ""):

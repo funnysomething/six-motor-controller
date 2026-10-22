@@ -113,6 +113,66 @@ Use the six sliders or number boxes to select signed speeds, then click **Apply 
 
 The GUI keeps responding during I2C transactions and reversal pauses, and shows link failures while disabling further motion controls. Sliders only edit the pending speeds; they do not start motors until Apply is clicked. Bus/address options still work with `--gui`. Run it on the Pi's desktop or through SSH with X forwarding; an ordinary headless SSH session can use the default terminal mode. Only run one controller at a time.
 
+#### Camera detection in the motor GUI
+
+Use the updated `motor_control.py`, `camera_control.py` and `sen0140.py` from the
+same checkout. Keep the full repository on the Pi so the trained model and vision
+environments can be found. From the repo root, run:
+
+```sh
+sudo apt install python3-tk python3-gpiozero python3-lgpio python3-smbus2
+python3 raspberry_pi/motor_control.py --gui
+```
+
+The **Testudo camera** tab starts detection automatically, with a live preview,
+boxes, confidence and the active inference backend. **Motors and sensors** retains
+the motor, ultrasonic and IMU controls. **STOP ALL MOTORS** stays visible on both
+tabs. Camera detection does not command motors. **Start camera** and **Stop camera**
+operate independently of motor controls; closing the GUI stops both.
+
+Automatic selection uses the camera's AI processor when
+`testudo_training/runs/testudo_imx500/weights/best_imx_model/` contains
+`packerOut.zip` and `labels.txt`. Otherwise it runs the trained
+`testudo_training/runs/testudo_imx500/weights/best.pt` on the **Pi CPU**. This is the
+same trained YOLO11n model; a `.pt` file cannot run directly on the camera chip.
+The GUI shows which backend is active. No conversion or retraining runs at GUI
+startup. To require camera-side inference and report a missing export:
+
+```sh
+python3 raspberry_pi/motor_control.py --gui --camera-backend imx500
+```
+
+To use the checkpoint directly, including when it is in another directory:
+
+```sh
+python3 raspberry_pi/motor_control.py --gui \
+  --camera-model testudo_training/runs/testudo_imx500/weights/best.pt
+```
+
+`--camera-model` also accepts a complete IMX500 or NCNN export directory. Use
+`--camera-backend ncnn` to select the existing `best_ncnn_model` export beside
+`best.pt`. The NCNN input size comes from its metadata; PyTorch uses the training
+size of 640. `--camera-conf 0.4` adjusts confidence and `--camera-fps 16` requests
+camera FPS; actual processing speed needs measurement on the Pi.
+
+The camera worker automatically selects `.venv-imx500` for camera AI or
+`.venv-pi4`/`.venv` for CPU detection. PyTorch prefers `.venv-pi4-cpu` when its
+`vision-ready.txt` validation marker exists. `--camera-python /path/to/bin/python`
+overrides this choice. If no matching repo environment exists, it uses the GUI's
+Python interpreter. Camera/native libraries are imported only in that separate
+process; a model-load failure, missing camera or native crash is reported in the
+camera tab without stopping the motor GUI. A stale preview is cleared after three
+seconds without frames. Motor shutdown completes before waiting for camera cleanup.
+
+For initial CPU setup, use [the Pi CPU setup instructions](../scripts/vision/README.md#raspberry-pi-cpu-detection).
+For camera AI dependencies and conversion, use [the IMX500 workflow](../testudo_training/IMX500.md).
+Only one program can own the camera; close standalone camera previews before
+starting this GUI. Use `--no-camera` for a motor-only GUI with no camera imports
+or processes. If you run a copied script outside the repo, copy `camera_control.py`
+alongside it and specify both `--camera-model` and `--camera-python` explicitly.
+Camera loading and simultaneous motor/camera operation still require Pi hardware
+testing; local tests use simulated devices.
+
 The GUI shows **Ultrasonic 1**, **Ultrasonic 2**, and **Ultrasonic 3** using the same I2C heartbeat, including when motors are stopped. Sensor 1 uses ESP32 RX0/GPIO3 and TX0/GPIO1; sensor 2 uses ESP32 RX/GPIO21 and TX/GPIO19; sensor 3 uses ESP32 RX/GPIO25 and TX/GPIO26. Connect each sensor TX to its ESP32 RX, and sensor RX to ESP32 TX, with the voltage translation described in the main wiring guide. Each reading independently shows centimeters, no underwater echo/outside 2-300 cm, no valid UART response, or stale readings. An I2C link failure marks all three unavailable and disables the motor directions. In manual mode, sensor readings do not change motor speeds. Update both the firmware and Pi script for three readings; older firmware leaves unsupported sensors unavailable.
 
 #### Automatic depth control

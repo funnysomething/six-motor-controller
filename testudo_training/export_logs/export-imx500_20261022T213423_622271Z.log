@@ -1,0 +1,81 @@
+Working directory: /mnt/c/Users/adisa/Documents/Workspace/Classes/ENEE408V
+/mnt/c/Users/adisa/Documents/Workspace/Classes/ENEE408V/testudo_training/.venv/bin/python /mnt/c/Users/adisa/Documents/Workspace/Classes/ENEE408V/testudo_training/export_imx500.py --weights /mnt/c/Users/adisa/Documents/Workspace/Classes/ENEE408V/testudo_training/runs/testudo_imx500/weights/best.pt --data /mnt/c/Users/adisa/Documents/Workspace/Classes/ENEE408V/datasets/testudo/data.yaml --imgsz 640 --weights testudo_training/runs/testudo_imx500/weights/best.pt --data datasets/testudo/data.yaml
+Export host: Linux-6.6.87.2-microsoft-standard-WSL2-x86_64-with-glibc2.39, architecture=x86_64, Python=3.12.3
+ultralytics: 8.4.184
+torch: 2.14.1
+model-compression-toolkit: 2.4.5
+imx500-converter: 3.19.2
+openjdk version "21.0.12.1" 2026-08-18
+OpenJDK Runtime Environment (build 21.0.12.1+1-1-24.04.4-Ubuntu)
+OpenJDK 64-Bit Server VM (build 21.0.12.1+1-1-24.04.4-Ubuntu, mixed mode, sharing)
+Memory before export:
+MemTotal:        7954648 kB
+MemAvailable:    7376136 kB
+SwapFree:        2095604 kB
+Exporting for the camera AI processor. YOLO26 and NCNN are unsupported here. Conversion may install additional dependencies and take time.
+Ultralytics 8.4.184 🚀 Python-3.12.3 torch-2.14.1+cu130 CPU (Intel Core Ultra 7 256V)
+YOLO11n summary (fused): 101 layers, 2,597,051 parameters, 0 gradients, 6.4 GFLOPs
+
+[34m[1mPyTorch:[0m starting from '/mnt/c/Users/adisa/Documents/Workspace/Classes/ENEE408V/testudo_training/runs/testudo_imx500/weights/best.pt' with input shape (1, 3, 640, 640) BCHW and output shape(s) ((1, 8400, 4), (1, 8400, 1)) (5.2 MB)
+[31m[1mrequirements:[0m Ultralytics requirement ['edge-mdt-cl<1.1.0'] not found, attempting AutoUpdate...
+Collecting edge-mdt-cl<1.1.0
+  Downloading edge_mdt_cl-1.0.0-py3-none-any.whl.metadata (4.0 kB)
+Requirement already satisfied: numpy in ./testudo_training/.venv/lib/python3.12/site-packages (from edge-mdt-cl<1.1.0) (2.5.4)
+Requirement already satisfied: packaging in ./testudo_training/.venv/lib/python3.12/site-packages (from edge-mdt-cl<1.1.0) (26.3)
+Downloading edge_mdt_cl-1.0.0-py3-none-any.whl (37 kB)
+Installing collected packages: edge-mdt-cl
+  Attempting uninstall: edge-mdt-cl
+    Found existing installation: edge-mdt-cl 1.1.1
+    Uninstalling edge-mdt-cl-1.1.1:
+      Successfully uninstalled edge-mdt-cl-1.1.1
+ERROR: pip's dependency resolver does not currently take into account all the packages that are installed. This behaviour is the source of the following dependency conflicts.
+uni-pytorch 3.19.0 requires edge-mdt-cl~=1.1.0, but you have edge-mdt-cl 1.0.0 which is incompatible.
+Successfully installed edge-mdt-cl-1.0.0
+
+[31m[1mrequirements:[0m AutoUpdate success ✅ 7.5s
+WARNING ⚠️ [31m[1mrequirements:[0m [1mRestart runtime or rerun command for updates to take effect[0m
+
+[34m[1mIMX:[0m collecting INT8 calibration images from 'data=/mnt/c/Users/adisa/Documents/Workspace/Classes/ENEE408V/datasets/testudo/data.yaml'
+[34m[1mval: [0mFast image access ✅ (ping: 2.3±0.9 ms, read: 53.5±4.6 MB/s, size: 241.5 KB)
+
+[K[34m[1mval: [0mScanning /mnt/c/Users/adisa/Documents/Workspace/Classes/ENEE408V/datasets/testudo/labels/val.cache... 30 images, 0 backgrounds, 0 corrupt: 100% ━━━━━━━━━━━━ 30/30 6.6Mit/s 0.0s
+WARNING ⚠️ [34m[1mIMX:[0m >300 images recommended for INT8 calibration, found 30 images.
+ERROR ❌ [34m[1mIMX:[0m export failure 17.9s: cannot import name 'runtime_version' from 'google.protobuf' (/mnt/c/Users/adisa/Documents/Workspace/Classes/ENEE408V/testudo_training/.venv/lib/python3.12/site-packages/google/protobuf/__init__.py)
+Export to IMX in the cloud with Ultralytics Platform: https://platform.ultralytics.com
+Traceback (most recent call last):
+  File "/mnt/c/Users/adisa/Documents/Workspace/Classes/ENEE408V/testudo_training/export_imx500.py", line 67, in main
+    exported = model.export(format="imx", data=str(args.data), imgsz=args.imgsz,
+               ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/mnt/c/Users/adisa/Documents/Workspace/Classes/ENEE408V/testudo_training/.venv/lib/python3.12/site-packages/ultralytics/engine/model.py", line 797, in export
+    return Exporter(overrides=args, _callbacks=self.callbacks)(model=self.model)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/mnt/c/Users/adisa/Documents/Workspace/Classes/ENEE408V/testudo_training/.venv/lib/python3.12/site-packages/ultralytics/engine/exporter.py", line 1022, in __call__
+    f = getattr(self, f"export_{fmt}")()
+        ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/mnt/c/Users/adisa/Documents/Workspace/Classes/ENEE408V/testudo_training/.venv/lib/python3.12/site-packages/ultralytics/engine/exporter.py", line 516, in outer_func
+    f = inner_func(*args, **kwargs)  # exported file/dir or tuple of (file/dir, *)
+        ^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/mnt/c/Users/adisa/Documents/Workspace/Classes/ENEE408V/testudo_training/.venv/lib/python3.12/site-packages/ultralytics/engine/exporter.py", line 1647, in export_imx
+    return torch2imx(
+           ^^^^^^^^^^
+  File "/mnt/c/Users/adisa/Documents/Workspace/Classes/ENEE408V/testudo_training/.venv/lib/python3.12/site-packages/ultralytics/utils/export/imx.py", line 285, in torch2imx
+    import model_compression_toolkit as mct
+  File "/mnt/c/Users/adisa/Documents/Workspace/Classes/ENEE408V/testudo_training/.venv/lib/python3.12/site-packages/model_compression_toolkit/__init__.py", line 19, in <module>
+    from model_compression_toolkit import core
+  File "/mnt/c/Users/adisa/Documents/Workspace/Classes/ENEE408V/testudo_training/.venv/lib/python3.12/site-packages/model_compression_toolkit/core/__init__.py", line 27, in <module>
+    from model_compression_toolkit.core.keras.resource_utilization_data_facade import keras_resource_utilization_data
+  File "/mnt/c/Users/adisa/Documents/Workspace/Classes/ENEE408V/testudo_training/.venv/lib/python3.12/site-packages/model_compression_toolkit/core/keras/resource_utilization_data_facade.py", line 22, in <module>
+    from model_compression_toolkit.core.common.mixed_precision.resource_utilization_tools.resource_utilization_data import compute_resource_utilization_data
+  File "/mnt/c/Users/adisa/Documents/Workspace/Classes/ENEE408V/testudo_training/.venv/lib/python3.12/site-packages/model_compression_toolkit/core/common/mixed_precision/resource_utilization_tools/resource_utilization_data.py", line 22, in <module>
+    from model_compression_toolkit.core.graph_prep_runner import graph_preparation_runner
+  File "/mnt/c/Users/adisa/Documents/Workspace/Classes/ENEE408V/testudo_training/.venv/lib/python3.12/site-packages/model_compression_toolkit/core/graph_prep_runner.py", line 32, in <module>
+    from model_compression_toolkit.core.common.visualization.tensorboard_writer import TensorboardWriter
+  File "/mnt/c/Users/adisa/Documents/Workspace/Classes/ENEE408V/testudo_training/.venv/lib/python3.12/site-packages/model_compression_toolkit/core/common/visualization/tensorboard_writer.py", line 23, in <module>
+    from tensorboard.compat.proto.attr_value_pb2 import AttrValue
+  File "/mnt/c/Users/adisa/Documents/Workspace/Classes/ENEE408V/testudo_training/.venv/lib/python3.12/site-packages/tensorboard/compat/proto/attr_value_pb2.py", line 9, in <module>
+    from google.protobuf import runtime_version as _runtime_version
+ImportError: cannot import name 'runtime_version' from 'google.protobuf' (/mnt/c/Users/adisa/Documents/Workspace/Classes/ENEE408V/testudo_training/.venv/lib/python3.12/site-packages/google/protobuf/__init__.py)
+IMX500 export failed: cannot import name 'runtime_version' from 'google.protobuf' (/mnt/c/Users/adisa/Documents/Workspace/Classes/ENEE408V/testudo_training/.venv/lib/python3.12/site-packages/google/protobuf/__init__.py)
+Use trained YOLO11n weights on Linux with Java 17+.
+
+Process return code: 1

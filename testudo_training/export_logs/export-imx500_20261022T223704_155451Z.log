@@ -1,0 +1,350 @@
+Working directory: /mnt/c/Users/adisa/Documents/Workspace/Classes/ENEE408V
+/mnt/c/Users/adisa/Documents/Workspace/Classes/ENEE408V/testudo_training/.venv/bin/python /mnt/c/Users/adisa/Documents/Workspace/Classes/ENEE408V/testudo_training/export_imx500.py --weights /mnt/c/Users/adisa/Documents/Workspace/Classes/ENEE408V/testudo_training/runs/testudo_imx500/weights/best.pt --data /mnt/c/Users/adisa/Documents/Workspace/Classes/ENEE408V/datasets/testudo/data.yaml --imgsz 640 --weights testudo_training/runs/testudo_imx500/weights/best.pt --data datasets/testudo/data.yaml
+Export host: Linux-6.6.87.2-microsoft-standard-WSL2-x86_64-with-glibc2.39, architecture=x86_64, Python=3.12.3
+ultralytics: 8.4.184
+torch: 2.14.1
+model-compression-toolkit: 2.4.5
+imx500-converter: 3.19.2
+openjdk version "21.0.12.1" 2026-08-18
+OpenJDK Runtime Environment (build 21.0.12.1+1-1-24.04.4-Ubuntu)
+OpenJDK 64-Bit Server VM (build 21.0.12.1+1-1-24.04.4-Ubuntu, mixed mode, sharing)
+Memory before export:
+MemTotal:        7954648 kB
+MemAvailable:    7422356 kB
+SwapFree:        2093800 kB
+Exporting for the camera AI processor. YOLO26 and NCNN are unsupported here. Conversion may install additional dependencies and take time.
+Ultralytics 8.4.184 🚀 Python-3.12.3 torch-2.14.1+cu130 CPU (Intel Core Ultra 7 256V)
+YOLO11n summary (fused): 101 layers, 2,597,051 parameters, 0 gradients, 6.4 GFLOPs
+
+[34m[1mPyTorch:[0m starting from '/mnt/c/Users/adisa/Documents/Workspace/Classes/ENEE408V/testudo_training/runs/testudo_imx500/weights/best.pt' with input shape (1, 3, 640, 640) BCHW and output shape(s) ((1, 8400, 4), (1, 8400, 1)) (5.2 MB)
+[34m[1mIMX:[0m collecting INT8 calibration images from 'data=/mnt/c/Users/adisa/Documents/Workspace/Classes/ENEE408V/datasets/testudo/data.yaml'
+WARNING ⚠️ [34m[1mval: [0mSlow image access detected (ping: 18.1±1.0 ms, read: 6.2±0.2 MB/s, size: 253.4 KB). Use local storage instead of remote/mounted storage for better performance. See https://docs.ultralytics.com/guides/model-training-tips
+
+[K[34m[1mval: [0mScanning /mnt/c/Users/adisa/Documents/Workspace/Classes/ENEE408V/datasets/testudo/labels/val.cache... 30 images, 0 backgrounds, 0 corrupt: 100% ━━━━━━━━━━━━ 30/30 2.2Mit/s 0.0s
+WARNING ⚠️ [34m[1mIMX:[0m >300 images recommended for INT8 calibration, found 30 images.
+
+[34m[1mIMX:[0m starting export with model_compression_toolkit 2.4.5...
+representative_data_gen generates a batch size of 1 which can be slow for optimization: consider increasing the batch size
+WARNING:Model Compression Toolkit:OperatorSetNames.DEPTHWISE_CONV is not in model.
+
+Statistics Collection: 0it [00:00, ?it/s]
+Statistics Collection: 1it [00:01,  1.71s/it]
+Statistics Collection: 2it [00:03,  1.71s/it]
+Statistics Collection: 3it [00:04,  1.65s/it]
+Statistics Collection: 4it [00:06,  1.66s/it]
+Statistics Collection: 5it [00:08,  1.72s/it]
+Statistics Collection: 6it [00:10,  1.77s/it]
+Statistics Collection: 7it [00:12,  1.85s/it]
+Statistics Collection: 8it [00:14,  1.78s/it]
+Statistics Collection: 9it [00:15,  1.63s/it]
+Statistics Collection: 10it [00:17,  1.68s/it]
+Statistics Collection: 11it [00:18,  1.68s/it]
+Statistics Collection: 12it [00:20,  1.79s/it]
+Statistics Collection: 14it [00:22,  1.25s/it]
+Statistics Collection: 15it [00:23,  1.39s/it]
+Statistics Collection: 16it [00:25,  1.48s/it]
+Statistics Collection: 17it [00:27,  1.57s/it]
+Statistics Collection: 18it [00:29,  1.61s/it]
+Statistics Collection: 19it [00:31,  1.71s/it]
+Statistics Collection: 20it [00:32,  1.72s/it]
+Statistics Collection: 21it [00:34,  1.78s/it]
+Statistics Collection: 22it [00:36,  1.89s/it]
+Statistics Collection: 23it [00:38,  1.91s/it]
+Statistics Collection: 24it [00:40,  1.84s/it]
+Statistics Collection: 25it [00:42,  1.83s/it]
+Statistics Collection: 26it [00:44,  1.83s/it]
+Statistics Collection: 27it [00:46,  1.87s/it]
+Statistics Collection: 28it [00:47,  1.77s/it]
+Statistics Collection: 29it [00:49,  1.71s/it]
+Statistics Collection: 30it [00:51,  1.76s/it]
+Statistics Collection: 30it [00:51,  1.70s/it]
+
+Calculating quantization parameters:   0%|          | 0/280 [00:00<?, ?it/s]
+Calculating quantization parameters:   1%|          | 2/280 [00:00<00:24, 11.18it/s]
+Calculating quantization parameters:   1%|▏         | 4/280 [00:00<00:25, 10.93it/s]
+Calculating quantization parameters:   2%|▏         | 6/280 [00:00<00:22, 11.97it/s]
+Calculating quantization parameters:  12%|█▏        | 34/280 [00:01<00:13, 18.24it/s]
+Calculating quantization parameters:  13%|█▎        | 36/280 [00:02<00:16, 14.85it/s]
+Calculating quantization parameters:  15%|█▍        | 41/280 [00:02<00:14, 16.96it/s]
+Calculating quantization parameters:  15%|█▌        | 43/280 [00:02<00:15, 14.86it/s]
+Calculating quantization parameters:  16%|█▌        | 45/280 [00:03<00:17, 13.24it/s]
+Calculating quantization parameters:  17%|█▋        | 48/280 [00:03<00:16, 13.75it/s]
+Calculating quantization parameters:  18%|█▊        | 50/280 [00:03<00:17, 13.25it/s]
+Calculating quantization parameters:  19%|█▉        | 53/280 [00:03<00:15, 14.21it/s]
+Calculating quantization parameters:  20%|██        | 56/280 [00:03<00:14, 15.36it/s]
+Calculating quantization parameters:  21%|██        | 59/280 [00:04<00:17, 12.30it/s]
+Calculating quantization parameters:  22%|██▏       | 61/280 [00:08<01:47,  2.05it/s]
+Calculating quantization parameters:  22%|██▎       | 63/280 [00:09<01:47,  2.01it/s]
+Calculating quantization parameters:  24%|██▍       | 68/280 [00:09<01:00,  3.51it/s]
+Calculating quantization parameters:  25%|██▌       | 70/280 [00:09<00:56,  3.74it/s]
+Calculating quantization parameters:  26%|██▌       | 72/280 [00:09<00:51,  4.03it/s]
+Calculating quantization parameters:  27%|██▋       | 75/280 [00:10<00:45,  4.54it/s]
+Calculating quantization parameters:  28%|██▊       | 77/280 [00:10<00:43,  4.61it/s]
+Calculating quantization parameters:  29%|██▊       | 80/280 [00:11<00:32,  6.19it/s]
+Calculating quantization parameters:  30%|██▉       | 83/280 [00:11<00:26,  7.56it/s]
+Calculating quantization parameters:  31%|███       | 86/280 [00:12<00:37,  5.18it/s]
+Calculating quantization parameters:  31%|███▏      | 88/280 [00:12<00:37,  5.09it/s]
+Calculating quantization parameters:  34%|███▎      | 94/280 [00:14<00:40,  4.64it/s]
+Calculating quantization parameters:  34%|███▍      | 96/280 [00:14<00:45,  4.02it/s]
+Calculating quantization parameters:  36%|███▌      | 101/280 [00:15<00:32,  5.57it/s]
+Calculating quantization parameters:  40%|████      | 113/280 [00:15<00:14, 11.58it/s]
+Calculating quantization parameters:  41%|████▏     | 116/280 [00:15<00:16,  9.96it/s]
+Calculating quantization parameters:  42%|████▏     | 118/280 [00:16<00:18,  8.71it/s]
+Calculating quantization parameters:  43%|████▎     | 120/280 [00:17<00:25,  6.39it/s]
+Calculating quantization parameters:  44%|████▎     | 122/280 [00:17<00:30,  5.26it/s]
+Calculating quantization parameters:  45%|████▌     | 126/280 [00:18<00:25,  6.04it/s]
+Calculating quantization parameters:  47%|████▋     | 131/280 [00:18<00:18,  8.23it/s]
+Calculating quantization parameters:  48%|████▊     | 133/280 [00:18<00:18,  8.06it/s]
+Calculating quantization parameters:  49%|████▉     | 137/280 [00:19<00:15,  9.13it/s]
+Calculating quantization parameters:  50%|█████     | 141/280 [00:19<00:12, 11.00it/s]
+Calculating quantization parameters:  52%|█████▏    | 146/280 [00:19<00:08, 15.06it/s]
+Calculating quantization parameters:  53%|█████▎    | 149/280 [00:19<00:07, 16.39it/s]
+Calculating quantization parameters:  54%|█████▍    | 152/280 [00:19<00:07, 17.51it/s]
+Calculating quantization parameters:  55%|█████▌    | 155/280 [00:20<00:09, 13.34it/s]
+Calculating quantization parameters:  56%|█████▌    | 157/280 [00:20<00:10, 11.35it/s]
+Calculating quantization parameters:  58%|█████▊    | 162/280 [00:20<00:11, 10.32it/s]
+Calculating quantization parameters:  59%|█████▊    | 164/280 [00:21<00:16,  7.03it/s]
+Calculating quantization parameters:  60%|██████    | 168/280 [00:22<00:15,  7.38it/s]
+Calculating quantization parameters:  61%|██████    | 170/280 [00:23<00:31,  3.46it/s]
+Calculating quantization parameters:  62%|██████▏   | 173/280 [00:25<00:44,  2.42it/s]
+Calculating quantization parameters:  64%|██████▎   | 178/280 [00:26<00:27,  3.76it/s]
+Calculating quantization parameters:  64%|██████▍   | 180/280 [00:26<00:27,  3.60it/s]
+Calculating quantization parameters:  65%|██████▌   | 182/280 [00:27<00:27,  3.63it/s]
+Calculating quantization parameters:  66%|██████▌   | 185/280 [00:27<00:21,  4.35it/s]
+Calculating quantization parameters:  67%|██████▋   | 187/280 [00:28<00:20,  4.50it/s]
+Calculating quantization parameters:  68%|██████▊   | 190/280 [00:28<00:15,  5.91it/s]
+Calculating quantization parameters:  69%|██████▉   | 193/280 [00:28<00:12,  7.16it/s]
+Calculating quantization parameters:  70%|███████   | 196/280 [00:29<00:16,  5.05it/s]
+Calculating quantization parameters:  71%|███████   | 198/280 [00:30<00:16,  4.97it/s]
+Calculating quantization parameters:  74%|███████▍  | 208/280 [00:30<00:06, 10.75it/s]
+Calculating quantization parameters:  75%|███████▌  | 210/280 [00:31<00:13,  5.21it/s]
+Calculating quantization parameters:  76%|███████▌  | 212/280 [00:32<00:12,  5.24it/s]
+Calculating quantization parameters:  76%|███████▋  | 214/280 [00:32<00:11,  5.56it/s]
+Calculating quantization parameters:  78%|███████▊  | 219/280 [00:32<00:07,  8.12it/s]
+Calculating quantization parameters:  80%|███████▉  | 223/280 [00:32<00:06,  9.45it/s]
+Calculating quantization parameters:  80%|████████  | 225/280 [00:33<00:05,  9.85it/s]
+Calculating quantization parameters:  82%|████████▏ | 229/280 [00:33<00:04, 11.09it/s]
+Calculating quantization parameters:  83%|████████▎ | 232/280 [00:33<00:03, 13.35it/s]
+Calculating quantization parameters:  84%|████████▎ | 234/280 [00:33<00:03, 13.54it/s]
+Calculating quantization parameters:  84%|████████▍ | 236/280 [00:33<00:03, 13.19it/s]
+Calculating quantization parameters:  85%|████████▌ | 238/280 [00:33<00:03, 13.17it/s]
+Calculating quantization parameters:  86%|████████▌ | 240/280 [00:34<00:03, 11.14it/s]
+Calculating quantization parameters:  87%|████████▋ | 243/280 [00:34<00:03, 11.69it/s]
+Calculating quantization parameters:  88%|████████▊ | 245/280 [00:34<00:02, 11.74it/s]
+Calculating quantization parameters:  90%|████████▉ | 251/280 [00:34<00:01, 18.14it/s]
+Calculating quantization parameters: 100%|██████████| 280/280 [00:34<00:00,  8.03it/s]
+
+0it [00:00, ?it/s]
+1it [00:27, 27.44s/it]
+2it [00:59, 29.93s/it]
+3it [01:24, 27.97s/it]
+4it [02:04, 32.49s/it]
+5it [02:25, 28.49s/it]
+6it [02:50, 27.41s/it]
+7it [03:19, 27.67s/it]
+8it [03:45, 27.16s/it]
+9it [04:11, 26.81s/it]
+10it [04:39, 27.38s/it]
+11it [05:05, 26.89s/it]
+12it [05:32, 26.75s/it]
+13it [05:56, 26.12s/it]
+14it [06:20, 25.53s/it]
+15it [06:43, 24.69s/it]
+16it [07:11, 25.54s/it]
+17it [07:37, 25.71s/it]
+18it [08:00, 24.88s/it]
+19it [08:26, 25.24s/it]
+20it [08:52, 25.50s/it]
+21it [09:18, 25.74s/it]
+22it [09:45, 26.01s/it]
+23it [10:09, 25.58s/it]
+24it [10:32, 24.67s/it]
+25it [10:53, 23.43s/it]
+26it [11:10, 21.68s/it]
+27it [11:36, 22.98s/it]
+28it [12:02, 23.90s/it]
+29it [12:23, 22.94s/it]
+30it [12:48, 23.55s/it]
+31it [13:15, 24.53s/it]
+32it [13:38, 24.08s/it]
+33it [14:08, 25.89s/it]
+34it [14:34, 25.85s/it]
+35it [14:57, 25.14s/it]
+36it [15:23, 25.42s/it]
+37it [15:51, 26.16s/it]
+38it [16:17, 26.19s/it]
+39it [16:47, 27.13s/it]
+40it [17:14, 27.23s/it]
+41it [17:43, 27.87s/it]
+42it [18:10, 27.42s/it]
+43it [18:38, 27.54s/it]
+44it [19:07, 27.96s/it]
+45it [19:34, 27.88s/it]
+46it [20:00, 27.10s/it]
+47it [20:11, 22.35s/it]
+48it [20:34, 22.58s/it]
+49it [20:55, 22.28s/it]
+50it [21:21, 23.16s/it]
+51it [21:41, 22.30s/it]
+52it [21:55, 19.77s/it]
+53it [22:18, 20.73s/it]
+54it [22:45, 22.69s/it]
+55it [23:13, 24.36s/it]
+56it [23:44, 26.19s/it]
+57it [24:13, 27.07s/it]
+58it [24:24, 22.25s/it]
+59it [24:46, 22.20s/it]
+60it [25:07, 21.85s/it]
+61it [25:39, 24.94s/it]
+62it [26:05, 25.34s/it]
+63it [26:49, 30.84s/it]
+64it [27:14, 28.95s/it]
+65it [27:31, 25.37s/it]
+66it [27:55, 24.97s/it]
+67it [28:15, 23.43s/it]
+68it [29:03, 30.92s/it]
+69it [29:26, 28.49s/it]
+70it [29:50, 27.27s/it]
+71it [30:13, 26.05s/it]
+72it [30:39, 26.06s/it]
+73it [31:04, 25.63s/it]
+74it [31:26, 24.64s/it]
+75it [31:48, 23.83s/it]
+76it [32:11, 23.40s/it]
+77it [32:29, 21.98s/it]
+78it [32:54, 22.75s/it]
+79it [33:15, 22.29s/it]
+80it [33:37, 22.11s/it]
+81it [33:57, 21.50s/it]
+82it [34:21, 22.25s/it]
+83it [34:45, 22.84s/it]
+84it [35:09, 23.12s/it]
+85it [35:30, 22.55s/it]
+86it [35:54, 22.80s/it]
+87it [36:15, 22.45s/it]
+88it [36:42, 23.79s/it]
+88it [36:42, 25.03s/it]
+Welcome to the CBC MILP Solver 
+Version: 2.10.3 
+Build Date: Dec 15 2019 
+
+command line - /mnt/c/Users/adisa/Documents/Workspace/Classes/ENEE408V/testudo_training/.venv/lib/python3.12/site-packages/pulp/apis/../solverdir/cbc/linux/i64/cbc /tmp/558eace9494b4355b750dfe798368969-pulp.mps -sec 60 -timeMode elapsed -branch -printingOptions all -solution /tmp/558eace9494b4355b750dfe798368969-pulp.sol (default strategy 1)
+At line 2 NAME          MODEL
+At line 3 ROWS
+At line 182 COLUMNS
+At line 1591 RHS
+At line 1769 BOUNDS
+At line 2034 ENDATA
+Problem MODEL has 177 rows, 352 columns and 792 elements
+Coin0008I MODEL read with 0 errors
+seconds was changed from 1e+100 to 60
+Option for timeMode changed from cpu to elapsed
+Continuous objective value is 0.0040704 - 0.00 seconds
+Cgl0004I processed model has 89 rows, 264 columns (264 integer (264 of which binary)) and 440 elements
+Cbc0038I Initial state - 2 integers unsatisfied sum - 0.76102
+Cbc0038I Solution found of 0.00414641
+Cbc0038I Before mini branch and bound, 262 integers at bound fixed and 0 continuous
+Cbc0038I Full problem 89 rows 264 columns, reduced to 0 rows 0 columns
+Cbc0038I Mini branch and bound did not improve solution (0.12 seconds)
+Cbc0038I Round again with cutoff of 0.00412981
+Cbc0038I Reduced cost fixing fixed 164 variables on major pass 2
+Cbc0038I Pass   1: suminf.    0.16620 (2) obj. 0.00412981 iterations 1
+Cbc0038I Pass   2: suminf.    0.76102 (2) obj. 0.0040704 iterations 1
+Cbc0038I Pass   3: suminf.    1.13966 (4) obj. 0.00412981 iterations 2
+Cbc0038I Pass   4: suminf.    0.69210 (2) obj. 0.00412981 iterations 2
+Cbc0038I Pass   5: suminf.    0.76883 (2) obj. 0.00412215 iterations 1
+Cbc0038I Pass   6: suminf.    1.72243 (4) obj. 0.00412981 iterations 1
+Cbc0038I Pass   7: suminf.    0.69210 (2) obj. 0.00412981 iterations 1
+Cbc0038I Pass   8: suminf.    1.09473 (4) obj. 0.00412981 iterations 2
+Cbc0038I Pass   9: suminf.    1.09473 (4) obj. 0.00412981 iterations 0
+Cbc0038I Pass  10: suminf.    0.76265 (2) obj. 0.00408648 iterations 1
+Cbc0038I Pass  11: suminf.    0.32889 (2) obj. 0.00412981 iterations 1
+Cbc0038I Pass  12: suminf.    0.32889 (2) obj. 0.00412981 iterations 0
+Cbc0038I Pass  13: suminf.    0.32889 (2) obj. 0.00412981 iterations 0
+Cbc0038I Pass  14: suminf.    0.27760 (2) obj. 0.00412981 iterations 2
+Cbc0038I Pass  15: suminf.    0.27760 (2) obj. 0.00412981 iterations 0
+Cbc0038I Pass  16: suminf.    0.76211 (2) obj. 0.00408141 iterations 1
+Cbc0038I Pass  17: suminf.    1.03379 (4) obj. 0.00412981 iterations 2
+Cbc0038I Pass  18: suminf.    0.67217 (2) obj. 0.00412981 iterations 2
+Cbc0038I Pass  19: suminf.    0.76232 (2) obj. 0.00412081 iterations 1
+Cbc0038I Pass  20: suminf.    1.23488 (4) obj. 0.00412981 iterations 1
+Cbc0038I Pass  21: suminf.    0.56077 (2) obj. 0.00412981 iterations 4
+Cbc0038I Pass  22: suminf.    0.56077 (2) obj. 0.00412981 iterations 0
+Cbc0038I Pass  23: suminf.    0.76124 (2) obj. 0.00410979 iterations 1
+Cbc0038I Pass  24: suminf.    1.73003 (4) obj. 0.00412981 iterations 2
+Cbc0038I Pass  25: suminf.    0.76341 (2) obj. 0.00412462 iterations 3
+Cbc0038I Pass  26: suminf.    0.71144 (2) obj. 0.00412981 iterations 1
+Cbc0038I Pass  27: suminf.    0.76341 (2) obj. 0.00412462 iterations 2
+Cbc0038I Pass  28: suminf.    1.09274 (4) obj. 0.00412981 iterations 3
+Cbc0038I Pass  29: suminf.    0.73563 (2) obj. 0.00412981 iterations 2
+Cbc0038I Pass  30: suminf.    0.79444 (2) obj. 0.00412394 iterations 2
+Cbc0038I No solution found this major pass
+Cbc0038I Before mini branch and bound, 248 integers at bound fixed and 0 continuous
+Cbc0038I Mini branch and bound did not improve solution (0.12 seconds)
+Cbc0038I After 0.12 seconds - Feasibility pump exiting with objective of 0.00414641 - took 0.01 seconds
+Cbc0012I Integer solution of 0.0041464119 found by feasibility pump after 0 iterations and 0 nodes (0.12 seconds)
+Cbc0006I The LP relaxation is infeasible or too expensive
+Cbc0013I At root node, 0 cuts changed objective from 0.0040703951 to 0.0040703951 in 1 passes
+Cbc0014I Cut generator 0 (Probing) - 1 row cuts average 0.0 elements, 0 column cuts (0 active)  in 0.000 seconds - new frequency is 1
+Cbc0014I Cut generator 1 (Gomory) - 0 row cuts average 0.0 elements, 0 column cuts (0 active)  in 0.000 seconds - new frequency is -100
+Cbc0014I Cut generator 2 (Knapsack) - 0 row cuts average 0.0 elements, 0 column cuts (0 active)  in 0.000 seconds - new frequency is -100
+Cbc0014I Cut generator 3 (Clique) - 0 row cuts average 0.0 elements, 0 column cuts (0 active)  in 0.000 seconds - new frequency is -100
+Cbc0014I Cut generator 4 (MixedIntegerRounding2) - 0 row cuts average 0.0 elements, 0 column cuts (0 active)  in 0.000 seconds - new frequency is -100
+Cbc0014I Cut generator 5 (FlowCover) - 0 row cuts average 0.0 elements, 0 column cuts (0 active)  in 0.000 seconds - new frequency is -100
+Cbc0014I Cut generator 6 (TwoMirCuts) - 0 row cuts average 0.0 elements, 0 column cuts (0 active)  in 0.000 seconds - new frequency is -100
+Cbc0014I Cut generator 7 (ZeroHalf) - 0 row cuts average 0.0 elements, 0 column cuts (0 active)  in 0.000 seconds - new frequency is -100
+Cbc0001I Search completed - best objective 0.004146411861134163, took 0 iterations and 0 nodes (0.13 seconds)
+Cbc0035I Maximum depth 0, 164 variables fixed on reduced cost
+Cuts at root node changed objective from 0.0040704 to 0.0040704
+Probing was tried 1 times and created 1 cuts of which 0 were active after adding rounds of cuts (0.000 seconds)
+Gomory was tried 0 times and created 0 cuts of which 0 were active after adding rounds of cuts (0.000 seconds)
+Knapsack was tried 0 times and created 0 cuts of which 0 were active after adding rounds of cuts (0.000 seconds)
+Clique was tried 0 times and created 0 cuts of which 0 were active after adding rounds of cuts (0.000 seconds)
+MixedIntegerRounding2 was tried 0 times and created 0 cuts of which 0 were active after adding rounds of cuts (0.000 seconds)
+FlowCover was tried 0 times and created 0 cuts of which 0 were active after adding rounds of cuts (0.000 seconds)
+TwoMirCuts was tried 0 times and created 0 cuts of which 0 were active after adding rounds of cuts (0.000 seconds)
+ZeroHalf was tried 0 times and created 0 cuts of which 0 were active after adding rounds of cuts (0.000 seconds)
+
+Result - Optimal solution found
+
+Objective value:                0.00414641
+Enumerated nodes:               0
+Total iterations:               0
+Time (CPU seconds):             0.02
+Time (Wallclock seconds):       0.13
+
+Option for printingOptions changed from normal to all
+Total time (CPU seconds):       0.02   (Wallclock seconds):       0.20
+
+/mnt/c/Users/adisa/Documents/Workspace/Classes/ENEE408V/testudo_training/.venv/lib/python3.12/site-packages/torch/onnx/_internal/torchscript_exporter/jit_utils.py:308: UserWarning: Constant folding - Only steps=1 can be constant folded for opset >= 10 onnx::Slice op. Constant folding not applied. (Triggered internally at /__w/pytorch/pytorch/torch/csrc/jit/passes/onnx/constant_fold.cpp:178.)
+  _C._jit_pass_onnx_node_shape_type_inference(node, params_dict, opset_version)
+/mnt/c/Users/adisa/Documents/Workspace/Classes/ENEE408V/testudo_training/.venv/lib/python3.12/site-packages/torch/onnx/_internal/torchscript_exporter/utils.py:712: UserWarning: Constant folding - Only steps=1 can be constant folded for opset >= 10 onnx::Slice op. Constant folding not applied. (Triggered internally at /__w/pytorch/pytorch/torch/csrc/jit/passes/onnx/constant_fold.cpp:178.)
+  _C._jit_pass_onnx_graph_shape_type_inference(
+/mnt/c/Users/adisa/Documents/Workspace/Classes/ENEE408V/testudo_training/.venv/lib/python3.12/site-packages/torch/onnx/_internal/torchscript_exporter/utils.py:1185: UserWarning: Constant folding - Only steps=1 can be constant folded for opset >= 10 onnx::Slice op. Constant folding not applied. (Triggered internally at /__w/pytorch/pytorch/torch/csrc/jit/passes/onnx/constant_fold.cpp:178.)
+  _C._jit_pass_onnx_graph_shape_type_inference(
+2026-10-22 19:24:10,717 INFO : Running version 3.19.0 [/mnt/c/Users/adisa/Documents/Workspace/Classes/ENEE408V/testudo_training/.venv/lib/python3.12/site-packages/uni/common/logger.py:179]
+2026-10-22 19:24:10,718 INFO : Converting /mnt/c/Users/adisa/Documents/Workspace/Classes/ENEE408V/testudo_training/runs/testudo_imx500/weights/best_imx_model/model_imx.onnx [/mnt/c/Users/adisa/Documents/Workspace/Classes/ENEE408V/testudo_training/.venv/lib/python3.12/site-packages/uni/common/logger.py:179]
+2026-10-22 19:25:58,921 INFO : Wrote outputs to /tmp/tmpzzkcx7ke/model_imx.uni-pytorch.um.pb [/mnt/c/Users/adisa/Documents/Workspace/Classes/ENEE408V/testudo_training/.venv/lib/python3.12/site-packages/uni/common/logger.py:179]
+2026-10-22 19:25:58,925 INFO : Converted successfully [/mnt/c/Users/adisa/Documents/Workspace/Classes/ENEE408V/testudo_training/.venv/lib/python3.12/site-packages/uni/common/logger.py:179]
+2026-10-22 19:26:18.392 INFO : CODE: [START] Starting SDSPconv
+2026-10-22 19:29:12.461 INFO : ConvFe conversion finished successfully
+2026-10-22 19:29:44.552 INFO : CBE component - DspConvParser has started conversion.
+2026-10-22 19:29:48.753 INFO : Dsp-Dnn-Parser finished successfully !
+2026-10-22 19:32:09.302 INFO : LogicModel generated successfully ! 
+2026-10-22 19:32:09.310 INFO : DspConvParser runs: 144883 [msec]
+2026-10-22 19:32:09.311 INFO : CBE component - DspConvParser finished conversion.
+2026-10-22 19:36:06.528 INFO : Converter Backend successfully completed!
+2026-10-22 19:36:06.529 INFO : Conversion time is 3 Minutes and 54.47 Seconds
+2026-10-22 19:36:32.697 INFO : packer zip successfully generated under /mnt/c/Users/adisa/Documents/Workspace/Classes/ENEE408V/testudo_training/runs/testudo_imx500/weights/best_imx_model/packerOut.zip
+2026-10-22 19:36:44.903 INFO : CODE: [OUTPUT] Output is in /mnt/c/Users/adisa/Documents/Workspace/Classes/ENEE408V/testudo_training/runs/testudo_imx500/weights/best_imx_model
+[34m[1mIMX:[0m export success ✅ 3749.2s, saved as '/mnt/c/Users/adisa/Documents/Workspace/Classes/ENEE408V/testudo_training/runs/testudo_imx500/weights/best_imx_model' (14.0 MB)
+
+Export complete (3462.0s)
+Results saved to [1m/mnt/c/Users/adisa/Documents/Workspace/Classes/ENEE408V/testudo_training/runs/testudo_imx500/weights/best_imx_model[0m
+Predict:         yolo predict task=detect model=/mnt/c/Users/adisa/Documents/Workspace/Classes/ENEE408V/testudo_training/runs/testudo_imx500/weights/best_imx_model imgsz=640 
+Validate:        yolo val task=detect model=/mnt/c/Users/adisa/Documents/Workspace/Classes/ENEE408V/testudo_training/runs/testudo_imx500/weights/best_imx_model imgsz=640  
+Visualize:       https://netron.app
+IMX500 export: /mnt/c/Users/adisa/Documents/Workspace/Classes/ENEE408V/testudo_training/runs/testudo_imx500/weights/best_imx_model
+Copy the complete export directory to the Pi.
+
+Process return code: 0

@@ -755,12 +755,15 @@ def interrupted(signum, frame):
 class MotorGui:
     """Small optional Tk interface; hardware requests never block Tk callbacks."""
 
-    def __init__(self, root, controller):
+    def __init__(self, root, controller, camera=None):
         import tkinter as tk
         from tkinter import ttk
 
         self.root = root
         self.controller = controller
+        self.camera = camera
+        self.camera_image = None
+        self.camera_seen = None
         self.results = queue.Queue()
         self.worker = None
         self.busy = False
@@ -788,10 +791,21 @@ class MotorGui:
                                                 ("mag", "Magnetic field"),
                                                 ("barometer", "Temperature / pressure"))}
         self.imu_tilt = tk.StringVar(root, value="Tilt: waiting for acceleration...")
-        root.title("Six motor control")
+        root.title("Six motor control and Testudo camera")
         root.minsize(920, 450)
-        frame = ttk.Frame(root, padding=16)
-        frame.grid(sticky="nsew")
+        shell = ttk.Frame(root)
+        shell.grid(sticky="nsew")
+        shell.columnconfigure(0, weight=1)
+        shell.rowconfigure(1, weight=1)
+        toolbar = ttk.Frame(shell, padding=(16, 8))
+        toolbar.grid(row=0, column=0, sticky="ew")
+        tk.Button(toolbar, text="STOP ALL MOTORS", command=self.stop, bg="#b42318", fg="white",
+                  activebackground="#8f1c13", activeforeground="white", padx=16).pack(side="left")
+        ttk.Label(toolbar, textvariable=self.status, wraplength=650).pack(side="left", padx=12)
+        self.tabs = ttk.Notebook(shell)
+        self.tabs.grid(row=1, column=0, sticky="nsew")
+        frame = ttk.Frame(self.tabs, padding=16)
+        self.tabs.add(frame, text="Motors and sensors")
         root.columnconfigure(0, weight=1)
         root.rowconfigure(0, weight=1)
         frame.columnconfigure(1, weight=1)
@@ -879,9 +893,79 @@ class MotorGui:
         for row, variable in enumerate((*self.imu_values.values(), self.imu_tilt)):
             ttk.Label(imu_frame, textvariable=variable, wraplength=330).grid(
                 row=row, column=0, sticky="w", pady=2)
+        camera_frame = ttk.Frame(self.tabs, padding=16)
+        self.tabs.add(camera_frame, text="Testudo camera")
+        self.camera_tab = camera_frame
+        self.camera_status = tk.StringVar(root, value="Camera disabled (--no-camera)." if camera is None
+                                         else "Camera ready to start.")
+        ttk.Label(camera_frame, text="Testudo detection", font=("TkDefaultFont", 16, "bold")).grid(
+            row=0, column=0, columnspan=2, sticky="w")
+        ttk.Label(camera_frame, textvariable=self.camera_status, wraplength=820).grid(
+            row=1, column=0, columnspan=2, sticky="w", pady=8)
+        self.camera_preview = ttk.Label(camera_frame, text="Waiting for camera...", anchor="center")
+        self.camera_preview.grid(row=2, column=0, columnspan=2, sticky="nsew", pady=8)
+        camera_frame.columnconfigure(0, weight=1)
+        camera_frame.rowconfigure(2, weight=1)
+        camera_buttons = ttk.Frame(camera_frame)
+        camera_buttons.grid(row=3, column=0, sticky="w")
+        self.camera_start = ttk.Button(camera_buttons, text="Start camera", command=self.start_camera)
+        self.camera_start.pack(side="left")
+        self.camera_stop = ttk.Button(camera_buttons, text="Stop camera", command=self.stop_camera)
+        self.camera_stop.pack(side="left", padx=8)
+        if camera is None:
+            self.camera_start.configure(state="disabled")
+        self.camera_stop.configure(state="disabled")
+        ttk.Label(camera_frame, text="Detection shows Testudo boxes and confidence. "
+                  "It does not command motors. STOP ALL MOTORS remains available on either tab.",
+                  wraplength=820).grid(row=4, column=0, columnspan=2, sticky="w", pady=12)
         root.protocol("WM_DELETE_WINDOW", self.close)
         root.bind("<Escape>", lambda event: self.stop())
         root.after(50, self.poll)
+        if camera is not None:
+            root.after(0, self.start_camera)
+
+    def start_camera(self):
+        if self.camera is not None and not self.closing:
+            self.camera_seen = None
+            self.camera.start()
+            self.update_camera()
+
+    def stop_camera(self):
+        if self.camera is not None:
+            self.camera.stop()
+            self.update_camera()
+
+    def update_camera(self):
+        if self.camera is None:
+            return
+        import tkinter as tk
+
+        self.camera.poll()
+        running = self.camera.running
+        stopping = self.camera.stopping_at is not None
+        self.camera_start.configure(state="disabled" if running or self.closing else "normal")
+        self.camera_stop.configure(state="normal" if running and not stopping and not self.closing else "disabled")
+        text = self.camera.status
+        latest = self.camera.latest
+        if not running or stopping:
+            self.camera_preview.configure(image="", text=text)
+            self.camera_image = None
+        elif latest is not None:
+            received_at, message = latest
+            age = time.monotonic() - received_at
+            if age > 3:
+                text = f"Camera feed stale ({age:.0f} s since last frame). {text}"
+                self.camera_preview.configure(image="", text="Camera feed stale; waiting for frames...")
+                self.camera_image = None
+            elif received_at != self.camera_seen:
+                try:
+                    photo = tk.PhotoImage(master=self.root, data=message["image"], format="PPM")
+                    self.camera_preview.configure(image=photo, text="")
+                    self.camera_image = photo
+                    self.camera_seen = received_at
+                except (tk.TclError, KeyError) as error:
+                    text = f"Camera preview error: {error}"
+        self.camera_status.set(text)
 
     def copy_group(self):
         if self.auto_enabled.get() or self.busy or self.closing:
@@ -1005,6 +1089,7 @@ class MotorGui:
             self.status.set("Automatic control active: speed scales over each pair's distance limits; no good reading stops its pair.")
         self.update_distance()
         self.update_imu()
+        self.update_camera()
         output_problem = self.update_outputs()
         if (output_problem and self.controller.fault is None and not self.busy
                 and not self.closing and not getattr(self.controller, "recovering", False)):
@@ -1102,12 +1187,14 @@ class MotorGui:
 
     def close(self):
         self.closing = True
+        if self.camera is not None:
+            self.camera.stop()
         self.set_controls(False)
         self.status.set("Stopping and closing...")
         if not self.busy:
             self.root.destroy()  # main's finally stops motors before closing I2C.
 
-def run_gui(controller):
+def run_gui(controller, camera=None):
     try:
         import tkinter as tk
     except ImportError as error:
@@ -1119,7 +1206,7 @@ def run_gui(controller):
     app = None
     previous_handlers = {}
     try:
-        app = MotorGui(root, controller)
+        app = MotorGui(root, controller, camera=camera)
         # Tk callbacks can swallow KeyboardInterrupt; request a normal GUI
         # shutdown from the next poll instead, without touching Tk in a handler.
         for name in ("SIGINT", "SIGTERM", "SIGHUP"):
@@ -1129,6 +1216,8 @@ def run_gui(controller):
                     signum, lambda signum, frame: app.shutdown_requested.set())
         root.mainloop()
     finally:
+        if camera is not None:
+            camera.stop()
         for signum, handler in previous_handlers.items():
             signal.signal(signum, handler)
         # Also cover Ctrl+C/SIGTERM while a hardware request is in flight.
@@ -1147,6 +1236,13 @@ def main():
                         help="ESP32 7-bit I2C address (default: 0x32)")
     parser.add_argument("--gui", action="store_true", help="open the optional six-motor desktop GUI")
     parser.add_argument("--no-imu", action="store_true", help="disable SEN0140 polling in the GUI")
+    parser.add_argument("--no-camera", action="store_true", help="disable automatic camera startup in the GUI")
+    parser.add_argument("--camera-backend", choices=("auto", "imx500", "ncnn", "pytorch"), default="auto",
+                        help="auto selects IMX500 when its export exists, otherwise trained best.pt on the Pi CPU")
+    parser.add_argument("--camera-model", type=Path, help="trained .pt file or camera model export directory")
+    parser.add_argument("--camera-python", help="camera worker Python (default: matching repo vision environment)")
+    parser.add_argument("--camera-conf", type=float, default=0.5, help="camera detection confidence threshold")
+    parser.add_argument("--camera-fps", type=int, default=16, help="requested camera FPS")
     parser.add_argument("--trace-motors", action="store_true",
                         help="log applied PWM, direction GPIO readback and acknowledgement age")
     parser.add_argument("--pwm-map", type=parse_pwm_map, default=DEFAULT_PWM_MAP,
@@ -1159,6 +1255,8 @@ def main():
         parser.error("Use a nonnegative bus and a 7-bit address from 0x08 to 0x77")
     if args.gpiochip is not None and args.gpiochip < 0:
         parser.error("--gpiochip must be nonnegative")
+    if not math.isfinite(args.camera_conf) or not 0 <= args.camera_conf <= 1 or args.camera_fps <= 0:
+        parser.error("--camera-conf must be 0-1 and --camera-fps must be positive")
     if args.diagnose:
         try:
             return diagnose_gpio(args.gpiochip)
@@ -1174,6 +1272,7 @@ def main():
     signal.signal(signal.SIGTERM, interrupted)
     signal.signal(signal.SIGHUP, interrupted)
     pin_factory = None
+    camera = None
     try:
         pin_factory = make_gpio_factory(args.gpiochip)
         with SMBus(args.bus) as bus:
@@ -1193,7 +1292,14 @@ def main():
                                          imu=imu, trace=args.trace_motors)
             try:
                 if args.gui:
-                    run_gui(controller)
+                    if not args.no_camera:
+                        if __package__:
+                            from .camera_control import CameraConfig, CameraSession
+                        else:
+                            from camera_control import CameraConfig, CameraSession
+                        camera = CameraSession(CameraConfig(args.camera_backend, args.camera_model,
+                                                            args.camera_python, args.camera_conf, args.camera_fps))
+                    run_gui(controller, camera=camera)
                     return 1 if controller.fault is not None else 0
                 print(f"Six motors ready; I2C /dev/i2c-{args.bus}, address 0x{args.address:02x}.")
                 print(HELP)
@@ -1216,7 +1322,11 @@ def main():
                 if controller.fault is not None:
                     raise OSError(str(controller.fault))
             finally:
-                controller.close()
+                try:
+                    controller.close()
+                finally:
+                    if camera is not None:
+                        camera.close()
     except (KeyboardInterrupt, EOFError):
         print("\nStopped and exited.")
     except Exception as error:

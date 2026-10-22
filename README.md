@@ -80,6 +80,13 @@ See [Pi setup and commands](raspberry_pi/README.md#six-motor-i2c-controller) for
 
 For the optional desktop GUI, install `python3-tk` on the Pi and run `python3 raspberry_pi/motor_control.py --gui`. It has six signed-speed sliders, a group speed control, Apply, Stop All, and applied-speed/link status. See [GUI instructions](raspberry_pi/README.md#optional-desktop-gui). The terminal controller remains the default.
 
+The GUI also starts the trained Testudo detector in a separate process and shows
+its live preview in a **Testudo camera** tab, with **STOP ALL MOTORS** visible on
+both tabs. It uses the IMX500 processor when a camera export is present, otherwise
+the trained `testudo_imx500/weights/best.pt` on the Pi CPU. Use `--no-camera` to
+disable it, or `--camera-backend imx500` to require camera-side inference. Keep
+`camera_control.py` alongside the updated motor script. See [camera setup and model options](raspberry_pi/README.md#camera-detection-in-the-motor-gui).
+
 ```text
 m 60                  # all six at +60%
 m 60 -60 40 40 0 75    # Motors 1-6, each with its own signed speed

@@ -1,0 +1,268 @@
+Working directory: /mnt/c/Users/adisa/Documents/Workspace/Classes/ENEE408V
+/mnt/c/Users/adisa/Documents/Workspace/Classes/ENEE408V/testudo_training/.venv/bin/python /mnt/c/Users/adisa/Documents/Workspace/Classes/ENEE408V/testudo_training/export_imx500.py --weights /mnt/c/Users/adisa/Documents/Workspace/Classes/ENEE408V/testudo_training/runs/testudo_imx500/weights/best.pt --data /mnt/c/Users/adisa/Documents/Workspace/Classes/ENEE408V/datasets/testudo/data.yaml --imgsz 640 --weights testudo_training/runs/testudo_imx500/weights/best.pt --data datasets/testudo/data.yaml
+Export host: Linux-6.6.87.2-microsoft-standard-WSL2-x86_64-with-glibc2.39, architecture=x86_64, Python=3.12.3
+ultralytics: 8.4.184
+torch: 2.14.1
+model-compression-toolkit: 2.4.5
+imx500-converter: 3.19.2
+openjdk version "21.0.12.1" 2026-08-18
+OpenJDK Runtime Environment (build 21.0.12.1+1-1-24.04.4-Ubuntu)
+OpenJDK 64-Bit Server VM (build 21.0.12.1+1-1-24.04.4-Ubuntu, mixed mode, sharing)
+Memory before export:
+MemTotal:        7954648 kB
+MemAvailable:    6940336 kB
+SwapFree:        2095604 kB
+Exporting for the camera AI processor. YOLO26 and NCNN are unsupported here. Conversion may install additional dependencies and take time.
+Ultralytics 8.4.184 🚀 Python-3.12.3 torch-2.14.1+cu130 CPU (Intel Core Ultra 7 256V)
+YOLO11n summary (fused): 101 layers, 2,597,051 parameters, 0 gradients, 6.4 GFLOPs
+
+[34m[1mPyTorch:[0m starting from '/mnt/c/Users/adisa/Documents/Workspace/Classes/ENEE408V/testudo_training/runs/testudo_imx500/weights/best.pt' with input shape (1, 3, 640, 640) BCHW and output shape(s) ((1, 8400, 4), (1, 8400, 1)) (5.2 MB)
+[34m[1mIMX:[0m collecting INT8 calibration images from 'data=/mnt/c/Users/adisa/Documents/Workspace/Classes/ENEE408V/datasets/testudo/data.yaml'
+WARNING ⚠️ [34m[1mval: [0mSlow image access detected (ping: 3.2±1.8 ms, read: 37.8±3.4 MB/s, size: 234.4 KB). Use local storage instead of remote/mounted storage for better performance. See https://docs.ultralytics.com/guides/model-training-tips
+
+[K[34m[1mval: [0mScanning /mnt/c/Users/adisa/Documents/Workspace/Classes/ENEE408V/datasets/testudo/labels/val.cache... 30 images, 0 backgrounds, 0 corrupt: 100% ━━━━━━━━━━━━ 30/30 4.7Mit/s 0.0s
+WARNING ⚠️ [34m[1mIMX:[0m >300 images recommended for INT8 calibration, found 30 images.
+
+[34m[1mIMX:[0m starting export with model_compression_toolkit 2.4.5...
+representative_data_gen generates a batch size of 1 which can be slow for optimization: consider increasing the batch size
+WARNING:Model Compression Toolkit:OperatorSetNames.DEPTHWISE_CONV is not in model.
+
+Statistics Collection: 0it [00:00, ?it/s]
+Statistics Collection: 1it [00:00,  1.34it/s]
+Statistics Collection: 2it [00:01,  1.11it/s]
+Statistics Collection: 3it [00:02,  1.06it/s]
+Statistics Collection: 4it [00:03,  1.02it/s]
+Statistics Collection: 5it [00:04,  1.03it/s]
+Statistics Collection: 6it [00:05,  1.02it/s]
+Statistics Collection: 7it [00:06,  1.01s/it]
+Statistics Collection: 8it [00:07,  1.00s/it]
+Statistics Collection: 9it [00:08,  1.00s/it]
+Statistics Collection: 10it [00:09,  1.01it/s]
+Statistics Collection: 11it [00:10,  1.00s/it]
+Statistics Collection: 12it [00:11,  1.00it/s]
+Statistics Collection: 13it [00:12,  1.01it/s]
+Statistics Collection: 14it [00:13,  1.00s/it]
+Statistics Collection: 15it [00:15,  1.08s/it]
+Statistics Collection: 16it [00:15,  1.02s/it]
+Statistics Collection: 17it [00:16,  1.01s/it]
+Statistics Collection: 18it [00:17,  1.00it/s]
+Statistics Collection: 19it [00:18,  1.00it/s]
+Statistics Collection: 20it [00:19,  1.00it/s]
+Statistics Collection: 21it [00:20,  1.02s/it]
+Statistics Collection: 22it [00:21,  1.00s/it]
+Statistics Collection: 23it [00:22,  1.01s/it]
+Statistics Collection: 24it [00:23,  1.00it/s]
+Statistics Collection: 25it [00:24,  1.01it/s]
+Statistics Collection: 26it [00:25,  1.01it/s]
+Statistics Collection: 27it [00:26,  1.01it/s]
+Statistics Collection: 30it [00:27,  1.81it/s]
+Statistics Collection: 30it [00:27,  1.09it/s]
+
+Calculating quantization parameters:   0%|          | 0/280 [00:00<?, ?it/s]
+Calculating quantization parameters:   1%|▏         | 4/280 [00:00<00:08, 31.75it/s]
+Calculating quantization parameters:   4%|▍         | 11/280 [00:00<00:05, 51.13it/s]
+Calculating quantization parameters:   6%|▌         | 17/280 [00:00<00:05, 48.70it/s]
+Calculating quantization parameters:   8%|▊         | 22/280 [00:00<00:09, 28.06it/s]
+Calculating quantization parameters:  10%|█         | 28/280 [00:00<00:07, 31.76it/s]
+Calculating quantization parameters:  11%|█▏        | 32/280 [00:00<00:07, 31.34it/s]
+Calculating quantization parameters:  13%|█▎        | 36/280 [00:01<00:22, 10.70it/s]
+Calculating quantization parameters:  15%|█▌        | 43/280 [00:02<00:15, 15.39it/s]
+Calculating quantization parameters:  17%|█▋        | 47/280 [00:02<00:13, 17.66it/s]
+Calculating quantization parameters:  18%|█▊        | 51/280 [00:02<00:12, 18.27it/s]
+Calculating quantization parameters:  20%|██        | 56/280 [00:02<00:10, 21.63it/s]
+Calculating quantization parameters:  21%|██▏       | 60/280 [00:02<00:10, 21.35it/s]
+Calculating quantization parameters:  22%|██▎       | 63/280 [00:05<00:49,  4.35it/s]
+Calculating quantization parameters:  25%|██▌       | 70/280 [00:05<00:31,  6.57it/s]
+Calculating quantization parameters:  26%|██▌       | 72/280 [00:05<00:30,  6.79it/s]
+Calculating quantization parameters:  27%|██▋       | 75/280 [00:06<00:27,  7.55it/s]
+Calculating quantization parameters:  28%|██▊       | 77/280 [00:06<00:26,  7.59it/s]
+Calculating quantization parameters:  29%|██▊       | 80/280 [00:06<00:20,  9.60it/s]
+Calculating quantization parameters:  30%|██▉       | 83/280 [00:06<00:17, 11.29it/s]
+Calculating quantization parameters:  31%|███       | 86/280 [00:07<00:24,  7.89it/s]
+Calculating quantization parameters:  31%|███▏      | 88/280 [00:07<00:24,  7.95it/s]
+Calculating quantization parameters:  34%|███▎      | 94/280 [00:08<00:25,  7.41it/s]
+Calculating quantization parameters:  34%|███▍      | 96/280 [00:08<00:28,  6.56it/s]
+Calculating quantization parameters:  36%|███▌      | 101/280 [00:09<00:20,  8.73it/s]
+Calculating quantization parameters:  40%|████      | 113/280 [00:09<00:09, 18.11it/s]
+Calculating quantization parameters:  42%|████▏     | 117/280 [00:09<00:12, 13.46it/s]
+Calculating quantization parameters:  43%|████▎     | 120/280 [00:10<00:14, 10.93it/s]
+Calculating quantization parameters:  44%|████▎     | 122/280 [00:10<00:17,  8.92it/s]
+Calculating quantization parameters:  45%|████▌     | 126/280 [00:11<00:16,  9.55it/s]
+Calculating quantization parameters:  47%|████▋     | 131/280 [00:11<00:12, 12.39it/s]
+Calculating quantization parameters:  48%|████▊     | 133/280 [00:11<00:12, 12.03it/s]
+Calculating quantization parameters:  49%|████▉     | 137/280 [00:11<00:10, 13.66it/s]
+Calculating quantization parameters:  50%|█████     | 141/280 [00:12<00:08, 16.11it/s]
+Calculating quantization parameters:  53%|█████▎    | 148/280 [00:12<00:06, 21.90it/s]
+Calculating quantization parameters:  54%|█████▍    | 152/280 [00:12<00:05, 24.58it/s]
+Calculating quantization parameters:  55%|█████▌    | 155/280 [00:12<00:06, 19.47it/s]
+Calculating quantization parameters:  56%|█████▋    | 158/280 [00:12<00:06, 18.28it/s]
+Calculating quantization parameters:  58%|█████▊    | 162/280 [00:12<00:05, 19.72it/s]
+Calculating quantization parameters:  59%|█████▉    | 165/280 [00:13<00:06, 18.62it/s]
+Calculating quantization parameters:  60%|██████    | 168/280 [00:13<00:06, 17.42it/s]
+Calculating quantization parameters:  61%|██████    | 170/280 [00:14<00:16,  6.86it/s]
+Calculating quantization parameters:  62%|██████▏   | 173/280 [00:14<00:17,  6.03it/s]
+Calculating quantization parameters:  64%|██████▎   | 178/280 [00:15<00:10,  9.51it/s]
+Calculating quantization parameters:  65%|██████▍   | 181/280 [00:15<00:10,  9.81it/s]
+Calculating quantization parameters:  65%|██████▌   | 183/280 [00:15<00:10,  9.27it/s]
+Calculating quantization parameters:  66%|██████▌   | 185/280 [00:15<00:10,  8.76it/s]
+Calculating quantization parameters:  67%|██████▋   | 187/280 [00:16<00:10,  8.46it/s]
+Calculating quantization parameters:  68%|██████▊   | 190/280 [00:16<00:08, 10.96it/s]
+Calculating quantization parameters:  69%|██████▉   | 193/280 [00:16<00:06, 12.51it/s]
+Calculating quantization parameters:  70%|███████   | 196/280 [00:17<00:10,  8.13it/s]
+Calculating quantization parameters:  71%|███████   | 198/280 [00:17<00:10,  8.05it/s]
+Calculating quantization parameters:  71%|███████▏  | 200/280 [00:17<00:10,  7.85it/s]
+Calculating quantization parameters:  72%|███████▏  | 202/280 [00:17<00:09,  8.57it/s]
+Calculating quantization parameters:  73%|███████▎  | 204/280 [00:18<00:11,  6.74it/s]
+Calculating quantization parameters:  74%|███████▎  | 206/280 [00:18<00:10,  6.98it/s]
+Calculating quantization parameters:  74%|███████▍  | 208/280 [00:18<00:09,  7.67it/s]
+Calculating quantization parameters:  75%|███████▌  | 210/280 [00:19<00:16,  4.34it/s]
+Calculating quantization parameters:  76%|███████▌  | 212/280 [00:19<00:13,  4.96it/s]
+Calculating quantization parameters:  76%|███████▋  | 214/280 [00:20<00:11,  5.98it/s]
+Calculating quantization parameters:  78%|███████▊  | 219/280 [00:20<00:05, 10.36it/s]
+Calculating quantization parameters:  80%|███████▉  | 223/280 [00:20<00:04, 13.33it/s]
+Calculating quantization parameters:  80%|████████  | 225/280 [00:20<00:03, 14.11it/s]
+Calculating quantization parameters:  82%|████████▏ | 229/280 [00:20<00:03, 15.95it/s]
+Calculating quantization parameters:  83%|████████▎ | 233/280 [00:20<00:02, 18.28it/s]
+Calculating quantization parameters:  84%|████████▍ | 236/280 [00:20<00:02, 19.56it/s]
+Calculating quantization parameters:  85%|████████▌ | 239/280 [00:21<00:02, 16.39it/s]
+Calculating quantization parameters:  87%|████████▋ | 243/280 [00:21<00:02, 17.91it/s]
+Calculating quantization parameters:  88%|████████▊ | 245/280 [00:21<00:01, 17.86it/s]
+Calculating quantization parameters:  90%|████████▉ | 251/280 [00:21<00:01, 25.72it/s]
+Calculating quantization parameters: 100%|██████████| 280/280 [00:21<00:00, 12.92it/s]
+
+0it [00:00, ?it/s]
+1it [00:13, 13.16s/it]
+2it [00:21, 10.39s/it]
+3it [00:30,  9.85s/it]
+4it [00:42, 10.63s/it]
+5it [00:50,  9.76s/it]
+6it [00:57,  8.84s/it]
+7it [01:04,  8.11s/it]
+8it [01:13,  8.24s/it]
+9it [01:22,  8.68s/it]
+10it [01:32,  9.17s/it]
+11it [01:41,  9.09s/it]
+12it [01:49,  8.76s/it]
+13it [01:57,  8.51s/it]
+14it [02:08,  9.10s/it]
+15it [02:20,  9.99s/it]
+16it [02:41, 13.46s/it]
+17it [02:56, 13.74s/it]
+18it [03:10, 13.86s/it]
+19it [03:23, 13.51s/it]
+20it [03:38, 14.15s/it]
+21it [04:04, 17.77s/it]
+22it [04:16, 16.03s/it]
+23it [04:25, 13.86s/it]
+24it [04:39, 13.97s/it]
+25it [04:51, 13.18s/it]
+26it [04:59, 11.66s/it]
+27it [05:11, 11.87s/it]
+28it [05:21, 11.23s/it]
+29it [05:34, 11.64s/it]
+30it [05:46, 11.99s/it]
+31it [05:56, 11.37s/it]
+32it [06:07, 11.20s/it]
+33it [06:21, 12.10s/it]
+34it [06:30, 11.02s/it]
+35it [06:41, 10.93s/it]
+36it [06:51, 10.94s/it]
+37it [07:01, 10.63s/it]
+38it [07:27, 15.02s/it]
+39it [07:57, 19.62s/it]
+40it [08:11, 18.02s/it]
+41it [08:21, 15.43s/it]
+42it [08:34, 14.92s/it]
+43it [08:48, 14.59s/it]
+44it [09:00, 13.89s/it]
+45it [09:12, 13.26s/it]
+46it [09:22, 12.10s/it]
+47it [09:34, 12.32s/it]
+48it [09:49, 12.84s/it]
+49it [09:59, 12.09s/it]
+50it [10:11, 12.05s/it]
+51it [10:20, 11.20s/it]
+52it [10:33, 11.78s/it]
+53it [10:45, 11.87s/it]
+54it [10:54, 10.95s/it]
+55it [11:03, 10.47s/it]
+56it [11:15, 10.72s/it]
+57it [11:22,  9.59s/it]
+58it [11:32,  9.94s/it]
+59it [11:39,  9.02s/it]
+60it [11:47,  8.58s/it]
+61it [11:53,  7.89s/it]
+62it [12:01,  7.75s/it]
+63it [12:07,  7.40s/it]
+64it [12:13,  6.89s/it]
+65it [12:19,  6.78s/it]
+66it [12:23,  5.80s/it]
+67it [12:30,  6.12s/it]
+68it [12:36,  6.29s/it]
+69it [12:44,  6.54s/it]
+70it [12:48,  5.98s/it]
+71it [12:55,  6.21s/it]
+72it [13:01,  6.15s/it]
+73it [13:10,  7.12s/it]
+74it [13:17,  6.97s/it]
+75it [13:23,  6.67s/it]
+76it [13:30,  6.67s/it]
+77it [13:37,  6.89s/it]
+78it [13:46,  7.66s/it]
+79it [13:52,  7.02s/it]
+80it [14:00,  7.40s/it]
+81it [14:09,  7.78s/it]
+82it [14:16,  7.54s/it]
+83it [14:22,  7.05s/it]
+84it [14:29,  6.94s/it]
+85it [14:37,  7.37s/it]
+86it [14:47,  8.07s/it]
+87it [14:53,  7.48s/it]
+88it [15:01,  7.59s/it]
+88it [15:01, 10.24s/it]
+ERROR ❌ [34m[1mIMX:[0m export failure 1087.2s: LpVariable.__init__() got an unexpected keyword argument 'lowBound'
+Export to IMX in the cloud with Ultralytics Platform: https://platform.ultralytics.com
+Traceback (most recent call last):
+  File "/mnt/c/Users/adisa/Documents/Workspace/Classes/ENEE408V/testudo_training/export_imx500.py", line 67, in main
+    exported = model.export(format="imx", data=str(args.data), imgsz=args.imgsz,
+               ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/mnt/c/Users/adisa/Documents/Workspace/Classes/ENEE408V/testudo_training/.venv/lib/python3.12/site-packages/ultralytics/engine/model.py", line 797, in export
+    return Exporter(overrides=args, _callbacks=self.callbacks)(model=self.model)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/mnt/c/Users/adisa/Documents/Workspace/Classes/ENEE408V/testudo_training/.venv/lib/python3.12/site-packages/ultralytics/engine/exporter.py", line 1022, in __call__
+    f = getattr(self, f"export_{fmt}")()
+        ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/mnt/c/Users/adisa/Documents/Workspace/Classes/ENEE408V/testudo_training/.venv/lib/python3.12/site-packages/ultralytics/engine/exporter.py", line 516, in outer_func
+    f = inner_func(*args, **kwargs)  # exported file/dir or tuple of (file/dir, *)
+        ^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/mnt/c/Users/adisa/Documents/Workspace/Classes/ENEE408V/testudo_training/.venv/lib/python3.12/site-packages/ultralytics/engine/exporter.py", line 1647, in export_imx
+    return torch2imx(
+           ^^^^^^^^^^
+  File "/mnt/c/Users/adisa/Documents/Workspace/Classes/ENEE408V/testudo_training/.venv/lib/python3.12/site-packages/ultralytics/utils/export/imx.py", line 330, in torch2imx
+    else mct.ptq.pytorch_post_training_quantization(  # Perform post training quantization
+         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/mnt/c/Users/adisa/Documents/Workspace/Classes/ENEE408V/testudo_training/.venv/lib/python3.12/site-packages/model_compression_toolkit/ptq/pytorch/quantization_facade.py", line 125, in pytorch_post_training_quantization
+    tg, bit_widths_config, _, scheduling_info = core_runner(in_model=in_module,
+                                                ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/mnt/c/Users/adisa/Documents/Workspace/Classes/ENEE408V/testudo_training/.venv/lib/python3.12/site-packages/model_compression_toolkit/core/runner.py", line 127, in core_runner
+    bit_widths_config = search_bit_width(tg,
+                        ^^^^^^^^^^^^^^^^^^^^
+  File "/mnt/c/Users/adisa/Documents/Workspace/Classes/ENEE408V/testudo_training/.venv/lib/python3.12/site-packages/model_compression_toolkit/core/common/mixed_precision/mixed_precision_search_facade.py", line 101, in search_bit_width
+    nodes_bit_cfg = search_manager.search()
+                    ^^^^^^^^^^^^^^^^^^^^^^^
+  File "/mnt/c/Users/adisa/Documents/Workspace/Classes/ENEE408V/testudo_training/.venv/lib/python3.12/site-packages/model_compression_toolkit/core/common/mixed_precision/mixed_precision_search_manager.py", line 105, in search
+    mp_config = self._prepare_and_run_solver()
+                ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/mnt/c/Users/adisa/Documents/Workspace/Classes/ENEE408V/testudo_training/.venv/lib/python3.12/site-packages/model_compression_toolkit/core/common/mixed_precision/mixed_precision_search_manager.py", line 122, in _prepare_and_run_solver
+    solver = MixedPrecisionIntegerLPSolver(layers_candidates_sensitivity, candidates_ru, rel_target_ru)
+             ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/mnt/c/Users/adisa/Documents/Workspace/Classes/ENEE408V/testudo_training/.venv/lib/python3.12/site-packages/model_compression_toolkit/core/common/mixed_precision/search_methods/linear_programming.py", line 44, in __init__
+    self.layer_to_indicator_vars, self.objective_vars = self._init_problem_vars(layer_to_sensitivity_mapping)
+                                                        ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/mnt/c/Users/adisa/Documents/Workspace/Classes/ENEE408V/testudo_training/.venv/lib/python3.12/site-packages/model_compression_toolkit/core/common/mixed_precision/search_methods/linear_programming.py", line 90, in _init_problem_vars
+    LpVariable(f"layer_{layer_idx}_{qc_idx}", lowBound=0, upBound=1, cat=LpInteger)
+TypeError: LpVariable.__init__() got an unexpected keyword argument 'lowBound'
+IMX500 export failed: LpVariable.__init__() got an unexpected keyword argument 'lowBound'
+Use trained YOLO11n weights on Linux with Java 17+.
+
+Process return code: 1
