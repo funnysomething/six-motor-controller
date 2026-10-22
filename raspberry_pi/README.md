@@ -36,13 +36,13 @@ The script prints distance in centimeters every 0.5 seconds. Use Ctrl+C to stop 
 
 ## Six-motor I2C controller
 
-`motor_control.py` controls all six motors simultaneously. The Pi owns L298N direction inputs; the ESP32 owns six enable/PWM inputs. Upload the matching firmware from the development computer with:
+`motor_control.py` controls all six motors simultaneously. The Pi owns one DIR input per motor; the ESP32 owns six PWM inputs. DIR HIGH selects forward, DIR LOW selects reverse, and zero PWM stops the motor. Upload the matching firmware from the development computer with:
 
 ```sh
 pio run -e six-motor-i2c -t upload
 ```
 
-Follow the [complete motor and I2C wiring table](../README.md#pin-map-from-the-supplied-diagrams). The Pi diagram duplicates Motor6 labels; the code assumes module 3 IN1/IN2 is Motor5 and IN3/IN4 is Motor6. Edit the last two `DIRECTION_PINS` pairs if your wiring differs.
+Follow the [complete motor and I2C wiring table](../README.md#pin-map-from-the-supplied-diagrams). The updated diagram assigns DIR GPIOs BCM 26, 19, 13, 6, 5 and 11 to Motors 1-6 respectively (physical header pins 37, 35, 33, 31, 29 and 23). Pi GPIO4, 9, 10, 17, 22 and 27 are no longer claimed for motor direction. Copy the updated Pi script when switching drivers; the existing ESP32 firmware works unchanged.
 
 ### Copy and configure
 
@@ -62,7 +62,7 @@ sudo usermod -aG i2c,gpio "$USER"
 sudo raspi-config
 ```
 
-Enable **Interface Options > I2C**. Disable SPI: direction GPIO9/10/11 use the SPI0 pins. Remove other overlays using any of the twelve motor direction GPIOs. Reboot after changing interface configuration/group membership:
+Enable **Interface Options > I2C**. Disable SPI: direction GPIO11 uses a SPI0 pin. Remove other overlays using any of the six motor direction GPIOs. Reboot after changing interface configuration/group membership:
 
 ```sh
 sudo reboot
@@ -80,7 +80,7 @@ This controller replaces the earlier UART script. UART presets/options are no lo
 
 ### GPIO startup errors
 
-The controller detects the header GPIO chip by a known label or by verifying all twelve motor line names against their BCM offsets, and opens it explicitly. It handles labels returned as bytes or with padding, and recognizes device aliases reporting the same kernel chip name. It uses BCM numbering, even if the header controller appears as `/dev/gpiochip1` or `/dev/gpiochip4`. If discovery cannot select a single accessible header chip, it prints each chip's metadata and stops before claiming any pins.
+The controller detects the header GPIO chip by a known label or by verifying all six motor line names against their BCM offsets, and opens it explicitly. It handles labels returned as bytes or with padding, and recognizes device aliases reporting the same kernel chip name. It uses BCM numbering, even if the header controller appears as `/dev/gpiochip1` or `/dev/gpiochip4`. If discovery cannot select a single accessible header chip, it prints each chip's metadata and stops before claiming any pins.
 
 For `lgpio.error: 'unexpected error'`, run local diagnostics:
 
@@ -88,13 +88,13 @@ For `lgpio.error: 'unexpected error'`, run local diagnostics:
 python3 ~/motor_control.py --diagnose
 ```
 
-This prints the Pi model, kernel, chip names/labels/line counts, and the reason each chip was accepted or rejected. Once a chip is selected it also prints the owners of the twelve motor GPIOs. It does not claim pins, change pin modes, or communicate with the ESP32. Device files existing does not identify the header; an eight-line chip cannot cover the motor offsets through GPIO26.
+This prints the Pi model, kernel, chip names/labels/line counts, and the reason each chip was accepted or rejected. Once a chip is selected it also prints the owners of the six motor GPIOs. It does not claim pins, change pin modes, or communicate with the ESP32. Device files existing does not identify the header; an eight-line chip cannot cover the motor offsets through GPIO26.
 
 If you have identified the header chip, select it explicitly. For example, use `python3 ~/motor_control.py --diagnose --gpiochip 4` to inspect chip 4 and `python3 ~/motor_control.py --gpiochip 4 --gui` to run on it. Explicit selection bypasses the exact-label requirement, but still checks device access, line count, and conflicting line names. An unknown-label chip with unnamed lines can be selected explicitly only when you have confirmed it is the header controller. The chip number in these examples must match your Pi; do not try arbitrary chip numbers to bypass an error.
 
-GPIO9/10/11 overlap SPI0, and GPIO4 overlaps the common 1-Wire overlay. Disable conflicting interfaces/overlays in `raspi-config` or the boot configuration, close other motor/GPIO programs, then reboot after interface changes. If a chip cannot be opened due to permissions, run `sudo usermod -aG gpio,i2c "$USER"`, then log out and back in. Keep system `python3-gpiozero` and `python3-lgpio` packages current; if using a virtual environment, ensure it has access to the intended packages.
+DIR GPIO11 overlaps SPI0. GPIO4 is no longer used for motor direction. Disable conflicting interfaces/overlays in `raspi-config` or the boot configuration, close other motor/GPIO programs, then reboot after interface changes. If a chip cannot be opened due to permissions, run `sudo usermod -aG gpio,i2c "$USER"`, then log out and back in. Keep system `python3-gpiozero` and `python3-lgpio` packages current; if using a virtual environment, ensure it has access to the intended packages.
 
-If a pin is claimed but has no consumer label, the diagnostic prints `consumer=<not supplied by kernel>` instead of implying the owner is known. It searches readable `/proc` GPIO descriptor metadata for process IDs/names, shows relevant settings from the main boot config files, and reads current pin functions with `pinctrl get` when available. Older kernels may omit descriptor metadata, kernel drivers have no owning process PID, and permissions may prevent inspecting other users. `sudo python3 ~/motor_control.py --diagnose` is a read-only way to inspect those processes. The diagnostic exits with status 1 when motor pins are claimed; normal startup also checks all twelve GPIOs and stops before configuring any direction outputs if a conflict is found.
+If a pin is claimed but has no consumer label, the diagnostic prints `consumer=<not supplied by kernel>` instead of implying the owner is known. It searches readable `/proc` GPIO descriptor metadata for process IDs/names, shows relevant settings from the main boot config files, and reads current pin functions with `pinctrl get` when available. Older kernels may omit descriptor metadata, kernel drivers have no owning process PID, and permissions may prevent inspecting other users. `sudo python3 ~/motor_control.py --diagnose` is a read-only way to inspect those processes. The diagnostic exits with status 1 when motor pins are claimed; normal startup also checks all six GPIOs and stops before configuring any direction outputs if a conflict is found.
 
 On Pi 4, the old UART presets can explain this exact set of overlaps: UART3 uses GPIO4/5, UART4 uses GPIO8/9, and UART5 uses GPIO12/13. Check for `dtoverlay=uart3`, `dtoverlay=uart4`, and `dtoverlay=uart5` left from UART testing, including any included config files. If these interfaces are no longer needed, comment out their overlay lines in `/boot/firmware/config.txt` (or `/boot/config.txt` on older systems) and reboot. Keep I2C enabled for the ESP32. SPI and 1-Wire are other possible conflicts; the GPIO numbers alone do not identify the owner. The [official overlay reference](https://github.com/raspberrypi/firmware/blob/master/boot/overlays/README) documents these mappings.
 
@@ -135,7 +135,7 @@ Enabling automatic mode first stops any manually running motors. Manual speed ed
 
 #### Troubleshooting applied speed without rotation
 
-**Last applied** reports the acknowledged PWM command, which does not measure motor rotation. The **Output feedback** line also shows acknowledgement age and cached readback of the actual Pi direction GPIOs: `10` is forward, `01` reverse, and `00` stopped. A direction mismatch or acknowledgements older than one second produces a status warning; the ESP32 watchdog may have disabled PWM after a stalled worker. Unexpected background GPIO/IMU exceptions now latch a visible fault and attempt an all-motor stop instead of silently ending the heartbeat.
+**Last applied** reports the acknowledged PWM command, which does not measure motor rotation. The **Output feedback** line also shows acknowledgement age and cached readback of the actual Pi direction GPIOs: `1` selects forward and `0` selects reverse; zero acknowledged PWM means stopped. DIR alone cannot indicate a stop. A direction mismatch or acknowledgements older than one second produces a status warning; the ESP32 watchdog may have disabled PWM after a stalled worker. Unexpected background GPIO/IMU exceptions now latch a visible fault and attempt an all-motor stop instead of silently ending the heartbeat.
 
 For a trace in the terminal, run the updated script with:
 
@@ -143,15 +143,15 @@ For a trace in the terminal, run the updated script with:
 python3 ~/motor_control.py --gui --trace-motors
 ```
 
-Enable automatic mode with a valid reading at or below that pair's minimum distance (3 cm by default). With the default maximum speeds, the affected pair should report `100` in `applied`, `10` for each motor's `GPIO IN1/IN2`, and a recent `PWM ack age`. The trace prints on state changes and about once per second while the worker runs. Compare it with a manual command at the same percentage and direction, and include any reconnect or worker error messages when diagnosing a failure. Use `--no-imu` alongside these options to isolate a suspected IMU polling stall.
+Enable automatic mode with a valid reading at or below that pair's minimum distance (3 cm by default). With the default maximum speeds, the affected pair should report `100` in `applied`, `1` for each motor's `GPIO DIR`, and a recent `PWM ack age`. The trace prints on state changes and about once per second while the worker runs. Compare it with a manual command at the same percentage and direction, and include any reconnect or worker error messages when diagnosing a failure. Use `--no-imu` alongside these options to isolate a suspected IMU polling stall.
 
 With the default limits, the 3-10 cm curve still uses the full 0-100% PWM range. If a motor requires 52% to start, for example, a 50% automatic command may leave it stopped; that does not explain a motor staying stopped at 100%. Minimum speed remains zero; this mode does not add a starting pulse.
 
 #### All six motors work together, but subsets do not
 
-This pattern can indicate that PWM enable wires and Pi direction pairs belong to different motor channels. When all six receive equal speeds, an ordering mismatch is hidden. When only a pair is commanded, its direction inputs may be active while its actual enable inputs receive zero. Shared or accidentally connected enable lines are another possibility. A valid I2C acknowledgement and Pi GPIO readback cannot establish the connections at the L298N inputs.
+This pattern can indicate that PWM enable wires and Pi DIR pins belong to different motor channels. When all six receive equal speeds, an ordering mismatch is hidden. When only a pair is commanded, its direction inputs may be active while its actual enable inputs receive zero. Shared or accidentally connected enable lines are another possibility. A valid I2C acknowledgement and Pi GPIO readback cannot establish the connections at the H-bridge inputs.
 
-To distinguish these cases in manual mode, run all six at the same working speed, then set only Motor 1 to zero and Apply. If two physical motors stop, the direction and PWM assignments likely refer to different motors. If all six stop, check for connected/shared enable lines. With power disconnected, trace each driver's ENA to the ESP32 PWM wire for that driver's IN1/IN2 pair, and ENB to the wire for IN3/IN4. Each enable needs its own ESP32 signal; keep the shared ground connection.
+To distinguish these cases in manual mode, run all six at the same working speed, then set only Motor 1 to zero and Apply. If two physical motors stop, the direction and PWM assignments likely refer to different motors. If all six stop, check for connected/shared enable lines. With power disconnected, trace each driver's PWM input to the ESP32 wire for that motor's DIR pin. Each PWM input needs its own ESP32 signal; keep the shared ground connection.
 
 The Pi script supports `--pwm-map C1,C2,C3,C4,C5,C6` to correct a confirmed ordering mismatch without changing firmware. Entries identify the ESP32 PWM channel used by each Pi motor, in Motor 1-6 direction order. Channel numbers in this option are **1-based**:
 
@@ -188,17 +188,17 @@ help                  show commands
 q                     stop and quit
 ```
 
-Speeds are integers from -100 to 100. The controller automatically disables the affected PWM channels before switching direction and waits a 0.5-second coast interval for a reversal. Unchanged motors continue running.
+Speeds are integers from -100 to 100. The controller acknowledges zero PWM before claiming DIR at startup or switching direction, and waits a 0.5-second coast interval for a reversal. Zero PWM stops the motor; the driver determines whether that coasts or brakes. Unchanged motors continue running.
 
 Startup requires an acknowledged all-zero PWM command. A background thread refreshes the six-channel command every 0.2 seconds even while the prompt waits. Quit, Ctrl+C, EOF, SIGTERM and SSH hangup attempt to stop and release GPIO resources.
 
 ### I2C retries and recovery
 
-An I2C read/write error or applied-status timeout immediately lowers all twelve Pi direction outputs and clears cached ultrasonic readings. The controller then makes up to **five recovery attempts**, sending only all-zero PWM commands, with delays of **0.1, 0.2, 0.4, 0.5, and 0.5 seconds** before the attempts. Each command still requires a matching acknowledgement within 0.3 seconds. Startup and shutdown zero commands use the same retry path. Invalid user input is not retried.
+An I2C read/write error or applied-status timeout holds all DIR outputs steady and clears cached ultrasonic readings. The controller then makes up to **five recovery attempts**, sending only all-zero PWM commands, with delays of **0.1, 0.2, 0.4, 0.5, and 0.5 seconds** before the attempts. Each command still requires a matching acknowledgement within 0.3 seconds. DIR is lowered only after zero PWM is acknowledged, and the reversal coast interval starts from that acknowledgement. Startup and shutdown zero commands use the same retry path. Invalid user input is not retried.
 
 The GUI stays responsive and shows **I2C reconnecting** while motion controls are disabled. A successful acknowledged zero command restores the link without restarting the app and rearms an ESP32 that rebooted or tripped its one-second watchdog. Interrupted manual commands are discarded: all motors stay stopped until you click Apply again. Automatic mode remains enabled and resumes on a later heartbeat only when fresh valid sensor telemetry supports motion. A pending STOP exits automatic mode and takes priority over further motion commands.
 
-If all five recovery attempts fail, the Pi latches a fault, keeps directions disabled, makes a final best-effort zero command, and refuses further motion until the program is restarted. The ESP32's one-second watchdog independently disables PWM if commands stop arriving.
+If all five recovery attempts fail, the Pi latches a fault, makes a final best-effort zero command, and refuses further motion until the program is restarted. If that command also fails, it holds DIR for 1.1 seconds without further writes, allowing the ESP32's one-second watchdog to disable PWM before lowering or releasing DIR. LOW DIR is reverse, so lowering it cannot serve as an emergency stop.
 
 Only one process should own the motor outputs. For control from a vision/navigation program, import `I2CPwm` and `MotorController`; call `set_speeds` with six signed percentages, or `set_motor` with a motor number (1-6) and speed. Always call `close()` in `finally` before closing the I2C bus.
 

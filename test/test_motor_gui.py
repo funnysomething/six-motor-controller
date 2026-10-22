@@ -184,17 +184,17 @@ class GuiTests(unittest.TestCase):
         self.app.apply()
         self.assertEqual(self.controller.calls, [])
 
-    def test_output_feedback_flags_disabled_gpio_despite_positive_applied_pwm(self):
+    def test_output_feedback_flags_reverse_dir_despite_positive_applied_pwm(self):
         self.controller.speeds = (100,) * 6
         self.controller.last_pwm_ack_at = time.monotonic()
-        self.controller.output_sample = ((100,) * 6, ((0, 0),) * 6, "")
+        self.controller.output_sample = ((100,) * 6, (0,) * 6, "")
         self.wait_until(lambda: "GPIO feedback disagrees" in self.app.status.get())
-        self.assertIn("M1=00", self.app.output_status.get())
+        self.assertIn("M1=0", self.app.output_status.get())
         self.assertEqual([value.get() for value in self.app.applied], ["+100%"] * 6)
 
     def test_stalled_motor_worker_feedback_warns_that_pwm_may_have_stopped(self):
         self.controller.speeds = (100,) * 6
-        self.controller.output_sample = ((100,) * 6, ((1, 0),) * 6, "")
+        self.controller.output_sample = ((100,) * 6, (1,) * 6, "")
         self.controller.last_pwm_ack_at = time.monotonic() - 2
         self.wait_until(lambda: "Motor updates stale" in self.app.status.get())
         self.assertIn("watchdog", self.app.status.get())

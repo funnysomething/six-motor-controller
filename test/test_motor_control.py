@@ -55,15 +55,16 @@ class ControllerTests(unittest.TestCase):
                 test.pins[pin] = self
 
             def off(self):
+                if self.value:
+                    motor = motors.DIRECTION_PINS.index(self.pin)
+                    test.assertEqual(test.pwm.values[motor], 0)
                 self.value = False
                 test.events.append(("off", self.pin))
 
             def on(self):
-                motor = next(i for i, pair in enumerate(motors.DIRECTION_PINS) if self.pin in pair)
-                # Every direction-high change must follow confirmed disabled PWM.
+                motor = motors.DIRECTION_PINS.index(self.pin)
+                # Both edges of DIR must follow confirmed disabled PWM.
                 test.assertEqual(test.pwm.values[motor], 0)
-                other = next(pin for pin in motors.DIRECTION_PINS[motor] if pin != self.pin)
-                test.assertFalse(test.pins[other].value)
                 self.value = True
                 test.events.append(("on", self.pin))
 
@@ -79,9 +80,10 @@ class ControllerTests(unittest.TestCase):
         self.controller.set_speeds(values)
         self.assertEqual(self.pwm.values, (60, 50, 40, 30, 0, 100))
         self.assertEqual(self.controller.speeds, values)
-        for value, pair in zip(values, motors.DIRECTION_PINS):
-            self.assertEqual((self.pins[pair[0]].value, self.pins[pair[1]].value),
-                             (value > 0, value < 0))
+        self.assertEqual(motors.DIRECTION_PINS, (26, 19, 13, 6, 5, 11))
+        self.assertEqual(set(self.pins), {26, 19, 13, 6, 5, 11})
+        for value, pin in zip(values, motors.DIRECTION_PINS):
+            self.assertEqual(self.pins[pin].value, value > 0)
 
     def test_missing_imu_does_not_interrupt_pwm_heartbeat(self):
         from raspberry_pi.sen0140 import Sen0140
@@ -113,12 +115,12 @@ class ControllerTests(unittest.TestCase):
         self.controller.set_speeds((100, 100, -50, -50, 0, 0))
         speeds, directions, error = self.controller.output_sample
         self.assertEqual(speeds, self.controller.speeds)
-        self.assertEqual(directions, ((1, 0), (1, 0), (0, 1), (0, 1), (0, 0), (0, 0)))
+        self.assertEqual(directions, (1, 1, 0, 0, 0, 0))
         self.assertEqual(error, "")
-        self.pins[motors.DIRECTION_PINS[0][0]].off()
+        self.pins[motors.DIRECTION_PINS[0]].value = False  # Simulate a GPIO mismatch.
         self.controller._record_outputs()
         self.assertEqual(self.controller.output_sample[0][0], 100)
-        self.assertEqual(self.controller.output_sample[1][0], (0, 0))
+        self.assertEqual(self.controller.output_sample[1][0], 0)
 
     def test_trace_contains_automatic_pwm_gpio_readback_and_ack_age(self):
         import contextlib
@@ -132,7 +134,7 @@ class ControllerTests(unittest.TestCase):
                 patch.object(self.controller.done, "wait", side_effect=[False, True]):
             self.controller._heartbeat()
         self.assertIn("Motors auto: applied=(100, 100, 100, 100, 100, 100)", output.getvalue())
-        self.assertIn("GPIO IN1/IN2=10 10 10 10 10 10", output.getvalue())
+        self.assertIn("GPIO DIR=1 1 1 1 1 1", output.getvalue())
         self.assertIn("PWM ack age=0.00s", output.getvalue())
         self.controller.trace = False
 
@@ -142,7 +144,7 @@ class ControllerTests(unittest.TestCase):
         self.controller.set_motor(2, -40)
         self.assertEqual(self.events[0], ("pwm", (60, 0, 60, 60, 60, 60)))
         toggled = {event[1] for event in self.events if event[0] in ("on", "off")}
-        self.assertEqual(toggled, set(motors.DIRECTION_PINS[1]))
+        self.assertEqual(toggled, {motors.DIRECTION_PINS[1]})
         self.assertEqual(self.controller.speeds, (60, -40, 60, 60, 60, 60))
         self.assertEqual(self.clock.pauses, [0.5])
 
@@ -218,13 +220,68 @@ class ControllerTests(unittest.TestCase):
         with self.assertRaises(OSError):
             self.controller.close()
         self.assertTrue(all(pin.closed and not pin.value for pin in self.pins.values()))
+
+    def test_interrupted_close_stops_pwm_before_releasing_dir(self):
+        self.controller.set_speeds((60,) * 6)
+        original_write = self.pwm.set_percentages
+        calls = 0
+
+        def interrupted_write(values):
+            nonlocal calls
+            calls += 1
+            if calls == 1:
+                raise KeyboardInterrupt
+            original_write(values)
+
+        with patch.object(self.pwm, "set_percentages", side_effect=interrupted_write):
+            with self.assertRaises(KeyboardInterrupt):
+                self.controller.close()
+        self.assertEqual(self.pwm.values, (0,) * 6)
+        self.assertTrue(all(pin.closed and not pin.value for pin in self.pins.values()))
+
     def test_startup_requires_zero_ack_before_starting_heartbeat(self):
+        self.controller.close()
         self.pwm.failures_remaining = motors.I2C_RECOVERY_ATTEMPTS + 1
         self.events.clear()
+        output_factory = Mock()
         with self.assertRaises(OSError):
-            motors.MotorController(self.pwm, self.pins[26].__class__)
+            motors.MotorController(self.pwm, output_factory)
+        output_factory.assert_not_called()
         self.assertFalse(any(event[0] == "on" for event in self.events))
         self.assertTrue(all(pin.closed and not pin.value for pin in self.pins.values()))
+
+    def test_startup_acknowledges_zero_before_claiming_dir(self):
+        self.controller.close()
+        self.pwm.values = (60,) * 6  # A previous process left PWM running.
+        original_output = self.pins[26].__class__
+
+        def output_factory(pin, initial_value):
+            self.assertEqual(self.pwm.values, (0,) * 6)
+            return original_output(pin, initial_value)
+
+        controller = motors.MotorController(self.pwm, output_factory, start_heartbeat=False)
+        self.addCleanup(controller.close)
+        self.assertEqual(len(controller.outputs), 6)
+
+    def test_both_reversal_directions_gate_pwm_before_dir_changes(self):
+        for value in (60, -60, 60):
+            self.controller.set_speeds((value,) * 6)
+            self.assertEqual(tuple(pin.value for pin in self.pins.values()), (value > 0,) * 6)
+        self.assertEqual(self.clock.pauses, [0.5, 0.5])
+
+    def test_unacknowledged_fault_stop_holds_dir_until_pwm_watchdog(self):
+        self.controller.set_speeds((60,) * 6)
+
+        def watchdog_wait(seconds):
+            self.assertEqual(seconds, motors.PWM_WATCHDOG_WAIT)
+            self.assertTrue(all(pin.value for pin in self.pins.values()))
+            self.pwm.values = (0,) * 6  # Simulate firmware watchdog expiring.
+
+        with patch.object(self.pwm, "set_percentages", side_effect=OSError("link lost")), \
+                patch.object(self.clock, "sleep", side_effect=watchdog_wait):
+            self.controller._fail(OSError("worker failed"))
+        self.assertFalse(any(pin.value for pin in self.pins.values()))
+
     def test_automatic_pairs_follow_independent_sensors_and_stop_on_bad_readings(self):
         self.controller.set_speeds((80,) * 6)
         settings = motors.DepthControl((100, -80, 50))
@@ -254,7 +311,7 @@ class ControllerTests(unittest.TestCase):
         values = (100, 100, -50, -50, 20, 20)
         self.controller.set_speeds(values)
         manual_events = list(self.events)
-        manual_gpio = tuple(self.pins[pin].value for pair in motors.DIRECTION_PINS for pin in pair)
+        manual_gpio = tuple(self.pins[pin].value for pin in motors.DIRECTION_PINS)
         self.controller.set_speeds((0,) * 6)
         self.clock.now += motors.REVERSE_PAUSE
         self.controller.enable_depth_control(motors.DepthControl((100, -100, 100)))
@@ -269,7 +326,7 @@ class ControllerTests(unittest.TestCase):
         self.assertEqual(self.events[1:], manual_events)
         self.assertEqual(self.controller.speeds, values)
         self.assertEqual(self.pwm.values, tuple(abs(value) for value in values))
-        self.assertEqual(tuple(self.pins[pin].value for pair in motors.DIRECTION_PINS for pin in pair),
+        self.assertEqual(tuple(self.pins[pin].value for pin in motors.DIRECTION_PINS),
                          manual_gpio)
 
     def test_automatic_reversal_keeps_polling_without_blocking_and_rechecks_sensor(self):
@@ -340,7 +397,7 @@ class ControllerTests(unittest.TestCase):
         self.assertEqual(self.controller.speeds, (0,) * 6)
         self.assertFalse(any(pin.value for pin in self.pins.values()))
         self.controller.set_speeds((-60,) * 6)
-        self.assertAlmostEqual(self.clock.pauses[-1], 0.4)
+        self.assertAlmostEqual(self.clock.pauses[-1], 0.5)
         self.assertEqual(self.controller.speeds, (-60,) * 6)
 
 
@@ -363,7 +420,7 @@ class ControllerTests(unittest.TestCase):
 
         def check_retry(values):
             if self.controller.recovering:
-                self.assertFalse(any(pin.value for pin in self.pins.values()))
+                self.assertTrue(all(pin.value for pin in self.pins.values()))
                 self.assertEqual(values, (0,) * 6)
             original_write(values)
 

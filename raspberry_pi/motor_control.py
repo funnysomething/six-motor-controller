@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Control six L298N motors: Pi direction GPIO, ESP32 PWM over I2C."""
+"""Control six PWM+DIR H-bridges: Pi direction GPIO, ESP32 PWM over I2C."""
 
 import argparse
 from dataclasses import dataclass
@@ -14,16 +14,17 @@ import sys
 import threading
 import time
 
-# BCM GPIO pairs in (forward-high, reverse-high) order, Motor1 through Motor6.
-# Physical pins: (37,35), (33,31), (29,23), (21,19), (15,13), (11,7).
-# The screenshot repeats Motor6 on IN1/IN2: those belong to Motor5 here.
-DIRECTION_PINS = ((26, 19), (13, 6), (5, 11), (9, 10), (22, 27), (17, 4))
+# BCM DIR GPIOs, Motor1 through Motor6: HIGH forward, LOW reverse.
+# Physical pins: 37, 35, 33, 31, 29, 23, per the updated Pi diagram.
+DIRECTION_PINS = (26, 19, 13, 6, 5, 11)
 MOTOR_COUNT = 6
 PWM_GPIO_PINS = (4, 13, 12, 16, 17, 18)  # ESP32 firmware channel order.
 # Confirmed wiring: logical Pi motors 1-6 use firmware PWM channels 4,5,6,1,2,3.
 DEFAULT_PWM_MAP = (3, 4, 5, 0, 1, 2)
 I2C_ADDRESS = 0x32
 REVERSE_PAUSE = 0.5
+# Firmware WATCHDOG_MS is 1000; include margin before releasing DIR on failure.
+PWM_WATCHDOG_WAIT = 1.1
 HEARTBEAT_INTERVAL = 0.2
 ACK_TIMEOUT = 0.3
 I2C_RECOVERY_ATTEMPTS = 5
@@ -34,7 +35,7 @@ DEPTH_MOTOR_PAIRS = ((0, 1), (2, 3), (4, 5))
 DEPTH_FULL_SPEED_CM = 3.0
 DEPTH_STOP_CM = 10.0
 HEADER_CHIP_LABELS = {"pinctrl-bcm2835", "pinctrl-bcm2711", "pinctrl-rp1"}
-MOTOR_GPIO_PINS = sorted({pin for pair in DIRECTION_PINS for pin in pair})
+MOTOR_GPIO_PINS = sorted(DIRECTION_PINS)
 
 
 def gpio_text(value):
@@ -135,13 +136,12 @@ def read_motor_gpio_lines(lgpio, chip):
     handle = lgpio.gpiochip_open(chip)
     lines = []
     try:
-        for motor, pair in enumerate(DIRECTION_PINS, 1):
-            for pin in pair:
-                _, offset, flags, name, consumer = lgpio.gpio_get_line_info(handle, pin)
-                consumer = gpio_text(consumer)
-                lines.append(dict(motor=motor, pin=pin, offset=offset, flags=flags,
-                                  name=gpio_text(name), consumer=consumer,
-                                  used=bool(flags & 1) or bool(consumer)))
+        for motor, pin in enumerate(DIRECTION_PINS, 1):
+            _, offset, flags, name, consumer = lgpio.gpio_get_line_info(handle, pin)
+            consumer = gpio_text(consumer)
+            lines.append(dict(motor=motor, pin=pin, offset=offset, flags=flags,
+                              name=gpio_text(name), consumer=consumer,
+                              used=bool(flags & 1) or bool(consumer)))
     finally:
         lgpio.gpiochip_close(handle)
     return lines
@@ -268,7 +268,7 @@ def diagnose_gpio(requested=None):
         if chip["lines"] <= max(MOTOR_GPIO_PINS):
             print("  Too few lines for the motor GPIO offsets.")
         elif matching_gpio_names(chip):
-            print("  All twelve motor line names match BCM GPIO offsets.")
+            print("  All six motor line names match BCM GPIO offsets.")
         elif gpio_text(chip["label"]) in HEADER_CHIP_LABELS:
             print("  Recognized Pi header label.")
         else:
@@ -295,8 +295,8 @@ def diagnose_gpio(requested=None):
         selected_chip = next(chip for chip in chips if chip["index"] == selected)
         print_gpio_claim_details(gpio_text(selected_chip.get("name", "")) or f"gpiochip{selected}")
     print("If a motor pin is owned by SPI, disable SPI in raspi-config and reboot.\n"
-          "Also check old UART3/4/5 overlays: they overlap GPIO4/5, GPIO9, and GPIO13 on Pi 4.\n"
-          "Close other motor programs. GPIO4 can also be claimed by a 1-Wire overlay.\n"
+          "Also check old UART3/5 overlays: they overlap DIR GPIO5 and GPIO13 on Pi 4.\n"
+          "Close other motor programs.\n"
           "For permissions: sudo usermod -aG gpio,i2c \"$USER\", then log out and back in.")
     return 1 if used else 0
 
@@ -320,7 +320,7 @@ def make_output_factory(pin_factory, output_type):
         try:
             return output_type(pin, initial_value=initial_value, pin_factory=pin_factory)
         except Exception as error:
-            motor = next(i for i, pair in enumerate(DIRECTION_PINS, 1) if pin in pair)
+            motor = DIRECTION_PINS.index(pin) + 1
             raise RuntimeError(
                 f"Cannot initialize Motor{motor} GPIO{pin} on gpiochip{pin_factory.chip}: {error}. "
                 "Run --diagnose; check SPI/1-Wire overlays, other GPIO programs, "
@@ -473,10 +473,10 @@ class MotorController:
         self.last_trace_at = float("-inf")
         self.last_trace_state = None
         try:
-            for pair in DIRECTION_PINS:
-                for pin in pair:
-                    self.outputs.append(output_factory(pin, initial_value=False))
+            # LOW selects reverse: acknowledge zero PWM before claiming DIR.
             self._write_pwm(self.speeds)
+            for pin in DIRECTION_PINS:
+                self.outputs.append(output_factory(pin, initial_value=False))
             self._record_outputs()
             if start_heartbeat:
                 self.worker = threading.Thread(target=self._heartbeat, daemon=True)
@@ -511,9 +511,7 @@ class MotorController:
     def _record_outputs(self):
         """Cache actual direction readback on the hardware worker, never Tk."""
         try:
-            directions = tuple((int(bool(self.outputs[2 * motor].value)),
-                                int(bool(self.outputs[2 * motor + 1].value)))
-                               for motor in range(MOTOR_COUNT))
+            directions = tuple(int(bool(output.value)) for output in self.outputs)
             error = ""
         except Exception as read_error:
             directions = None
@@ -523,10 +521,10 @@ class MotorController:
         mode = "auto" if self.depth_control is not None else "manual"
         state = (mode, self.output_sample, self.recovering, self.fault is not None)
         if self.trace and (state != self.last_trace_state or now - self.last_trace_at >= 1):
-            pins = (" ".join(f"{forward}{reverse}" for forward, reverse in directions)
+            pins = (" ".join(str(direction) for direction in directions)
                     if directions is not None else f"read error: {error}")
             age = (f"{now - self.last_pwm_ack_at:.2f}s" if self.last_pwm_ack_at is not None else "none")
-            print(f"Motors {mode}: applied={self.speeds}; GPIO IN1/IN2={pins}; "
+            print(f"Motors {mode}: applied={self.speeds}; GPIO DIR={pins}; "
                   f"PWM ack age={age}; recovering={self.recovering}; fault={self.fault}",
                   file=sys.stderr, flush=True)
             self.last_trace_at = now
@@ -544,21 +542,21 @@ class MotorController:
 
     def _recover_link(self, error):
         # A write may have reached the ESP32 even if its acknowledgement was
-        # lost. Drop Pi directions immediately and retry ONLY all-zero frames.
+        # lost. Hold DIR steady and retry ONLY all-zero frames. LOW is reverse,
+        # so changing DIR before PWM is disabled could reverse a running motor.
         # This also rearms an ESP32 that rebooted or tripped its watchdog.
         self.recovering = True
         now = time.monotonic()
-        self._direction_off()
         self.stopped_at = [now] * MOTOR_COUNT
         self.speeds = (0,) * MOTOR_COUNT
         self.last_pwm_ack_at = None
         self.pwm.ultrasonic_samples = (None, None, None)
         self._record_outputs()
-        print(f"\nI2C interrupted; motors stopped, retrying: {error}", file=sys.stderr)
+        print(f"\nI2C interrupted; requesting zero PWM, retrying: {error}", file=sys.stderr)
         try:
             for attempt in range(I2C_RECOVERY_ATTEMPTS):
                 self.link_notice = (f"I2C reconnecting ({attempt + 1}/{I2C_RECOVERY_ATTEMPTS}); "
-                                    "all motors stopped.")
+                                    "requesting zero PWM.")
                 time.sleep(min(I2C_RETRY_DELAY * 2 ** attempt, I2C_RETRY_MAX_DELAY))
                 try:
                     self.pwm.set_percentages(self.speeds)
@@ -566,6 +564,9 @@ class MotorController:
                     error = retry_error
                 else:
                     self.last_pwm_ack_at = time.monotonic()
+                    self.stopped_at = [self.last_pwm_ack_at] * MOTOR_COUNT
+                    self._direction_off()
+                    self._record_outputs()
                     self.link_notice = "I2C recovered; all motors stopped."
                     print(self.link_notice, file=sys.stderr)
                     return
@@ -580,13 +581,14 @@ class MotorController:
         self.fault = error
         self.depth_control = None
         self.done.set()
-        self._direction_off()
         self.speeds = (0,) * MOTOR_COUNT
-        self._record_outputs()
         try:
             self.pwm.set_percentages(self.speeds)
         except OSError:
-            pass  # The ESP32 also disables PWM after its one-second watchdog.
+            # No more writes until the firmware watchdog has disabled PWM.
+            time.sleep(PWM_WATCHDOG_WAIT)
+        self._direction_off()
+        self._record_outputs()
 
     def _heartbeat(self):
         while not self.done.wait(HEARTBEAT_INTERVAL):
@@ -608,7 +610,7 @@ class MotorController:
                     # thread and leave the GUI showing a frozen nonzero speed.
                     if self.fault is None:
                         self._fail(error)
-                    print(f"\nMotor worker failed; all directions disabled: {error}", file=sys.stderr)
+                    print(f"\nMotor worker failed; PWM stopped: {error}", file=sys.stderr)
                     return
 
     def enable_depth_control(self, settings):
@@ -657,15 +659,14 @@ class MotorController:
             try:
                 if changed:
                     gated = tuple(0 if i in changed else abs(v) for i, v in enumerate(self.speeds))
-                    # Confirm affected ENA/ENB outputs are zero before touching IN pins.
+                    # Confirm affected PWM outputs are zero before touching DIR.
                     if not self._write_pwm(gated):
                         return False
                     now = time.monotonic()
                     for i in changed:
                         if self.speeds[i] != 0:
                             self.stopped_at[i] = now
-                        self.outputs[2 * i].off()
-                        self.outputs[2 * i + 1].off()
+                        self.outputs[i].off()
                     pause = max((REVERSE_PAUSE - (now - self.stopped_at[i])
                                  for i in changed if directions[i] and self.last_directions[i]
                                  and directions[i] != self.last_directions[i]), default=0)
@@ -673,9 +674,7 @@ class MotorController:
                         time.sleep(pause)
                     for i in changed:
                         if directions[i] > 0:
-                            self.outputs[2 * i].on()
-                        elif directions[i] < 0:
-                            self.outputs[2 * i + 1].on()
+                            self.outputs[i].on()
                 # A nonzero frame may be applied even when its acknowledgement
                 # fails. Remember its direction before sending it so recovery
                 # still enforces the coast interval on the next reversal.
@@ -709,8 +708,12 @@ class MotorController:
             if self.closed:
                 return
             try:
-                self._direction_off()
                 self._write_pwm((0,) * MOTOR_COUNT)
+            except BaseException as error:
+                # An interrupted retry must not release DIR while PWM may run.
+                if self.fault is None:
+                    self._fail(error)
+                raise
             finally:
                 self._direction_off()
                 self.speeds = (0,) * MOTOR_COUNT
@@ -722,7 +725,7 @@ HELP = """m 60                  all six motors forward at 60%
 m -60                 all six motors reverse at 60%
 m 1 60                Motor1 at 60%; keep the other five settings
 m 60 -60 40 40 0 75    individual speeds for Motors 1 through 6
-s                     stop/coast all six motors
+s                     stop all six motors (zero PWM)
 help                  show commands
 q                     stop and quit"""
 
@@ -952,7 +955,7 @@ class MotorGui:
             variable.set(0)
         self.group_value.set(0)
         if self.controller.fault is not None:
-            self.status.set(f"Motor link failed; directions disabled: {self.controller.fault}")
+            self.status.set(f"Motor link failed; PWM stopped: {self.controller.fault}")
         elif self.busy:
             # No queued motion commands: stop is the next request after the
             # in-flight operation completes, including its reversal interval.
@@ -995,7 +998,7 @@ class MotorGui:
             variable.set(f"{speed:+d}%")
         if self.controller.fault is not None:
             self.auto_enabled.set(False)
-            self.status.set(f"Motor link failed; directions disabled: {self.controller.fault}")
+            self.status.set(f"Motor link failed; PWM stopped: {self.controller.fault}")
         elif not self.closing and getattr(self.controller, "link_notice", ""):
             self.status.set(self.controller.link_notice)
         elif self.auto_enabled.get() and not self.busy and not self.closing:
@@ -1018,14 +1021,14 @@ class MotorGui:
         ack_at = getattr(self.controller, "last_pwm_ack_at", None)
         age = time.monotonic() - ack_at if ack_at is not None else None
         ack_text = f"{age:.1f} s ago" if age is not None else "unavailable"
-        pins = (" ".join(f"M{motor + 1}={forward}{reverse}"
-                         for motor, (forward, reverse) in enumerate(directions))
+        pins = (" ".join(f"M{motor + 1}={direction}"
+                         for motor, direction in enumerate(directions))
                 if directions is not None else f"read error: {error}")
         self.output_status.set(f"PWM acknowledged: {ack_text}. Pi direction GPIO: {pins}\n"
-                               "10 = forward; 01 = reverse; 00 = stopped. Feedback does not measure rotation.")
+                               "DIR 1 = forward; DIR 0 = reverse; zero PWM = stopped. Feedback does not measure rotation.")
         if age is None or age > 1.0:
             return "Motor updates stale; the ESP32 watchdog may have stopped PWM. Check terminal output."
-        expected = tuple((int(speed > 0), int(speed < 0)) for speed in speeds)
+        expected = tuple(int(speed > 0) for speed in speeds)
         if directions is None or directions != expected:
             return "Motor direction GPIO feedback disagrees with applied speeds. Check terminal output."
         return None
