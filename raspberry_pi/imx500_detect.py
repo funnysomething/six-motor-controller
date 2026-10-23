@@ -8,6 +8,7 @@ from pathlib import Path
 import signal
 import sys
 import time
+import traceback
 
 
 def parse_args(argv=None):
@@ -16,7 +17,7 @@ def parse_args(argv=None):
                         help="IMX export containing packerOut.zip and labels.txt, not NCNN")
     parser.add_argument("--conf", type=float, default=0.5)
     parser.add_argument("--fps", type=int, default=16, help="requested camera FPS, not an inference guarantee")
-    parser.add_argument("--seconds", type=int, default=60)
+    parser.add_argument("--seconds", type=int, default=60, help="detection duration after camera startup")
     parser.add_argument("--headless", action="store_true", help="log detections without a preview window")
     args = parser.parse_args(argv)
     args.model_dir = args.model_dir.expanduser().resolve()
@@ -47,7 +48,9 @@ def run(args, AiCamera, Model, MODEL_TYPE, COLOR_FORMAT, postprocess, Annotator)
         def post_process(self, tensors):
             return postprocess(tensors)
 
-    device = AiCamera(frame_rate=args.fps, timeout=args.seconds, headless=args.headless)
+    # Sony's timeout includes firmware loading and calls __exit__ itself, which
+    # can close descriptors twice when used with a context manager.
+    device = AiCamera(frame_rate=args.fps, timeout=None, headless=args.headless)
     print("Deploying YOLO11n to the IMX500. Initial packaging/firmware loading can take minutes.", flush=True)
     model = TestudoModel()
     device.deploy(model)
@@ -73,6 +76,8 @@ def run(args, AiCamera, Model, MODEL_TYPE, COLOR_FORMAT, postprocess, Annotator)
             if annotator is not None:
                 annotator.annotate_boxes(frame, selected, labels=captions)
                 frame.display()
+            if now - begin >= args.seconds:
+                break
     return 0
 
 
@@ -93,6 +98,7 @@ def main(argv=None):
     except KeyboardInterrupt:
         return 130
     except Exception as error:
+        traceback.print_exc()
         print(f"IMX500 detection failed: {error}\nSee testudo_training/IMX500.md for Sony modlib setup.",
               file=sys.stderr)
         return 1
