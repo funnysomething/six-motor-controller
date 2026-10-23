@@ -33,7 +33,9 @@ def parse_args(argv=None):
     return args
 
 
-def run(args, AiCamera, Model, MODEL_TYPE, COLOR_FORMAT, postprocess, Annotator):
+def run(args, AiCamera, Model, MODEL_TYPE, COLOR_FORMAT, postprocess, Annotator,
+        *, on_frame=None, on_status=None, reuse_packaged=False):
+    """Share model loading and detection with the GUI; seconds=None streams until stopped."""
     labels = (args.model_dir / "labels.txt").read_text().splitlines()
     if len(labels) != 1 or labels[0].strip().casefold() != "testudo":
         raise ValueError("Expected exactly one Testudo label in labels.txt; check the trained model export")
@@ -52,21 +54,32 @@ def run(args, AiCamera, Model, MODEL_TYPE, COLOR_FORMAT, postprocess, Annotator)
     # can close descriptors twice when used with a context manager.
     device = AiCamera(frame_rate=args.fps, timeout=None, headless=args.headless)
     print("Deploying YOLO11n to the IMX500. Initial packaging/firmware loading can take minutes.", flush=True)
+    if on_status is not None:
+        on_status("Loading IMX500 model; preparing firmware (first deployment can take minutes).")
     model = TestudoModel()
-    device.deploy(model)
+    if reuse_packaged:
+        # The GUI cannot answer the packager's interactive overwrite prompt.
+        device.deploy(model, overwrite=False)
+    else:
+        device.deploy(model)
     annotator = None if args.headless else Annotator()
     frames = 0
     next_log = 0
     print("Network inference runs on the CAMERA; result decoding and preview run on the PI. "
           "Ctrl+C stops.", flush=True)
+    if on_status is not None:
+        on_status("Starting camera and uploading IMX500 firmware; this can take minutes.")
     with device as stream:
         begin = time.monotonic()
+        if on_status is not None:
+            on_status("IMX500 firmware loaded; waiting for detections.")
         for frame in stream:
             frames += 1
             detections = frame.detections
-            selected = detections[detections.confidence >= args.conf]
-            captions = [f"{labels[int(class_id)]} {float(score):.2f}"
-                        for _, score, class_id, _ in selected]
+            selected = None if detections is None else detections[detections.confidence >= args.conf]
+            captions = ([] if selected is None else
+                        [f"{labels[int(class_id)]} {float(score):.2f}"
+                         for _, score, class_id, _ in selected])
             now = time.monotonic()
             if now >= next_log:
                 # A camera image may reuse detections; don't call display rate inference FPS.
@@ -74,9 +87,13 @@ def run(args, AiCamera, Model, MODEL_TYPE, COLOR_FORMAT, postprocess, Annotator)
                       f"objects: {', '.join(captions) or 'none'}", flush=True)
                 next_log = now + 1
             if annotator is not None:
-                annotator.annotate_boxes(frame, selected, labels=captions)
-                frame.display()
-            if now - begin >= args.seconds:
+                if selected is not None:
+                    annotator.annotate_boxes(frame, selected, labels=captions)
+                if on_frame is None:
+                    frame.display()
+            if on_frame is not None:
+                on_frame(frame, captions)
+            if args.seconds is not None and now - begin >= args.seconds:
                 break
     return 0
 

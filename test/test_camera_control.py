@@ -143,6 +143,23 @@ class CameraTests(unittest.TestCase):
         session.process.poll.return_value = 0
         session.close()
 
+    def test_reader_shows_loading_stages_before_first_frame(self):
+        session = camera.CameraSession(Mock())
+        stages = ["Preparing firmware", "Uploading firmware", "Waiting for detections"]
+        observed = []
+
+        def messages():
+            for stage in stages:
+                yield camera.MESSAGE_PREFIX + json.dumps(dict(type="status", text=stage)) + "\n"
+                observed.append(session.status)
+
+        process = Mock()
+        process.stdout = MagicMock()
+        process.stdout.__iter__.return_value = messages()
+        process.wait.return_value = 0
+        session._read(process)
+        self.assertEqual(observed, stages)
+
     def test_real_worker_process_can_fail_without_touching_motor_controller(self):
         config = Mock()
         config.command.return_value = ([sys.executable, "-c", "raise RuntimeError('camera unplugged')"], "ncnn")
@@ -180,7 +197,7 @@ class CameraTests(unittest.TestCase):
             capture.stop.assert_called_once()
             capture.close.assert_called_once()
 
-    def test_imx_runner_deploys_trained_export_and_annotates_without_opencv_window(self):
+    def test_imx_runner_reuses_model_and_streams_until_stopped_without_opencv_window(self):
         with tempfile.TemporaryDirectory() as directory:
             root = export(Path(directory), "imx500")
             model_args = {}
@@ -192,25 +209,38 @@ class CameraTests(unittest.TestCase):
             detections = MagicMock()
             detections.confidence.__ge__.return_value = "mask"
             detections.__getitem__.return_value = [(None, .9, 0, None)]
-            frame = SimpleNamespace(detections=detections, image="rgb pixels", color_format="RGB")
+            display = Mock(side_effect=AssertionError("GUI must not open a second preview"))
+            frame = SimpleNamespace(detections=detections, image="rgb pixels", color_format="RGB", display=display)
+            waiting = SimpleNamespace(detections=None, image="first pixels", color_format="RGB", display=display)
             device = MagicMock()
-            device.__enter__.return_value = [frame]
+            device.__enter__.return_value = [waiting, frame]
             factory = Mock(return_value=device)
             annotator = Mock()
             cv2 = Mock()
             postprocess = Mock()
-            publish = Mock()
+            publish = Mock(side_effect=[None, KeyboardInterrupt])
+            status = Mock()
             with patch.dict("sys.modules", {"cv2": cv2, "modlib": Mock(),
                     "modlib.apps": SimpleNamespace(Annotator=Mock(return_value=annotator)),
                     "modlib.devices": SimpleNamespace(AiCamera=factory),
                     "modlib.models": SimpleNamespace(Model=Model, COLOR_FORMAT=SimpleNamespace(RGB="RGB"),
                                                      MODEL_TYPE=SimpleNamespace(CONVERTED="converted")),
-                    "modlib.models.post_processors": SimpleNamespace(pp_od_yolo_ultralytics=postprocess)}):
-                camera.run_imx500(SimpleNamespace(model=root, fps=16, conf=.5), publish)
+                    "modlib.models.post_processors": SimpleNamespace(pp_od_yolo_ultralytics=postprocess)}), \
+                    patch.object(camera.time, "monotonic", side_effect=[0, 300, 600]), \
+                    self.assertRaises(KeyboardInterrupt):
+                camera.run_imx500(SimpleNamespace(model=root, fps=16, conf=.5), publish, status=status)
             self.assertEqual(model_args["model_file"], str(root / "packerOut.zip"))
-            factory.assert_called_once_with(frame_rate=16, headless=False)
-            annotator.annotate_boxes.assert_called_once_with(frame, [(None, .9, 0, None)], labels=["Testudo 90%"])
-            publish.assert_called_once_with(cv2.cvtColor.return_value, ["Testudo 90%"], "IMX500 / camera AI", cv2)
+            factory.assert_called_once_with(frame_rate=16, timeout=None, headless=False)
+            device.deploy.assert_called_once_with(device.deploy.call_args.args[0], overwrite=False)
+            deployed = device.deploy.call_args.args[0]
+            deployed.post_process(["tensors"])
+            postprocess.assert_called_once_with(["tensors"])
+            annotator.annotate_boxes.assert_called_once_with(frame, [(None, .9, 0, None)], labels=["testudo 0.90"])
+            self.assertEqual(publish.call_count, 2)
+            self.assertEqual(publish.call_args_list[0].args[1], [])
+            self.assertEqual(publish.call_args.args, (cv2.cvtColor.return_value, ["testudo 0.90"], "IMX500 / camera AI", cv2))
+            self.assertIn("firmware loaded", status.call_args.args[0])
+            display.assert_not_called()
             device.__exit__.assert_called_once()
 
 

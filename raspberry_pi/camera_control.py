@@ -15,6 +15,7 @@ import subprocess
 import sys
 import threading
 import time
+import traceback
 
 
 ROOT = Path(__file__).resolve().parents[1]
@@ -103,7 +104,8 @@ class CameraSession:
                            else f"Loading {backend} on Pi CPU (IMX500 export not selected).")
             env = dict(os.environ, OMP_NUM_THREADS="2", OPENBLAS_NUM_THREADS="2", MKL_NUM_THREADS="2")
             options = {"creationflags": subprocess.CREATE_NO_WINDOW} if os.name == "nt" else {}
-            self.process = subprocess.Popen(command, stdout=subprocess.PIPE, stderr=subprocess.STDOUT,
+            self.process = subprocess.Popen(command, stdin=subprocess.DEVNULL,
+                                            stdout=subprocess.PIPE, stderr=subprocess.STDOUT,
                                             text=True, encoding="utf-8", errors="replace", env=env, **options)
             self.reader = threading.Thread(target=self._read, args=(self.process,), daemon=True)
             self.reader.start()
@@ -127,6 +129,8 @@ class CameraSession:
                     elif message["type"] == "error":
                         self.error = message["text"]
                         self.status = f"Camera failed: {self.error}"
+                    elif message["type"] == "status":
+                        self.status = message["text"]
                 except (ValueError, KeyError, TypeError) as error:
                     self.logs.append(f"Invalid camera message: {error}")
             code = process.wait()
@@ -224,42 +228,28 @@ def run_cpu(args, publish):
             camera.close()
 
 
-def run_imx500(args, publish):
+def run_imx500(args, publish, status=None):
     import cv2
     from modlib.apps import Annotator
     from modlib.devices import AiCamera
     from modlib.models import COLOR_FORMAT, MODEL_TYPE, Model
     from modlib.models.post_processors import pp_od_yolo_ultralytics
+    if __package__:
+        from .imx500_detect import run
+    else:
+        from imx500_detect import run
 
-    labels = (args.model / "labels.txt").read_text().splitlines()
-    if len(labels) != 1 or labels[0].strip().casefold() != "testudo":
-        raise ValueError("Expected exactly one Testudo class in labels.txt")
+    def on_frame(frame, captions):
+        image = frame.image
+        if frame.color_format == COLOR_FORMAT.RGB:
+            image = cv2.cvtColor(image, cv2.COLOR_RGB2BGR)
+        publish(image, captions, "IMX500 / camera AI", cv2)
 
-    class TestudoModel(Model):
-        def __init__(self):
-            super().__init__(model_file=str(args.model / "packerOut.zip"),
-                             model_type=MODEL_TYPE.CONVERTED,
-                             color_format=COLOR_FORMAT.RGB, preserve_aspect_ratio=False)
-            self.labels = labels
-
-        def post_process(self, tensors):
-            return pp_od_yolo_ultralytics(tensors)
-
-    device = AiCamera(frame_rate=args.fps, headless=False)
-    device.deploy(TestudoModel())
-    annotator = Annotator()
-    with device as stream:
-        for frame in stream:
-            detections = frame.detections
-            captions = []
-            if detections is not None:
-                selected = detections[detections.confidence >= args.conf]
-                captions = [f"Testudo {float(score):.0%}" for _, score, _, _ in selected]
-                annotator.annotate_boxes(frame, selected, labels=captions)
-            image = frame.image
-            if frame.color_format == COLOR_FORMAT.RGB:
-                image = cv2.cvtColor(image, cv2.COLOR_RGB2BGR)
-            publish(image, captions, "IMX500 / camera AI", cv2)
+    options = argparse.Namespace(model_dir=args.model, fps=args.fps, conf=args.conf,
+                                 seconds=None, headless=False)
+    return run(options, AiCamera, Model, MODEL_TYPE, COLOR_FORMAT,
+               pp_od_yolo_ultralytics, Annotator, on_frame=on_frame,
+               on_status=status, reuse_packaged=True)
 
 
 def worker_main(argv=None):
@@ -303,10 +293,14 @@ def worker_main(argv=None):
         # Keep library progress/logging separate from the framed GUI protocol.
         with redirect_stdout(sys.stderr):
             CameraConfig(args.backend, args.model, confidence=args.conf, fps=args.fps).resolve()
-            (run_imx500 if args.backend == "imx500" else run_cpu)(args, publish)
+            if args.backend == "imx500":
+                run_imx500(args, publish, status=lambda value: emit(dict(type="status", text=value)))
+            else:
+                run_cpu(args, publish)
     except KeyboardInterrupt:
         return 0
     except Exception as error:
+        traceback.print_exc()
         emit(dict(type="error", text=f"{error}. See camera setup in raspberry_pi/README.md."))
         return 1
     return 0

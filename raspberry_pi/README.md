@@ -115,7 +115,7 @@ The GUI keeps responding during I2C transactions and reversal pauses, and shows 
 
 #### Camera detection in the motor GUI
 
-Use the updated `motor_control.py`, `camera_control.py` and `sen0140.py` from the
+Use the updated `motor_control.py`, `camera_control.py`, `imx500_detect.py` and `sen0140.py` from the
 same checkout. Keep the full repository on the Pi so the trained model and vision
 environments can be found. From the repo root, run:
 
@@ -129,6 +129,14 @@ boxes, confidence and the active inference backend. **Motors and sensors** retai
 the motor, ultrasonic and IMU controls. **STOP ALL MOTORS** stays visible on both
 tabs. Camera detection does not command motors. **Start camera** and **Stop camera**
 operate independently of motor controls; closing the GUI stops both.
+
+IMX500 detection shares the tested `imx500_detect.py` loader and decoder. It
+reuses the existing packaged `pack/network.rpk` without an overwrite prompt,
+or packages the export if needed, then reads frames continuously until stopped.
+The camera tab shows loading, firmware upload and waiting-for-detections stages.
+There is no timed-test limit in the GUI; firmware loading does not consume a
+detection timeout. If you replace `packerOut.zip` with a newer model, run the
+standalone detector once and choose overwrite to refresh its packaged network.
 
 Automatic selection uses the camera's AI processor when
 `testudo_training/runs/testudo_imx500/weights/best_imx_model/` contains
