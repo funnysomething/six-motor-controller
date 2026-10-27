@@ -1,0 +1,332 @@
+Working directory: /mnt/c/Users/adisa/Documents/Workspace/Classes/ENEE408V
+/mnt/c/Users/adisa/Documents/Workspace/Classes/ENEE408V/testudo_training/.venv/bin/python /mnt/c/Users/adisa/Documents/Workspace/Classes/ENEE408V/testudo_training/export_imx500.py --weights /mnt/c/Users/adisa/Documents/Workspace/Classes/ENEE408V/testudo_training/runs/testudo_imx500/weights/best.pt --data /mnt/c/Users/adisa/Documents/Workspace/Classes/ENEE408V/datasets/testudo/data.yaml --imgsz 640 --weights testudo_training/runs/testudo_imx500/weights/best.pt --data datasets/testudo/data.yaml
+Export host: Linux-6.6.87.2-microsoft-standard-WSL2-x86_64-with-glibc2.39, architecture=x86_64, Python=3.12.3
+ultralytics: 8.4.184
+torch: 2.14.1
+model-compression-toolkit: not installed
+imx500-converter: not installed
+openjdk version "21.0.12.1" 2026-08-18
+OpenJDK Runtime Environment (build 21.0.12.1+1-1-24.04.4-Ubuntu)
+OpenJDK 64-Bit Server VM (build 21.0.12.1+1-1-24.04.4-Ubuntu, mixed mode, sharing)
+Memory before export:
+MemTotal:        7954648 kB
+MemAvailable:    7362856 kB
+SwapFree:        2095604 kB
+Creating new Ultralytics Settings v0.0.8 file ✅ 
+View Ultralytics Settings with 'yolo settings' or at '/home/adisa/.config/Ultralytics/settings.json'
+Update Settings with 'yolo settings key=value', i.e. 'yolo settings runs_dir=path/to/dir'. For help see https://docs.ultralytics.com/usage/settings.
+
+[KDownloading https://ultralytics.com/assets/Arial.ttf to '/home/adisa/.config/Ultralytics/Arial.ttf': 100% ━━━━━━━━━━━━ 755.1KB 15.9MB/s 0.0s
+Exporting for the camera AI processor. YOLO26 and NCNN are unsupported here. Conversion may install additional dependencies and take time.
+Ultralytics 8.4.184 🚀 Python-3.12.3 torch-2.14.1+cu130 CPU (Intel Core Ultra 7 256V)
+💡 ProTip: Export to OpenVINO format for best performance on Intel hardware. Learn more at https://docs.ultralytics.com/integrations/openvino
+YOLO11n summary (fused): 101 layers, 2,597,051 parameters, 0 gradients, 6.4 GFLOPs
+
+[34m[1mPyTorch:[0m starting from '/mnt/c/Users/adisa/Documents/Workspace/Classes/ENEE408V/testudo_training/runs/testudo_imx500/weights/best.pt' with input shape (1, 3, 640, 640) BCHW and output shape(s) ((1, 8400, 4), (1, 8400, 1)) (5.2 MB)
+[31m[1mrequirements:[0m Ultralytics requirements ['model-compression-toolkit>=2.4.1', 'edge-mdt-cl<1.1.0', 'edge-mdt-tpc>=1.2.0', 'pydantic<2.12'] not found, attempting AutoUpdate...
+Collecting model-compression-toolkit>=2.4.1
+  Downloading model_compression_toolkit-2.6.1-py3-none-any.whl.metadata (33 kB)
+Collecting edge-mdt-cl<1.1.0
+  Downloading edge_mdt_cl-1.0.0-py3-none-any.whl.metadata (4.0 kB)
+Collecting edge-mdt-tpc>=1.2.0
+  Downloading edge_mdt_tpc-1.3.0-py3-none-any.whl.metadata (6.7 kB)
+Collecting pydantic<2.12
+  Downloading pydantic-2.11.10-py3-none-any.whl.metadata (68 kB)
+Requirement already satisfied: numpy in ./testudo_training/.venv/lib/python3.12/site-packages (from edge-mdt-cl<1.1.0) (2.5.4)
+Requirement already satisfied: packaging in ./testudo_training/.venv/lib/python3.12/site-packages (from edge-mdt-cl<1.1.0) (26.3)
+Collecting annotated-types>=0.6.0 (from pydantic<2.12)
+  Downloading annotated_types-0.8.0-py3-none-any.whl.metadata (15 kB)
+Collecting pydantic-core==2.33.2 (from pydantic<2.12)
+  Downloading pydantic_core-2.33.2-cp312-cp312-manylinux_2_17_x86_64.manylinux2014_x86_64.whl.metadata (6.8 kB)
+Requirement already satisfied: typing-extensions>=4.12.2 in ./testudo_training/.venv/lib/python3.12/site-packages (from pydantic<2.12) (4.16.0)
+Collecting typing-inspection>=0.4.0 (from pydantic<2.12)
+  Downloading typing_inspection-0.4.4-py3-none-any.whl.metadata (2.6 kB)
+Collecting networkx!=2.8.1,<3.6 (from model-compression-toolkit>=2.4.1)
+  Downloading networkx-3.5-py3-none-any.whl.metadata (6.3 kB)
+Collecting tqdm (from model-compression-toolkit>=2.4.1)
+  Downloading tqdm-4.70.1-py3-none-any.whl.metadata (57 kB)
+Requirement already satisfied: Pillow in ./testudo_training/.venv/lib/python3.12/site-packages (from model-compression-toolkit>=2.4.1) (13.0.0)
+Collecting scikit-image (from model-compression-toolkit>=2.4.1)
+  Downloading scikit_image-0.26.0-cp312-cp312-manylinux_2_24_x86_64.manylinux_2_28_x86_64.whl.metadata (15 kB)
+Collecting scikit-learn (from model-compression-toolkit>=2.4.1)
+  Downloading scikit_learn-1.9.1-cp312-cp312-manylinux_2_27_x86_64.manylinux_2_28_x86_64.whl.metadata (9.3 kB)
+Collecting tensorboard (from model-compression-toolkit>=2.4.1)
+  Downloading tensorboard-2.21.0-py3-none-any.whl.metadata (1.8 kB)
+Collecting PuLP (from model-compression-toolkit>=2.4.1)
+  Downloading pulp-4.2.0-cp312-cp312-manylinux_2_17_x86_64.manylinux2014_x86_64.whl.metadata (13 kB)
+Collecting matplotlib<3.10.0 (from model-compression-toolkit>=2.4.1)
+  Downloading matplotlib-3.9.4-cp312-cp312-manylinux_2_17_x86_64.manylinux2014_x86_64.whl.metadata (11 kB)
+Collecting scipy (from model-compression-toolkit>=2.4.1)
+  Downloading scipy-1.18.1-cp312-cp312-manylinux_2_27_x86_64.manylinux_2_28_x86_64.whl.metadata (62 kB)
+Collecting protobuf (from model-compression-toolkit>=2.4.1)
+  Downloading protobuf-7.36.2-cp310-abi3-manylinux2014_x86_64.whl.metadata (595 bytes)
+Collecting mct-quantizers~=1.7.0 (from model-compression-toolkit>=2.4.1)
+  Downloading mct_quantizers-1.7.0-py3-none-any.whl.metadata (4.8 kB)
+INFO: pip is looking at multiple versions of model-compression-toolkit to determine which version is compatible with other requirements. This could take a while.
+Collecting model-compression-toolkit>=2.4.1
+  Downloading model_compression_toolkit-2.6.0-py3-none-any.whl.metadata (33 kB)
+  Downloading model_compression_toolkit-2.5.1-py3-none-any.whl.metadata (26 kB)
+Collecting mct-quantizers==1.6.0 (from model-compression-toolkit>=2.4.1)
+  Downloading mct_quantizers-1.6.0-py3-none-any.whl.metadata (4.6 kB)
+Collecting model-compression-toolkit>=2.4.1
+  Downloading model_compression_toolkit-2.5.0-py3-none-any.whl.metadata (26 kB)
+  Downloading model_compression_toolkit-2.4.5-py3-none-any.whl.metadata (24 kB)
+Requirement already satisfied: contourpy>=1.0.1 in ./testudo_training/.venv/lib/python3.12/site-packages (from matplotlib<3.10.0->model-compression-toolkit>=2.4.1) (1.4.0)
+Requirement already satisfied: cycler>=0.10 in ./testudo_training/.venv/lib/python3.12/site-packages (from matplotlib<3.10.0->model-compression-toolkit>=2.4.1) (0.12.1)
+Requirement already satisfied: fonttools>=4.22.0 in ./testudo_training/.venv/lib/python3.12/site-packages (from matplotlib<3.10.0->model-compression-toolkit>=2.4.1) (4.67.0)
+Requirement already satisfied: kiwisolver>=1.3.1 in ./testudo_training/.venv/lib/python3.12/site-packages (from matplotlib<3.10.0->model-compression-toolkit>=2.4.1) (1.5.1)
+Requirement already satisfied: pyparsing>=2.3.1 in ./testudo_training/.venv/lib/python3.12/site-packages (from matplotlib<3.10.0->model-compression-toolkit>=2.4.1) (3.3.3)
+Requirement already satisfied: python-dateutil>=2.7 in ./testudo_training/.venv/lib/python3.12/site-packages (from matplotlib<3.10.0->model-compression-toolkit>=2.4.1) (3.0.0)
+INFO: pip is still looking at multiple versions of model-compression-toolkit to determine which version is compatible with other requirements. This could take a while.
+Collecting edge-mdt-tpc>=1.2.0
+  Downloading edge_mdt_tpc-1.2.0-py3-none-any.whl.metadata (5.7 kB)
+Requirement already satisfied: six>=1.6 in ./testudo_training/.venv/lib/python3.12/site-packages (from python-dateutil>=2.7->matplotlib<3.10.0->model-compression-toolkit>=2.4.1) (1.17.0)
+Requirement already satisfied: tzdata in ./testudo_training/.venv/lib/python3.12/site-packages (from python-dateutil>=2.7->matplotlib<3.10.0->model-compression-toolkit>=2.4.1) (2026.5)
+Collecting orloge>=1.0.0 (from PuLP->model-compression-toolkit>=2.4.1)
+  Downloading orloge-1.0.0-py3-none-any.whl.metadata (7.4 kB)
+Collecting cpsat-logutils>=1.0.0 (from orloge>=1.0.0->PuLP->model-compression-toolkit>=2.4.1)
+  Downloading cpsat_logutils-1.0.0-py3-none-any.whl.metadata (4.4 kB)
+Collecting imageio!=2.35.0,>=2.33 (from scikit-image->model-compression-toolkit>=2.4.1)
+  Downloading imageio-2.38.1-py3-none-any.whl.metadata (9.7 kB)
+Collecting tifffile>=2022.8.12 (from scikit-image->model-compression-toolkit>=2.4.1)
+  Downloading tifffile-2026.10.15-py3-none-any.whl.metadata (34 kB)
+Collecting lazy-loader>=0.4 (from scikit-image->model-compression-toolkit>=2.4.1)
+  Downloading lazy_loader-0.6-py3-none-any.whl.metadata (6.0 kB)
+Collecting joblib>=1.4.0 (from scikit-learn->model-compression-toolkit>=2.4.1)
+  Downloading joblib-1.6.0-py3-none-any.whl.metadata (6.5 kB)
+Collecting narwhals>=2.0.1 (from scikit-learn->model-compression-toolkit>=2.4.1)
+  Downloading narwhals-2.27.1-py3-none-any.whl.metadata (15 kB)
+Collecting threadpoolctl>=3.5.0 (from scikit-learn->model-compression-toolkit>=2.4.1)
+  Downloading threadpoolctl-3.7.0-py3-none-any.whl.metadata (24 kB)
+Collecting cloudpickle>=3.0 (from joblib>=1.4.0->scikit-learn->model-compression-toolkit>=2.4.1)
+  Downloading cloudpickle-3.1.2-py3-none-any.whl.metadata (7.1 kB)
+Collecting absl-py>=0.4 (from tensorboard->model-compression-toolkit>=2.4.1)
+  Downloading absl_py-2.5.1-py3-none-any.whl.metadata (3.3 kB)
+Collecting grpcio<2.0,>=1.74.0 (from tensorboard->model-compression-toolkit>=2.4.1)
+  Downloading grpcio-1.84.1-cp312-cp312-manylinux2014_x86_64.manylinux_2_17_x86_64.whl.metadata (3.8 kB)
+Collecting markdown>=2.6.8 (from tensorboard->model-compression-toolkit>=2.4.1)
+  Downloading markdown-3.11.2-py3-none-any.whl.metadata (5.1 kB)
+Requirement already satisfied: setuptools>=41.0.0 in ./testudo_training/.venv/lib/python3.12/site-packages (from tensorboard->model-compression-toolkit>=2.4.1) (84.2.1)
+Collecting tensorboard-data-server<0.8.0,>=0.7.0 (from tensorboard->model-compression-toolkit>=2.4.1)
+  Downloading tensorboard_data_server-0.7.2-py3-none-manylinux_2_31_x86_64.whl.metadata (1.1 kB)
+Collecting werkzeug>=1.0.1 (from tensorboard->model-compression-toolkit>=2.4.1)
+  Downloading werkzeug-3.1.9-py3-none-any.whl.metadata (4.1 kB)
+Requirement already satisfied: markupsafe>=2.1.1 in ./testudo_training/.venv/lib/python3.12/site-packages (from werkzeug>=1.0.1->tensorboard->model-compression-toolkit>=2.4.1) (3.0.4)
+Downloading edge_mdt_cl-1.0.0-py3-none-any.whl (37 kB)
+Downloading pydantic-2.11.10-py3-none-any.whl (444 kB)
+Downloading pydantic_core-2.33.2-cp312-cp312-manylinux_2_17_x86_64.manylinux2014_x86_64.whl (2.0 MB)
+   ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ 2.0/2.0 MB 23.0 MB/s  0:00:00
+Downloading model_compression_toolkit-2.4.5-py3-none-any.whl (986 kB)
+   ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ 986.8/986.8 kB 32.6 MB/s  0:00:00
+Downloading mct_quantizers-1.6.0-py3-none-any.whl (107 kB)
+Downloading matplotlib-3.9.4-cp312-cp312-manylinux_2_17_x86_64.manylinux2014_x86_64.whl (8.3 MB)
+   ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ 8.3/8.3 MB 49.4 MB/s  0:00:00
+Downloading networkx-3.5-py3-none-any.whl (2.0 MB)
+   ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ 2.0/2.0 MB 51.8 MB/s  0:00:00
+Downloading edge_mdt_tpc-1.2.0-py3-none-any.whl (30 kB)
+Downloading annotated_types-0.8.0-py3-none-any.whl (13 kB)
+Downloading typing_inspection-0.4.4-py3-none-any.whl (14 kB)
+Downloading protobuf-7.36.2-cp310-abi3-manylinux2014_x86_64.whl (343 kB)
+Downloading pulp-4.2.0-cp312-cp312-manylinux_2_17_x86_64.manylinux2014_x86_64.whl (717 kB)
+   ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ 717.0/717.0 kB 60.8 MB/s  0:00:00
+Downloading orloge-1.0.0-py3-none-any.whl (16 kB)
+Downloading cpsat_logutils-1.0.0-py3-none-any.whl (37 kB)
+Downloading scikit_image-0.26.0-cp312-cp312-manylinux_2_24_x86_64.manylinux_2_28_x86_64.whl (13.6 MB)
+   ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ 13.6/13.6 MB 45.1 MB/s  0:00:00
+Downloading imageio-2.38.1-py3-none-any.whl (328 kB)
+Downloading lazy_loader-0.6-py3-none-any.whl (8.8 kB)
+Downloading scipy-1.18.1-cp312-cp312-manylinux_2_27_x86_64.manylinux_2_28_x86_64.whl (35.3 MB)
+   ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ 35.3/35.3 MB 48.4 MB/s  0:00:00
+Downloading tifffile-2026.10.15-py3-none-any.whl (276 kB)
+Downloading scikit_learn-1.9.1-cp312-cp312-manylinux_2_27_x86_64.manylinux_2_28_x86_64.whl (9.2 MB)
+   ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ 9.2/9.2 MB 51.1 MB/s  0:00:00
+Downloading joblib-1.6.0-py3-none-any.whl (306 kB)
+Downloading cloudpickle-3.1.2-py3-none-any.whl (22 kB)
+Downloading narwhals-2.27.1-py3-none-any.whl (483 kB)
+Downloading threadpoolctl-3.7.0-py3-none-any.whl (26 kB)
+Downloading tensorboard-2.21.0-py3-none-any.whl (5.5 MB)
+   ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ 5.5/5.5 MB 56.8 MB/s  0:00:00
+Downloading grpcio-1.84.1-cp312-cp312-manylinux2014_x86_64.manylinux_2_17_x86_64.whl (7.1 MB)
+   ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ 7.1/7.1 MB 51.7 MB/s  0:00:00
+Downloading tensorboard_data_server-0.7.2-py3-none-manylinux_2_31_x86_64.whl (6.6 MB)
+   ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ 6.6/6.6 MB 51.6 MB/s  0:00:00
+Downloading absl_py-2.5.1-py3-none-any.whl (137 kB)
+Downloading markdown-3.11.2-py3-none-any.whl (114 kB)
+Downloading werkzeug-3.1.9-py3-none-any.whl (228 kB)
+Downloading tqdm-4.70.1-py3-none-any.whl (80 kB)
+Installing collected packages: werkzeug, typing-inspection, tqdm, tifffile, threadpoolctl, tensorboard-data-server, scipy, pydantic-core, protobuf, networkx, narwhals, mct-quantizers, markdown, lazy-loader, imageio, grpcio, edge-mdt-cl, cloudpickle, annotated-types, absl-py, tensorboard, scikit-image, pydantic, matplotlib, joblib, scikit-learn, cpsat-logutils, orloge, PuLP, model-compression-toolkit, edge-mdt-tpc
+  Attempting uninstall: networkx
+    Found existing installation: networkx 3.7
+    Uninstalling networkx-3.7:
+      Successfully uninstalled networkx-3.7
+  Attempting uninstall: matplotlib
+    Found existing installation: matplotlib 3.11.2
+    Uninstalling matplotlib-3.11.2:
+      Successfully uninstalled matplotlib-3.11.2
+
+Successfully installed PuLP-4.2.0 absl-py-2.5.1 annotated-types-0.8.0 cloudpickle-3.1.2 cpsat-logutils-1.0.0 edge-mdt-cl-1.0.0 edge-mdt-tpc-1.2.0 grpcio-1.84.1 imageio-2.38.1 joblib-1.6.0 lazy-loader-0.6 markdown-3.11.2 matplotlib-3.9.4 mct-quantizers-1.6.0 model-compression-toolkit-2.4.5 narwhals-2.27.1 networkx-3.5 orloge-1.0.0 protobuf-7.36.2 pydantic-2.11.10 pydantic-core-2.33.2 scikit-image-0.26.0 scikit-learn-1.9.1 scipy-1.18.1 tensorboard-2.21.0 tensorboard-data-server-0.7.2 threadpoolctl-3.7.0 tifffile-2026.10.15 tqdm-4.70.1 typing-inspection-0.4.4 werkzeug-3.1.9
+
+[31m[1mrequirements:[0m AutoUpdate success ✅ 192.7s
+WARNING ⚠️ [31m[1mrequirements:[0m [1mRestart runtime or rerun command for updates to take effect[0m
+
+[31m[1mrequirements:[0m Ultralytics requirement ['imx500-converter[pt]>=3.17.3'] not found, attempting AutoUpdate...
+Collecting imx500-converter>=3.17.3 (from imx500-converter[pt]>=3.17.3)
+  Downloading imx500_converter-3.19.2-py3-none-any.whl.metadata (658 bytes)
+Collecting sdspconv~=3.19.1 (from imx500-converter>=3.17.3->imx500-converter[pt]>=3.17.3)
+  Downloading sdspconv-3.19.1-py3-none-any.whl.metadata (489 bytes)
+Collecting conv-allocator==3.19.1 (from sdspconv~=3.19.1->imx500-converter>=3.17.3->imx500-converter[pt]>=3.17.3)
+  Downloading conv_allocator-3.19.1-py3-none-any.whl.metadata (555 bytes)
+Collecting ortools==9.9.3963 (from conv-allocator==3.19.1->sdspconv~=3.19.1->imx500-converter>=3.17.3->imx500-converter[pt]>=3.17.3)
+  Downloading ortools-9.9.3963-cp312-cp312-manylinux_2_17_x86_64.manylinux2014_x86_64.whl.metadata (2.9 kB)
+Collecting protobuf==4.25.5 (from conv-allocator==3.19.1->sdspconv~=3.19.1->imx500-converter>=3.17.3->imx500-converter[pt]>=3.17.3)
+  Downloading protobuf-4.25.5-cp37-abi3-manylinux2014_x86_64.whl.metadata (541 bytes)
+Collecting uni-model==10.2.0 (from conv-allocator==3.19.1->sdspconv~=3.19.1->imx500-converter>=3.17.3->imx500-converter[pt]>=3.17.3)
+  Downloading uni_model-10.2.0-py3-none-any.whl.metadata (550 bytes)
+Requirement already satisfied: absl-py>=2.0.0 in ./testudo_training/.venv/lib/python3.12/site-packages (from ortools==9.9.3963->conv-allocator==3.19.1->sdspconv~=3.19.1->imx500-converter>=3.17.3->imx500-converter[pt]>=3.17.3) (2.5.1)
+Requirement already satisfied: numpy>=1.13.3 in ./testudo_training/.venv/lib/python3.12/site-packages (from ortools==9.9.3963->conv-allocator==3.19.1->sdspconv~=3.19.1->imx500-converter>=3.17.3->imx500-converter[pt]>=3.17.3) (2.5.4)
+Collecting pandas>=2.0.0 (from ortools==9.9.3963->conv-allocator==3.19.1->sdspconv~=3.19.1->imx500-converter>=3.17.3->imx500-converter[pt]>=3.17.3)
+  Downloading pandas-3.1.0-cp312-cp312-manylinux_2_24_x86_64.manylinux_2_28_x86_64.whl.metadata (18 kB)
+Collecting immutabledict>=3.0.0 (from ortools==9.9.3963->conv-allocator==3.19.1->sdspconv~=3.19.1->imx500-converter>=3.17.3->imx500-converter[pt]>=3.17.3)
+  Downloading immutabledict-4.3.1-py3-none-any.whl.metadata (3.5 kB)
+Collecting stringcase (from uni-model==10.2.0->conv-allocator==3.19.1->sdspconv~=3.19.1->imx500-converter>=3.17.3->imx500-converter[pt]>=3.17.3)
+  Downloading stringcase-1.2.0.tar.gz (3.0 kB)
+  Installing build dependencies: started
+  Installing build dependencies: finished with status 'done'
+  Getting requirements to build wheel: started
+  Getting requirements to build wheel: finished with status 'done'
+  Preparing metadata (pyproject.toml): started
+  Preparing metadata (pyproject.toml): finished with status 'done'
+Requirement already satisfied: networkx in ./testudo_training/.venv/lib/python3.12/site-packages (from uni-model==10.2.0->conv-allocator==3.19.1->sdspconv~=3.19.1->imx500-converter>=3.17.3->imx500-converter[pt]>=3.17.3) (3.5)
+Collecting uni-pytorch==3.19.0 (from imx500-converter[pt]>=3.17.3)
+  Downloading uni_pytorch-3.19.0-py3-none-any.whl.metadata (970 bytes)
+Collecting networkx (from uni-model==10.2.0->conv-allocator==3.19.1->sdspconv~=3.19.1->imx500-converter>=3.17.3->imx500-converter[pt]>=3.17.3)
+  Downloading networkx-3.0-py3-none-any.whl.metadata (5.1 kB)
+Requirement already satisfied: mct-quantizers~=1.6.0 in ./testudo_training/.venv/lib/python3.12/site-packages (from uni-pytorch==3.19.0->imx500-converter[pt]>=3.17.3) (1.6.0)
+Requirement already satisfied: packaging in ./testudo_training/.venv/lib/python3.12/site-packages (from uni-pytorch==3.19.0->imx500-converter[pt]>=3.17.3) (26.3)
+Collecting edge-mdt-cl~=1.1.0 (from uni-pytorch==3.19.0->imx500-converter[pt]>=3.17.3)
+  Downloading edge_mdt_cl-1.1.1-py3-none-any.whl.metadata (3.7 kB)
+Collecting onnx~=1.17.0 (from uni-pytorch==3.19.0->imx500-converter[pt]>=3.17.3)
+  Downloading onnx-1.17.0-cp312-cp312-manylinux_2_17_x86_64.manylinux2014_x86_64.whl.metadata (16 kB)
+Collecting onnxruntime~=1.21.0 (from uni-pytorch==3.19.0->imx500-converter[pt]>=3.17.3)
+  Downloading onnxruntime-1.21.1-cp312-cp312-manylinux_2_27_x86_64.manylinux_2_28_x86_64.whl.metadata (4.7 kB)
+Collecting onnxruntime-extensions~=0.13.0 (from uni-pytorch==3.19.0->imx500-converter[pt]>=3.17.3)
+  Downloading onnxruntime_extensions-0.13.0-cp312-cp312-manylinux_2_17_x86_64.manylinux2014_x86_64.whl.metadata (4.4 kB)
+Collecting coloredlogs (from onnxruntime~=1.21.0->uni-pytorch==3.19.0->imx500-converter[pt]>=3.17.3)
+  Downloading coloredlogs-15.0.1-py2.py3-none-any.whl.metadata (12 kB)
+Collecting flatbuffers (from onnxruntime~=1.21.0->uni-pytorch==3.19.0->imx500-converter[pt]>=3.17.3)
+  Downloading flatbuffers-25.12.19-py2.py3-none-any.whl.metadata (1.0 kB)
+Requirement already satisfied: sympy in ./testudo_training/.venv/lib/python3.12/site-packages (from onnxruntime~=1.21.0->uni-pytorch==3.19.0->imx500-converter[pt]>=3.17.3) (1.14.0)
+Requirement already satisfied: python-dateutil>=2.9.0 in ./testudo_training/.venv/lib/python3.12/site-packages (from pandas>=2.0.0->ortools==9.9.3963->conv-allocator==3.19.1->sdspconv~=3.19.1->imx500-converter>=3.17.3->imx500-converter[pt]>=3.17.3) (3.0.0)
+Requirement already satisfied: six>=1.6 in ./testudo_training/.venv/lib/python3.12/site-packages (from python-dateutil>=2.9.0->pandas>=2.0.0->ortools==9.9.3963->conv-allocator==3.19.1->sdspconv~=3.19.1->imx500-converter>=3.17.3->imx500-converter[pt]>=3.17.3) (1.17.0)
+Requirement already satisfied: tzdata in ./testudo_training/.venv/lib/python3.12/site-packages (from python-dateutil>=2.9.0->pandas>=2.0.0->ortools==9.9.3963->conv-allocator==3.19.1->sdspconv~=3.19.1->imx500-converter>=3.17.3->imx500-converter[pt]>=3.17.3) (2026.5)
+Collecting humanfriendly>=9.1 (from coloredlogs->onnxruntime~=1.21.0->uni-pytorch==3.19.0->imx500-converter[pt]>=3.17.3)
+  Downloading humanfriendly-10.0-py2.py3-none-any.whl.metadata (9.2 kB)
+Requirement already satisfied: mpmath<1.4,>=1.1.0 in ./testudo_training/.venv/lib/python3.12/site-packages (from sympy->onnxruntime~=1.21.0->uni-pytorch==3.19.0->imx500-converter[pt]>=3.17.3) (1.3.0)
+Downloading imx500_converter-3.19.2-py3-none-any.whl (29 kB)
+Downloading sdspconv-3.19.1-py3-none-any.whl (55.3 MB)
+   ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ 55.3/55.3 MB 22.6 MB/s  0:00:02
+Downloading conv_allocator-3.19.1-py3-none-any.whl (8.7 kB)
+Downloading ortools-9.9.3963-cp312-cp312-manylinux_2_17_x86_64.manylinux2014_x86_64.whl (24.8 MB)
+   ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ 24.8/24.8 MB 45.4 MB/s  0:00:00
+Downloading protobuf-4.25.5-cp37-abi3-manylinux2014_x86_64.whl (294 kB)
+Downloading uni_model-10.2.0-py3-none-any.whl (186 kB)
+Downloading immutabledict-4.3.1-py3-none-any.whl (5.0 kB)
+Downloading uni_pytorch-3.19.0-py3-none-any.whl (288 kB)
+Downloading edge_mdt_cl-1.1.1-py3-none-any.whl (45 kB)
+Downloading networkx-3.0-py3-none-any.whl (2.0 MB)
+   ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ 2.0/2.0 MB 42.4 MB/s  0:00:00
+Downloading onnx-1.17.0-cp312-cp312-manylinux_2_17_x86_64.manylinux2014_x86_64.whl (16.0 MB)
+   ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ 16.0/16.0 MB 37.6 MB/s  0:00:00
+Downloading onnxruntime-1.21.1-cp312-cp312-manylinux_2_27_x86_64.manylinux_2_28_x86_64.whl (16.0 MB)
+   ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ 16.0/16.0 MB 46.2 MB/s  0:00:00
+Downloading onnxruntime_extensions-0.13.0-cp312-cp312-manylinux_2_17_x86_64.manylinux2014_x86_64.whl (6.0 MB)
+   ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ 6.0/6.0 MB 29.4 MB/s  0:00:00
+Downloading pandas-3.1.0-cp312-cp312-manylinux_2_24_x86_64.manylinux_2_28_x86_64.whl (12.0 MB)
+   ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ 12.0/12.0 MB 47.1 MB/s  0:00:00
+Downloading coloredlogs-15.0.1-py2.py3-none-any.whl (46 kB)
+Downloading humanfriendly-10.0-py2.py3-none-any.whl (86 kB)
+Downloading flatbuffers-25.12.19-py2.py3-none-any.whl (26 kB)
+Building wheels for collected packages: stringcase
+  Building wheel for stringcase (pyproject.toml): started
+  Building wheel for stringcase (pyproject.toml): finished with status 'done'
+  Created wheel for stringcase: filename=stringcase-1.2.0-py3-none-any.whl size=3635 sha256=00fb29cf57cb435048d868196ce1ac6f33e17eaa47956cf1a58980cff941dd19
+  Stored in directory: /tmp/pip-ephem-wheel-cache-x8c_btmk/wheels/37/76/84/09143757ac9846675769f3649fc2aa936ec40255783a23ba52
+Successfully built stringcase
+Installing collected packages: stringcase, onnxruntime-extensions, flatbuffers, protobuf, networkx, immutabledict, humanfriendly, edge-mdt-cl, uni-model, pandas, onnx, coloredlogs, ortools, onnxruntime, uni-pytorch, conv-allocator, sdspconv, imx500-converter
+  Attempting uninstall: protobuf
+    Found existing installation: protobuf 7.36.2
+    Uninstalling protobuf-7.36.2:
+      Successfully uninstalled protobuf-7.36.2
+  Attempting uninstall: networkx
+    Found existing installation: networkx 3.5
+    Uninstalling networkx-3.5:
+      Successfully uninstalled networkx-3.5
+  Attempting uninstall: edge-mdt-cl
+    Found existing installation: edge-mdt-cl 1.0.0
+    Uninstalling edge-mdt-cl-1.0.0:
+      Successfully uninstalled edge-mdt-cl-1.0.0
+
+ERROR: pip's dependency resolver does not currently take into account all the packages that are installed. This behaviour is the source of the following dependency conflicts.
+tensorboard 2.21.0 requires protobuf<8.0.0,>=6.31.1, but you have protobuf 4.25.5 which is incompatible.
+Successfully installed coloredlogs-15.0.1 conv-allocator-3.19.1 edge-mdt-cl-1.1.1 flatbuffers-25.12.19 humanfriendly-10.0 immutabledict-4.3.1 imx500-converter-3.19.2 networkx-3.0 onnx-1.17.0 onnxruntime-1.21.1 onnxruntime-extensions-0.13.0 ortools-9.9.3963 pandas-3.1.0 protobuf-4.25.5 sdspconv-3.19.1 stringcase-1.2.0 uni-model-10.2.0 uni-pytorch-3.19.0
+
+[31m[1mrequirements:[0m AutoUpdate success ✅ 274.0s
+WARNING ⚠️ [31m[1mrequirements:[0m [1mRestart runtime or rerun command for updates to take effect[0m
+
+[34m[1mIMX:[0m collecting INT8 calibration images from 'data=/mnt/c/Users/adisa/Documents/Workspace/Classes/ENEE408V/datasets/testudo/data.yaml'
+WARNING ⚠️ [34m[1mval: [0mSlow image access detected (ping: 1.4±0.1 ms, read: 24.1±5.4 MB/s, size: 260.0 KB). Use local storage instead of remote/mounted storage for better performance. See https://docs.ultralytics.com/guides/model-training-tips
+
+[K[34m[1mval: [0mScanning /mnt/c/Users/adisa/Documents/Workspace/Classes/ENEE408V/datasets/testudo/labels/val... 9 images, 0 backgrounds, 0 corrupt: 30% ━━━╸──────── 9/30 24.1it/s 0.1s<0.9s
+[K[34m[1mval: [0mScanning /mnt/c/Users/adisa/Documents/Workspace/Classes/ENEE408V/datasets/testudo/labels/val... 14 images, 0 backgrounds, 0 corrupt: 46% ━━━━━╸────── 14/30 30.4it/s 0.2s<0.5s
+[K[34m[1mval: [0mScanning /mnt/c/Users/adisa/Documents/Workspace/Classes/ENEE408V/datasets/testudo/labels/val... 21 images, 0 backgrounds, 0 corrupt: 70% ━━━━━━━━──── 21/30 42.0it/s 0.3s<0.2s
+[K[34m[1mval: [0mScanning /mnt/c/Users/adisa/Documents/Workspace/Classes/ENEE408V/datasets/testudo/labels/val... 30 images, 0 backgrounds, 0 corrupt: 100% ━━━━━━━━━━━━ 30/30 83.3it/s 0.4s
+[34m[1mval: [0mNew cache created: /mnt/c/Users/adisa/Documents/Workspace/Classes/ENEE408V/datasets/testudo/labels/val.cache
+WARNING ⚠️ [34m[1mIMX:[0m >300 images recommended for INT8 calibration, found 30 images.
+ERROR ❌ [34m[1mIMX:[0m export failure 518.9s: module 'matplotlib._docstring' has no attribute 'dedent_interpd'
+Export to IMX in the cloud with Ultralytics Platform: https://platform.ultralytics.com
+Traceback (most recent call last):
+  File "/mnt/c/Users/adisa/Documents/Workspace/Classes/ENEE408V/testudo_training/export_imx500.py", line 67, in main
+    exported = model.export(format="imx", data=str(args.data), imgsz=args.imgsz,
+               ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/mnt/c/Users/adisa/Documents/Workspace/Classes/ENEE408V/testudo_training/.venv/lib/python3.12/site-packages/ultralytics/engine/model.py", line 797, in export
+    return Exporter(overrides=args, _callbacks=self.callbacks)(model=self.model)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/mnt/c/Users/adisa/Documents/Workspace/Classes/ENEE408V/testudo_training/.venv/lib/python3.12/site-packages/ultralytics/engine/exporter.py", line 1022, in __call__
+    f = getattr(self, f"export_{fmt}")()
+        ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/mnt/c/Users/adisa/Documents/Workspace/Classes/ENEE408V/testudo_training/.venv/lib/python3.12/site-packages/ultralytics/engine/exporter.py", line 516, in outer_func
+    f = inner_func(*args, **kwargs)  # exported file/dir or tuple of (file/dir, *)
+        ^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/mnt/c/Users/adisa/Documents/Workspace/Classes/ENEE408V/testudo_training/.venv/lib/python3.12/site-packages/ultralytics/engine/exporter.py", line 1647, in export_imx
+    return torch2imx(
+           ^^^^^^^^^^
+  File "/mnt/c/Users/adisa/Documents/Workspace/Classes/ENEE408V/testudo_training/.venv/lib/python3.12/site-packages/ultralytics/utils/export/imx.py", line 285, in torch2imx
+    import model_compression_toolkit as mct
+  File "/mnt/c/Users/adisa/Documents/Workspace/Classes/ENEE408V/testudo_training/.venv/lib/python3.12/site-packages/model_compression_toolkit/__init__.py", line 19, in <module>
+    from model_compression_toolkit import core
+  File "/mnt/c/Users/adisa/Documents/Workspace/Classes/ENEE408V/testudo_training/.venv/lib/python3.12/site-packages/model_compression_toolkit/core/__init__.py", line 27, in <module>
+    from model_compression_toolkit.core.keras.resource_utilization_data_facade import keras_resource_utilization_data
+  File "/mnt/c/Users/adisa/Documents/Workspace/Classes/ENEE408V/testudo_training/.venv/lib/python3.12/site-packages/model_compression_toolkit/core/keras/resource_utilization_data_facade.py", line 22, in <module>
+    from model_compression_toolkit.core.common.mixed_precision.resource_utilization_tools.resource_utilization_data import compute_resource_utilization_data
+  File "/mnt/c/Users/adisa/Documents/Workspace/Classes/ENEE408V/testudo_training/.venv/lib/python3.12/site-packages/model_compression_toolkit/core/common/mixed_precision/resource_utilization_tools/resource_utilization_data.py", line 22, in <module>
+    from model_compression_toolkit.core.graph_prep_runner import graph_preparation_runner
+  File "/mnt/c/Users/adisa/Documents/Workspace/Classes/ENEE408V/testudo_training/.venv/lib/python3.12/site-packages/model_compression_toolkit/core/graph_prep_runner.py", line 32, in <module>
+    from model_compression_toolkit.core.common.visualization.tensorboard_writer import TensorboardWriter
+  File "/mnt/c/Users/adisa/Documents/Workspace/Classes/ENEE408V/testudo_training/.venv/lib/python3.12/site-packages/model_compression_toolkit/core/common/visualization/tensorboard_writer.py", line 22, in <module>
+    from matplotlib.figure import Figure
+  File "/mnt/c/Users/adisa/Documents/Workspace/Classes/ENEE408V/testudo_training/.venv/lib/python3.12/site-packages/matplotlib/figure.py", line 40, in <module>
+    from matplotlib import _blocking_input, backend_bases, _docstring, projections
+  File "/mnt/c/Users/adisa/Documents/Workspace/Classes/ENEE408V/testudo_training/.venv/lib/python3.12/site-packages/matplotlib/backend_bases.py", line 49, in <module>
+    from matplotlib import (
+  File "/mnt/c/Users/adisa/Documents/Workspace/Classes/ENEE408V/testudo_training/.venv/lib/python3.12/site-packages/matplotlib/text.py", line 17, in <module>
+    from .patches import FancyArrowPatch, FancyBboxPatch, Rectangle
+  File "/mnt/c/Users/adisa/Documents/Workspace/Classes/ENEE408V/testudo_training/.venv/lib/python3.12/site-packages/matplotlib/patches.py", line 654, in <module>
+    class Shadow(Patch):
+  File "/mnt/c/Users/adisa/Documents/Workspace/Classes/ENEE408V/testudo_training/.venv/lib/python3.12/site-packages/matplotlib/patches.py", line 658, in Shadow
+    @_docstring.dedent_interpd
+     ^^^^^^^^^^^^^^^^^^^^^^^^^
+AttributeError: module 'matplotlib._docstring' has no attribute 'dedent_interpd'
+IMX500 export failed: module 'matplotlib._docstring' has no attribute 'dedent_interpd'
+Use trained YOLO11n weights on Linux with Java 17+.
+
+Process return code: 1

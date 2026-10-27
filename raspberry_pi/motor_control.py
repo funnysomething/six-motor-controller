@@ -1,7 +1,9 @@
 #!/usr/bin/env python3
-"""Control six L298N motors: Pi direction GPIO, ESP32 PWM over I2C."""
+"""Control six PWM+DIR H-bridges: Pi direction GPIO, ESP32 PWM over I2C."""
 
 import argparse
+from dataclasses import dataclass
+import math
 from pathlib import Path
 import platform
 import queue
@@ -12,17 +14,28 @@ import sys
 import threading
 import time
 
-# BCM GPIO pairs in (forward-high, reverse-high) order, Motor1 through Motor6.
-# Physical pins: (37,35), (33,31), (29,23), (21,19), (15,13), (11,7).
-# The screenshot repeats Motor6 on IN1/IN2: those belong to Motor5 here.
-DIRECTION_PINS = ((26, 19), (13, 6), (5, 11), (9, 10), (22, 27), (17, 4))
+# BCM DIR GPIOs, Motor1 through Motor6: HIGH forward, LOW reverse.
+# Physical pins: 37, 35, 33, 31, 29, 23, per the updated Pi diagram.
+DIRECTION_PINS = (26, 19, 13, 6, 5, 11)
 MOTOR_COUNT = 6
+PWM_GPIO_PINS = (4, 13, 12, 16, 17, 18)  # ESP32 firmware channel order.
+# Confirmed wiring: logical Pi motors 1-6 use firmware PWM channels 4,5,6,1,2,3.
+DEFAULT_PWM_MAP = (3, 4, 5, 0, 1, 2)
 I2C_ADDRESS = 0x32
 REVERSE_PAUSE = 0.5
+# Firmware WATCHDOG_MS is 1000; include margin before releasing DIR on failure.
+PWM_WATCHDOG_WAIT = 1.1
 HEARTBEAT_INTERVAL = 0.2
 ACK_TIMEOUT = 0.3
+I2C_RECOVERY_ATTEMPTS = 5
+I2C_RETRY_DELAY = 0.1
+I2C_RETRY_MAX_DELAY = 0.5
+ULTRASONIC_STALE_SECONDS = 1.0
+DEPTH_MOTOR_PAIRS = ((0, 1), (2, 3), (4, 5))
+DEPTH_FULL_SPEED_CM = 3.0
+DEPTH_STOP_CM = 10.0
 HEADER_CHIP_LABELS = {"pinctrl-bcm2835", "pinctrl-bcm2711", "pinctrl-rp1"}
-MOTOR_GPIO_PINS = sorted({pin for pair in DIRECTION_PINS for pin in pair})
+MOTOR_GPIO_PINS = sorted(DIRECTION_PINS)
 
 
 def gpio_text(value):
@@ -123,13 +136,12 @@ def read_motor_gpio_lines(lgpio, chip):
     handle = lgpio.gpiochip_open(chip)
     lines = []
     try:
-        for motor, pair in enumerate(DIRECTION_PINS, 1):
-            for pin in pair:
-                _, offset, flags, name, consumer = lgpio.gpio_get_line_info(handle, pin)
-                consumer = gpio_text(consumer)
-                lines.append(dict(motor=motor, pin=pin, offset=offset, flags=flags,
-                                  name=gpio_text(name), consumer=consumer,
-                                  used=bool(flags & 1) or bool(consumer)))
+        for motor, pin in enumerate(DIRECTION_PINS, 1):
+            _, offset, flags, name, consumer = lgpio.gpio_get_line_info(handle, pin)
+            consumer = gpio_text(consumer)
+            lines.append(dict(motor=motor, pin=pin, offset=offset, flags=flags,
+                              name=gpio_text(name), consumer=consumer,
+                              used=bool(flags & 1) or bool(consumer)))
     finally:
         lgpio.gpiochip_close(handle)
     return lines
@@ -256,7 +268,7 @@ def diagnose_gpio(requested=None):
         if chip["lines"] <= max(MOTOR_GPIO_PINS):
             print("  Too few lines for the motor GPIO offsets.")
         elif matching_gpio_names(chip):
-            print("  All twelve motor line names match BCM GPIO offsets.")
+            print("  All six motor line names match BCM GPIO offsets.")
         elif gpio_text(chip["label"]) in HEADER_CHIP_LABELS:
             print("  Recognized Pi header label.")
         else:
@@ -283,8 +295,8 @@ def diagnose_gpio(requested=None):
         selected_chip = next(chip for chip in chips if chip["index"] == selected)
         print_gpio_claim_details(gpio_text(selected_chip.get("name", "")) or f"gpiochip{selected}")
     print("If a motor pin is owned by SPI, disable SPI in raspi-config and reboot.\n"
-          "Also check old UART3/4/5 overlays: they overlap GPIO4/5, GPIO9, and GPIO13 on Pi 4.\n"
-          "Close other motor programs. GPIO4 can also be claimed by a 1-Wire overlay.\n"
+          "Also check old UART3/5 overlays: they overlap DIR GPIO5 and GPIO13 on Pi 4.\n"
+          "Close other motor programs.\n"
           "For permissions: sudo usermod -aG gpio,i2c \"$USER\", then log out and back in.")
     return 1 if used else 0
 
@@ -308,7 +320,7 @@ def make_output_factory(pin_factory, output_type):
         try:
             return output_type(pin, initial_value=initial_value, pin_factory=pin_factory)
         except Exception as error:
-            motor = next(i for i, pair in enumerate(DIRECTION_PINS, 1) if pin in pair)
+            motor = DIRECTION_PINS.index(pin) + 1
             raise RuntimeError(
                 f"Cannot initialize Motor{motor} GPIO{pin} on gpiochip{pin_factory.chip}: {error}. "
                 "Run --diagnose; check SPI/1-Wire overlays, other GPIO programs, "
@@ -323,13 +335,29 @@ def checksum(data):
     return result
 
 
+def parse_pwm_map(value):
+    """CLI channel numbers are 1-based, in Pi direction-motor order."""
+    try:
+        channels = tuple(int(channel.strip()) - 1 for channel in value.split(","))
+    except ValueError as error:
+        raise argparse.ArgumentTypeError("Use six comma-separated channel numbers, 1 through 6.") from error
+    if sorted(channels) != list(range(MOTOR_COUNT)):
+        raise argparse.ArgumentTypeError("--pwm-map must contain each channel 1 through 6 exactly once.")
+    return channels
+
+
 class I2CPwm:
     """Raw I2C frames; no SMBus register or length bytes are added."""
 
-    def __init__(self, bus, message_factory, address=I2C_ADDRESS):
+    def __init__(self, bus, message_factory, address=I2C_ADDRESS, channel_map=DEFAULT_PWM_MAP):
+        channel_map = tuple(channel_map)
+        if (any(type(channel) is not int for channel in channel_map)
+                or sorted(channel_map) != list(range(MOTOR_COUNT))):
+            raise ValueError("PWM channel map must be a permutation of zero-based channels 0 through 5")
         self.bus = bus
         self.message = message_factory
         self.address = address
+        self.channel_map = channel_map
         self.sequence = secrets.randbits(32)
         # Atomic tuple of (receipt time, sensor state, millimeters), updated
         # only by acknowledged motor transactions. Tk never touches the bus.
@@ -344,6 +372,12 @@ class I2CPwm:
         if len(values) != MOTOR_COUNT or any(
                 type(v) is not int or not 0 <= v <= 100 for v in values):
             raise ValueError("PWM needs six integer percentages from 0 to 100")
+        # Direction GPIOs and GUI stay in logical motor order. Only PWM wire
+        # magnitudes are reordered; acknowledgements must match that order too.
+        wire_values = [0] * MOTOR_COUNT
+        for motor, channel in enumerate(self.channel_map):
+            wire_values[channel] = values[motor]
+        values = tuple(wire_values)
         self.sequence = (self.sequence + 1) & 0xFFFFFFFF
         sequence = self.sequence.to_bytes(4, "little")
         frame = bytes((0xA5, 1)) + sequence + bytes(values)
@@ -377,10 +411,48 @@ class I2CPwm:
         raise OSError("ESP32 did not acknowledge applied PWM; check I2C/firmware")
 
 
+@dataclass(frozen=True)
+class DepthControl:
+    """Each pair scales from its maximum speed to zero over its distance range."""
+
+    pair_speeds: tuple = (100, 100, 100)
+    min_distances_cm: tuple = (DEPTH_FULL_SPEED_CM,) * 3
+    max_distances_cm: tuple = (DEPTH_STOP_CM,) * 3
+
+    def __post_init__(self):
+        if (len(self.pair_speeds) != 3 or any(
+                type(value) is not int or not -100 <= value <= 100
+                for value in self.pair_speeds)):
+            raise ValueError("Use three integer pair speeds from -100 to 100.")
+        for distances in (self.min_distances_cm, self.max_distances_cm):
+            if len(distances) != 3 or any(
+                    type(value) not in (int, float) or not math.isfinite(value)
+                    or not 2 <= value <= 300 for value in distances):
+                raise ValueError("Use three finite distances from 2 to 300 cm for each limit.")
+        if any(low >= high for low, high in zip(self.min_distances_cm, self.max_distances_cm)):
+            raise ValueError("Each minimum distance must be less than its maximum distance.")
+
+    def speeds(self, samples, now):
+        values = [0] * MOTOR_COUNT
+        for sensor, pair in enumerate(DEPTH_MOTOR_PAIRS):
+            sample = samples[sensor] if sensor < len(samples) else None
+            if sample is None:
+                continue
+            at, state, mm = sample
+            if state != 1 or not 0 <= now - at <= ULTRASONIC_STALE_SECONDS or not 20 <= mm <= 3000:
+                continue
+            low, high = self.min_distances_cm[sensor], self.max_distances_cm[sensor]
+            fraction = max(0.0, min(1.0, (high - mm / 10) / (high - low)))
+            speed = round(self.pair_speeds[sensor] * fraction)
+            for motor in pair:
+                values[motor] = speed
+        return tuple(values)
+
+
 class MotorController:
     """Serialize direction changes and heartbeat writes for all six motors."""
 
-    def __init__(self, pwm, output_factory, start_heartbeat=True, imu=None):
+    def __init__(self, pwm, output_factory, start_heartbeat=True, imu=None, trace=False):
         self.pwm = pwm
         self.imu = imu
         self.outputs = []
@@ -388,15 +460,24 @@ class MotorController:
         self.last_directions = [0] * MOTOR_COUNT
         self.stopped_at = [0.0] * MOTOR_COUNT
         self.fault = None
+        self.recovering = False
+        self.link_notice = ""
+        self.depth_control = None
         self.lock = threading.RLock()
         self.done = threading.Event()
         self.worker = None
         self.closed = False
+        self.trace = trace
+        self.last_pwm_ack_at = None
+        self.output_sample = None
+        self.last_trace_at = float("-inf")
+        self.last_trace_state = None
         try:
-            for pair in DIRECTION_PINS:
-                for pin in pair:
-                    self.outputs.append(output_factory(pin, initial_value=False))
-            self.pwm.set_percentages(self.speeds)
+            # LOW selects reverse: acknowledge zero PWM before claiming DIR.
+            self._write_pwm(self.speeds)
+            for pin in DIRECTION_PINS:
+                self.outputs.append(output_factory(pin, initial_value=False))
+            self._record_outputs()
             if start_heartbeat:
                 self.worker = threading.Thread(target=self._heartbeat, daemon=True)
                 self.worker.start()
@@ -427,16 +508,87 @@ class MotorController:
     def ultrasonic_samples(self):
         return self.pwm.ultrasonic_samples
 
+    def _record_outputs(self):
+        """Cache actual direction readback on the hardware worker, never Tk."""
+        try:
+            directions = tuple(int(bool(output.value)) for output in self.outputs)
+            error = ""
+        except Exception as read_error:
+            directions = None
+            error = str(read_error)
+        self.output_sample = (self.speeds, directions, error)
+        now = time.monotonic()
+        mode = "auto" if self.depth_control is not None else "manual"
+        state = (mode, self.output_sample, self.recovering, self.fault is not None)
+        if self.trace and (state != self.last_trace_state or now - self.last_trace_at >= 1):
+            pins = (" ".join(str(direction) for direction in directions)
+                    if directions is not None else f"read error: {error}")
+            age = (f"{now - self.last_pwm_ack_at:.2f}s" if self.last_pwm_ack_at is not None else "none")
+            print(f"Motors {mode}: applied={self.speeds}; GPIO DIR={pins}; "
+                  f"PWM ack age={age}; recovering={self.recovering}; fault={self.fault}",
+                  file=sys.stderr, flush=True)
+            self.last_trace_at = now
+            self.last_trace_state = state
+
+    def _write_pwm(self, values):
+        """Return False if recovery stopped an interrupted motion command."""
+        try:
+            self.pwm.set_percentages(values)
+        except OSError as error:
+            self._recover_link(error)
+            return False
+        self.last_pwm_ack_at = time.monotonic()
+        return True
+
+    def _recover_link(self, error):
+        # A write may have reached the ESP32 even if its acknowledgement was
+        # lost. Hold DIR steady and retry ONLY all-zero frames. LOW is reverse,
+        # so changing DIR before PWM is disabled could reverse a running motor.
+        # This also rearms an ESP32 that rebooted or tripped its watchdog.
+        self.recovering = True
+        now = time.monotonic()
+        self.stopped_at = [now] * MOTOR_COUNT
+        self.speeds = (0,) * MOTOR_COUNT
+        self.last_pwm_ack_at = None
+        self.pwm.ultrasonic_samples = (None, None, None)
+        self._record_outputs()
+        print(f"\nI2C interrupted; requesting zero PWM, retrying: {error}", file=sys.stderr)
+        try:
+            for attempt in range(I2C_RECOVERY_ATTEMPTS):
+                self.link_notice = (f"I2C reconnecting ({attempt + 1}/{I2C_RECOVERY_ATTEMPTS}); "
+                                    "requesting zero PWM.")
+                time.sleep(min(I2C_RETRY_DELAY * 2 ** attempt, I2C_RETRY_MAX_DELAY))
+                try:
+                    self.pwm.set_percentages(self.speeds)
+                except OSError as retry_error:
+                    error = retry_error
+                else:
+                    self.last_pwm_ack_at = time.monotonic()
+                    self.stopped_at = [self.last_pwm_ack_at] * MOTOR_COUNT
+                    self._direction_off()
+                    self._record_outputs()
+                    self.link_notice = "I2C recovered; all motors stopped."
+                    print(self.link_notice, file=sys.stderr)
+                    return
+            failure = OSError(f"I2C recovery failed after {I2C_RECOVERY_ATTEMPTS} retries: {error}")
+            self._fail(failure)
+            raise failure from error
+        finally:
+            self.recovering = False
+
     def _fail(self, error):
         # Latch the error so a background heartbeat can never restart motion.
         self.fault = error
+        self.depth_control = None
         self.done.set()
-        self._direction_off()
         self.speeds = (0,) * MOTOR_COUNT
         try:
             self.pwm.set_percentages(self.speeds)
         except OSError:
-            pass  # The ESP32 also disables PWM after its one-second watchdog.
+            # No more writes until the firmware watchdog has disabled PWM.
+            time.sleep(PWM_WATCHDOG_WAIT)
+        self._direction_off()
+        self._record_outputs()
 
     def _heartbeat(self):
         while not self.done.wait(HEARTBEAT_INTERVAL):
@@ -444,17 +596,55 @@ class MotorController:
                 if self.done.is_set():
                     return
                 try:
-                    self.pwm.set_percentages(tuple(abs(v) for v in self.speeds))
-                except OSError as error:
-                    self._fail(error)
-                    print(f"\nMotor link failed; all directions disabled: {error}", file=sys.stderr)
+                    if not self._write_pwm(tuple(abs(v) for v in self.speeds)):
+                        continue  # Recovered at zero; defer automatic control to the next heartbeat.
+                    if self.depth_control is not None:
+                        self._update_depth_control()
+                    self._record_outputs()
+                    if self.imu is not None:
+                        # Same worker and controller lock as PWM writes: no bus
+                        # transactions from Tk, and one IMU component per cycle.
+                        self.imu.poll_next()
+                except Exception as error:
+                    # Unexpected GPIO/IMU errors must not silently kill this
+                    # thread and leave the GUI showing a frozen nonzero speed.
+                    if self.fault is None:
+                        self._fail(error)
+                    print(f"\nMotor worker failed; PWM stopped: {error}", file=sys.stderr)
                     return
-                if self.imu is not None:
-                    # Same worker and controller lock as PWM writes: no bus
-                    # transactions from Tk, and one IMU component per cycle.
-                    self.imu.poll_next()
+
+    def enable_depth_control(self, settings):
+        if not isinstance(settings, DepthControl):
+            raise ValueError("Provide DepthControl settings")
+        with self.lock:
+            self.set_speeds((0,) * MOTOR_COUNT)
+            self.depth_control = settings
+
+    def _update_depth_control(self):
+        # Called under the controller lock after receiving fresh telemetry.
+        # Coast over successive heartbeats instead of sleeping on a reversal,
+        # so sensors continue updating and STOP can acquire the lock promptly.
+        now = time.monotonic()
+        requested = self.depth_control.speeds(self.ultrasonic_samples, now)
+        values = list(requested)
+        for motor, value in enumerate(values):
+            direction = (value > 0) - (value < 0)
+            if direction and self.last_directions[motor] not in (0, direction):
+                if self.speeds[motor] or now - self.stopped_at[motor] < REVERSE_PAUSE:
+                    values[motor] = 0
+        values = tuple(values)
+        if values != self.speeds:
+            if self._set_speeds(values):
+                self.link_notice = ""
 
     def set_speeds(self, values):
+        """A manual command also exits automatic depth control."""
+        with self.lock:
+            self.link_notice = ""
+            self._set_speeds(values)
+            self.depth_control = None
+
+    def _set_speeds(self, values):
         """Set all six signed percentages; unchanged motors keep running."""
         values = tuple(values)
         if len(values) != MOTOR_COUNT or any(
@@ -469,14 +659,14 @@ class MotorController:
             try:
                 if changed:
                     gated = tuple(0 if i in changed else abs(v) for i, v in enumerate(self.speeds))
-                    # Confirm affected ENA/ENB outputs are zero before touching IN pins.
-                    self.pwm.set_percentages(gated)
+                    # Confirm affected PWM outputs are zero before touching DIR.
+                    if not self._write_pwm(gated):
+                        return False
                     now = time.monotonic()
                     for i in changed:
                         if self.speeds[i] != 0:
                             self.stopped_at[i] = now
-                        self.outputs[2 * i].off()
-                        self.outputs[2 * i + 1].off()
+                        self.outputs[i].off()
                     pause = max((REVERSE_PAUSE - (now - self.stopped_at[i])
                                  for i in changed if directions[i] and self.last_directions[i]
                                  and directions[i] != self.last_directions[i]), default=0)
@@ -484,16 +674,21 @@ class MotorController:
                         time.sleep(pause)
                     for i in changed:
                         if directions[i] > 0:
-                            self.outputs[2 * i].on()
-                        elif directions[i] < 0:
-                            self.outputs[2 * i + 1].on()
-                self.pwm.set_percentages(tuple(abs(v) for v in values))
-                self.speeds = values
+                            self.outputs[i].on()
+                # A nonzero frame may be applied even when its acknowledgement
+                # fails. Remember its direction before sending it so recovery
+                # still enforces the coast interval on the next reversal.
                 for i, direction in enumerate(directions):
                     if direction:
                         self.last_directions[i] = direction
+                if not self._write_pwm(tuple(abs(v) for v in values)):
+                    return False
+                self.speeds = values
+                self._record_outputs()
+                return True
             except BaseException as error:
-                self._fail(error)
+                if self.fault is None:
+                    self._fail(error)
                 raise
 
     def set_motor(self, motor, speed):
@@ -509,10 +704,16 @@ class MotorController:
         if self.worker is not None:
             self.worker.join()
         with self.lock:
+            self.depth_control = None
             if self.closed:
                 return
             try:
-                self.pwm.set_percentages((0,) * MOTOR_COUNT)
+                self._write_pwm((0,) * MOTOR_COUNT)
+            except BaseException as error:
+                # An interrupted retry must not release DIR while PWM may run.
+                if self.fault is None:
+                    self._fail(error)
+                raise
             finally:
                 self._direction_off()
                 self.speeds = (0,) * MOTOR_COUNT
@@ -520,12 +721,11 @@ class MotorController:
                     output.close()
                 self.closed = True
 
-
 HELP = """m 60                  all six motors forward at 60%
 m -60                 all six motors reverse at 60%
 m 1 60                Motor1 at 60%; keep the other five settings
 m 60 -60 40 40 0 75    individual speeds for Motors 1 through 6
-s                     stop/coast all six motors
+s                     stop all six motors (zero PWM)
 help                  show commands
 q                     stop and quit"""
 
@@ -555,12 +755,15 @@ def interrupted(signum, frame):
 class MotorGui:
     """Small optional Tk interface; hardware requests never block Tk callbacks."""
 
-    def __init__(self, root, controller):
+    def __init__(self, root, controller, camera=None):
         import tkinter as tk
         from tkinter import ttk
 
         self.root = root
         self.controller = controller
+        self.camera = camera
+        self.camera_image = None
+        self.camera_seen = None
         self.results = queue.Queue()
         self.worker = None
         self.busy = False
@@ -568,10 +771,17 @@ class MotorGui:
         self.closing = False
         self.shutdown_requested = threading.Event()
         self.controls = []
+        self.auto_enabled = tk.BooleanVar(root, value=False)
+        self.depth_speeds = [tk.StringVar(root, value="100") for _ in DEPTH_MOTOR_PAIRS]
+        self.depth_min_distances = [tk.StringVar(root, value=f"{DEPTH_FULL_SPEED_CM:g}")
+                                    for _ in DEPTH_MOTOR_PAIRS]
+        self.depth_max_distances = [tk.StringVar(root, value=f"{DEPTH_STOP_CM:g}")
+                                    for _ in DEPTH_MOTOR_PAIRS]
         self.values = [tk.StringVar(root, value="0") for _ in range(MOTOR_COUNT)]
         self.group_value = tk.StringVar(root, value="0")
         self.applied = [tk.StringVar(root, value="0%") for _ in range(MOTOR_COUNT)]
         self.status = tk.StringVar(root, value="Ready. All motors stopped.")
+        self.output_status = tk.StringVar(root, value="Output feedback: waiting for motor controller...")
         self.distances = [tk.StringVar(root, value=f"Ultrasonic {sensor + 1}: waiting for ESP32...")
                           for sensor in range(3)]
         self.distance = self.distances[0]
@@ -581,10 +791,21 @@ class MotorGui:
                                                 ("mag", "Magnetic field"),
                                                 ("barometer", "Temperature / pressure"))}
         self.imu_tilt = tk.StringVar(root, value="Tilt: waiting for acceleration...")
-        root.title("Six motor control")
-        root.minsize(620, 450)
-        frame = ttk.Frame(root, padding=16)
-        frame.grid(sticky="nsew")
+        root.title("Six motor control and Testudo camera")
+        root.minsize(920, 450)
+        shell = ttk.Frame(root)
+        shell.grid(sticky="nsew")
+        shell.columnconfigure(0, weight=1)
+        shell.rowconfigure(1, weight=1)
+        toolbar = ttk.Frame(shell, padding=(16, 8))
+        toolbar.grid(row=0, column=0, sticky="ew")
+        tk.Button(toolbar, text="STOP ALL MOTORS", command=self.stop, bg="#b42318", fg="white",
+                  activebackground="#8f1c13", activeforeground="white", padx=16).pack(side="left")
+        ttk.Label(toolbar, textvariable=self.status, wraplength=650).pack(side="left", padx=12)
+        self.tabs = ttk.Notebook(shell)
+        self.tabs.grid(row=1, column=0, sticky="nsew")
+        frame = ttk.Frame(self.tabs, padding=16)
+        self.tabs.add(frame, text="Motors and sensors")
         root.columnconfigure(0, weight=1)
         root.rowconfigure(0, weight=1)
         frame.columnconfigure(1, weight=1)
@@ -643,17 +864,112 @@ class MotorGui:
             ttk.Label(frame, textvariable=variable, font=("TkDefaultFont", 14),
                       wraplength=580).grid(
                 row=13 + sensor, column=0, columnspan=4, sticky="w", pady=6)
+        ttk.Label(frame, textvariable=self.output_status, wraplength=580).grid(
+            row=16, column=0, columnspan=4, sticky="w", pady=(6, 0))
+        auto_frame = ttk.LabelFrame(frame, text="Automatic depth control", padding=8)
+        auto_frame.grid(row=2, column=4, rowspan=10, sticky="new", padx=(18, 0))
+        self.auto_toggle = ttk.Checkbutton(auto_frame, text="Enable automatic control",
+                                           variable=self.auto_enabled, command=self.toggle_auto)
+        self.auto_toggle.grid(row=0, column=0, columnspan=4, sticky="w")
+        for column, label in enumerate(("Sensor / motors", "Min (cm)", "Max (cm)", "Max speed (%)")):
+            ttk.Label(auto_frame, text=label).grid(row=1, column=column, sticky="w", padx=4)
+        for sensor, pair in enumerate(DEPTH_MOTOR_PAIRS):
+            ttk.Label(auto_frame, text=f"Ultrasonic {sensor + 1} / {pair[0] + 1}, {pair[1] + 1}").grid(
+                row=sensor + 2, column=0, sticky="w", padx=4)
+            for column, variable, low, high, step in (
+                    (1, self.depth_min_distances[sensor], 2, 300, 0.1),
+                    (2, self.depth_max_distances[sensor], 2, 300, 0.1),
+                    (3, self.depth_speeds[sensor], -100, 100, 1)):
+                entry = ttk.Spinbox(auto_frame, from_=low, to=high, increment=step,
+                                    textvariable=variable, width=7)
+                entry.grid(row=sensor + 2, column=column, padx=4, pady=2)
+                self.controls.append(entry)
+        ttk.Label(auto_frame, text="At or below min distance = max speed; at or above max distance = 0%. "
+                  "Speed decreases linearly between them. Negative max speed = reverse. "
+                  "Set limits before enabling. No good reading = pair stopped.",
+                  wraplength=420).grid(row=5, column=0, columnspan=4, sticky="w", pady=(4, 0))
         imu_frame = ttk.LabelFrame(frame, text="SEN0140 V2 IMU", padding=8)
-        imu_frame.grid(row=13 + len(self.distances), column=0, columnspan=4,
-                       sticky="ew", pady=(8, 0))
+        imu_frame.grid(row=12, column=4, rowspan=4, sticky="new", padx=(18, 0), pady=(8, 0))
         for row, variable in enumerate((*self.imu_values.values(), self.imu_tilt)):
-            ttk.Label(imu_frame, textvariable=variable, wraplength=560).grid(
+            ttk.Label(imu_frame, textvariable=variable, wraplength=330).grid(
                 row=row, column=0, sticky="w", pady=2)
+        camera_frame = ttk.Frame(self.tabs, padding=16)
+        self.tabs.add(camera_frame, text="Testudo camera")
+        self.camera_tab = camera_frame
+        self.camera_status = tk.StringVar(root, value="Camera disabled (--no-camera)." if camera is None
+                                         else "Camera ready to start.")
+        ttk.Label(camera_frame, text="Testudo detection", font=("TkDefaultFont", 16, "bold")).grid(
+            row=0, column=0, columnspan=2, sticky="w")
+        ttk.Label(camera_frame, textvariable=self.camera_status, wraplength=820).grid(
+            row=1, column=0, columnspan=2, sticky="w", pady=8)
+        self.camera_preview = ttk.Label(camera_frame, text="Waiting for camera...", anchor="center")
+        self.camera_preview.grid(row=2, column=0, columnspan=2, sticky="nsew", pady=8)
+        camera_frame.columnconfigure(0, weight=1)
+        camera_frame.rowconfigure(2, weight=1)
+        camera_buttons = ttk.Frame(camera_frame)
+        camera_buttons.grid(row=3, column=0, sticky="w")
+        self.camera_start = ttk.Button(camera_buttons, text="Start camera", command=self.start_camera)
+        self.camera_start.pack(side="left")
+        self.camera_stop = ttk.Button(camera_buttons, text="Stop camera", command=self.stop_camera)
+        self.camera_stop.pack(side="left", padx=8)
+        if camera is None:
+            self.camera_start.configure(state="disabled")
+        self.camera_stop.configure(state="disabled")
+        ttk.Label(camera_frame, text="Detection shows Testudo boxes and confidence. "
+                  "It does not command motors. STOP ALL MOTORS remains available on either tab.",
+                  wraplength=820).grid(row=4, column=0, columnspan=2, sticky="w", pady=12)
         root.protocol("WM_DELETE_WINDOW", self.close)
         root.bind("<Escape>", lambda event: self.stop())
         root.after(50, self.poll)
+        if camera is not None:
+            root.after(0, self.start_camera)
+
+    def start_camera(self):
+        if self.camera is not None and not self.closing:
+            self.camera_seen = None
+            self.camera.start()
+            self.update_camera()
+
+    def stop_camera(self):
+        if self.camera is not None:
+            self.camera.stop()
+            self.update_camera()
+
+    def update_camera(self):
+        if self.camera is None:
+            return
+        import tkinter as tk
+
+        self.camera.poll()
+        running = self.camera.running
+        stopping = self.camera.stopping_at is not None
+        self.camera_start.configure(state="disabled" if running or self.closing else "normal")
+        self.camera_stop.configure(state="normal" if running and not stopping and not self.closing else "disabled")
+        text = self.camera.status
+        latest = self.camera.latest
+        if not running or stopping:
+            self.camera_preview.configure(image="", text=text)
+            self.camera_image = None
+        elif latest is not None:
+            received_at, message = latest
+            age = time.monotonic() - received_at
+            if age > 3:
+                text = f"Camera feed stale ({age:.0f} s since last frame). {text}"
+                self.camera_preview.configure(image="", text="Camera feed stale; waiting for frames...")
+                self.camera_image = None
+            elif received_at != self.camera_seen:
+                try:
+                    photo = tk.PhotoImage(master=self.root, data=message["image"], format="PPM")
+                    self.camera_preview.configure(image=photo, text="")
+                    self.camera_image = photo
+                    self.camera_seen = received_at
+                except (tk.TclError, KeyError) as error:
+                    text = f"Camera preview error: {error}"
+        self.camera_status.set(text)
 
     def copy_group(self):
+        if self.auto_enabled.get() or self.busy or self.closing:
+            return
         try:
             value = int(self.group_value.get())
             if not -100 <= value <= 100:
@@ -666,7 +982,8 @@ class MotorGui:
         self.status.set("Group speed copied. Click Apply to send it.")
 
     def apply(self):
-        if self.busy or self.closing or self.controller.fault is not None:
+        if (self.auto_enabled.get() or self.busy or self.closing
+                or getattr(self.controller, "recovering", False) or self.controller.fault is not None):
             return
         try:
             values = tuple(int(variable.get()) for variable in self.values)
@@ -677,14 +994,38 @@ class MotorGui:
             return
         self.send(values)
 
-    def send(self, values):
+    def toggle_auto(self):
+        if (self.busy or self.closing or getattr(self.controller, "recovering", False)
+                or self.controller.fault is not None):
+            self.auto_enabled.set(getattr(self.controller, "depth_control", None) is not None)
+            return
+        if not self.auto_enabled.get():
+            self.stop()
+            return
+        try:
+            settings = DepthControl(
+                tuple(int(value.get()) for value in self.depth_speeds),
+                min_distances_cm=tuple(float(value.get()) for value in self.depth_min_distances),
+                max_distances_cm=tuple(float(value.get()) for value in self.depth_max_distances))
+        except ValueError as error:
+            self.auto_enabled.set(False)
+            self.status.set(f"Automatic control: {error}")
+            return
+        for variable in self.values:
+            variable.set(0)
+        self.send((0,) * MOTOR_COUNT, depth_control=settings)
+
+    def send(self, values, depth_control=None):
         self.busy = True
         self.set_controls(False)
         self.status.set("Stopping all motors..." if not any(values) else "Applying speeds...")
 
         def request():
             try:
-                self.controller.set_speeds(values)
+                if depth_control is None:
+                    self.controller.set_speeds(values)
+                else:
+                    self.controller.enable_depth_control(depth_control)
                 self.results.put(None)
             except Exception as error:
                 self.results.put(error)
@@ -693,11 +1034,12 @@ class MotorGui:
         self.worker.start()
 
     def stop(self):
+        self.auto_enabled.set(False)
         for variable in self.values:
             variable.set(0)
         self.group_value.set(0)
         if self.controller.fault is not None:
-            self.status.set(f"Motor link failed; directions disabled: {self.controller.fault}")
+            self.status.set(f"Motor link failed; PWM stopped: {self.controller.fault}")
         elif self.busy:
             # No queued motion commands: stop is the next request after the
             # in-flight operation completes, including its reversal interval.
@@ -708,7 +1050,8 @@ class MotorGui:
 
     def set_controls(self, enabled):
         for widget in self.controls:
-            widget.configure(state="normal" if enabled else "disabled")
+            widget.configure(state="normal" if enabled and not self.auto_enabled.get() else "disabled")
+        self.auto_toggle.configure(state="normal" if enabled else "disabled")
 
     def poll(self):
         if self.shutdown_requested.is_set() and not self.closing:
@@ -723,6 +1066,7 @@ class MotorGui:
             self.busy = False
             self.worker.join()
             if result is not None:
+                self.auto_enabled.set(False)
                 self.status.set(f"Command failed: {result}")
             else:
                 self.status.set("All motors stopped." if not any(self.controller.speeds)
@@ -737,11 +1081,42 @@ class MotorGui:
         for variable, speed in zip(self.applied, self.controller.speeds):
             variable.set(f"{speed:+d}%")
         if self.controller.fault is not None:
-            self.status.set(f"Motor link failed; directions disabled: {self.controller.fault}")
+            self.auto_enabled.set(False)
+            self.status.set(f"Motor link failed; PWM stopped: {self.controller.fault}")
+        elif not self.closing and getattr(self.controller, "link_notice", ""):
+            self.status.set(self.controller.link_notice)
+        elif self.auto_enabled.get() and not self.busy and not self.closing:
+            self.status.set("Automatic control active: speed scales over each pair's distance limits; no good reading stops its pair.")
         self.update_distance()
         self.update_imu()
-        self.set_controls(not self.busy and not self.closing and self.controller.fault is None)
+        self.update_camera()
+        output_problem = self.update_outputs()
+        if (output_problem and self.controller.fault is None and not self.busy
+                and not self.closing and not getattr(self.controller, "recovering", False)):
+            self.status.set(output_problem)
+        self.set_controls(not self.busy and not self.closing and self.controller.fault is None
+                          and not getattr(self.controller, "recovering", False))
         self.root.after(50, self.poll)
+
+    def update_outputs(self):
+        sample = getattr(self.controller, "output_sample", None)
+        if sample is None:
+            return None
+        speeds, directions, error = sample
+        ack_at = getattr(self.controller, "last_pwm_ack_at", None)
+        age = time.monotonic() - ack_at if ack_at is not None else None
+        ack_text = f"{age:.1f} s ago" if age is not None else "unavailable"
+        pins = (" ".join(f"M{motor + 1}={direction}"
+                         for motor, direction in enumerate(directions))
+                if directions is not None else f"read error: {error}")
+        self.output_status.set(f"PWM acknowledged: {ack_text}. Pi direction GPIO: {pins}\n"
+                               "DIR 1 = forward; DIR 0 = reverse; zero PWM = stopped. Feedback does not measure rotation.")
+        if age is None or age > 1.0:
+            return "Motor updates stale; the ESP32 watchdog may have stopped PWM. Check terminal output."
+        expected = tuple(int(speed > 0) for speed in speeds)
+        if directions is None or directions != expected:
+            return "Motor direction GPIO feedback disagrees with applied speeds. Check terminal output."
+        return None
 
     def update_distance(self):
         samples = getattr(self.controller, "ultrasonic_samples",
@@ -754,11 +1129,13 @@ class MotorGui:
     def distance_text(self, sample):
         if self.controller.fault is not None:
             text = "unavailable (motor link failed)"
+        elif getattr(self.controller, "recovering", False):
+            text = "unavailable (I2C reconnecting)"
         elif sample is None:
             text = "unavailable (waiting for sensor firmware)"
         else:
             received_at, state, mm = sample
-            if time.monotonic() - received_at > 1.0:
+            if time.monotonic() - received_at > ULTRASONIC_STALE_SECONDS:
                 text = "stale (no recent readings)"
             elif state == 1:
                 text = f"{mm / 10:.1f} cm"
@@ -810,13 +1187,14 @@ class MotorGui:
 
     def close(self):
         self.closing = True
+        if self.camera is not None:
+            self.camera.stop()
         self.set_controls(False)
         self.status.set("Stopping and closing...")
         if not self.busy:
             self.root.destroy()  # main's finally stops motors before closing I2C.
 
-
-def run_gui(controller):
+def run_gui(controller, camera=None):
     try:
         import tkinter as tk
     except ImportError as error:
@@ -828,7 +1206,7 @@ def run_gui(controller):
     app = None
     previous_handlers = {}
     try:
-        app = MotorGui(root, controller)
+        app = MotorGui(root, controller, camera=camera)
         # Tk callbacks can swallow KeyboardInterrupt; request a normal GUI
         # shutdown from the next poll instead, without touching Tk in a handler.
         for name in ("SIGINT", "SIGTERM", "SIGHUP"):
@@ -838,6 +1216,8 @@ def run_gui(controller):
                     signum, lambda signum, frame: app.shutdown_requested.set())
         root.mainloop()
     finally:
+        if camera is not None:
+            camera.stop()
         for signum, handler in previous_handlers.items():
             signal.signal(signum, handler)
         # Also cover Ctrl+C/SIGTERM while a hardware request is in flight.
@@ -856,6 +1236,18 @@ def main():
                         help="ESP32 7-bit I2C address (default: 0x32)")
     parser.add_argument("--gui", action="store_true", help="open the optional six-motor desktop GUI")
     parser.add_argument("--no-imu", action="store_true", help="disable SEN0140 polling in the GUI")
+    parser.add_argument("--no-camera", action="store_true", help="disable automatic camera startup in the GUI")
+    parser.add_argument("--camera-backend", choices=("auto", "imx500", "ncnn", "pytorch"), default="auto",
+                        help="auto selects IMX500 when its export exists, otherwise trained best.pt on the Pi CPU")
+    parser.add_argument("--camera-model", type=Path, help="trained .pt file or camera model export directory")
+    parser.add_argument("--camera-python", help="camera worker Python (default: matching repo vision environment)")
+    parser.add_argument("--camera-conf", type=float, default=0.5, help="camera detection confidence threshold")
+    parser.add_argument("--camera-fps", type=int, default=16, help="requested camera FPS")
+    parser.add_argument("--trace-motors", action="store_true",
+                        help="log applied PWM, direction GPIO readback and acknowledgement age")
+    parser.add_argument("--pwm-map", type=parse_pwm_map, default=DEFAULT_PWM_MAP,
+                        metavar="C1,C2,C3,C4,C5,C6",
+                        help="ESP32 PWM channels for Pi motors 1-6 (default: 4,5,6,1,2,3)")
     parser.add_argument("--gpiochip", type=int, help="header GPIO chip index (default: detect by label)")
     parser.add_argument("--diagnose", action="store_true", help="inspect GPIO chips/pin owners without changing pins")
     args = parser.parse_args()
@@ -863,6 +1255,8 @@ def main():
         parser.error("Use a nonnegative bus and a 7-bit address from 0x08 to 0x77")
     if args.gpiochip is not None and args.gpiochip < 0:
         parser.error("--gpiochip must be nonnegative")
+    if not math.isfinite(args.camera_conf) or not 0 <= args.camera_conf <= 1 or args.camera_fps <= 0:
+        parser.error("--camera-conf must be 0-1 and --camera-fps must be positive")
     if args.diagnose:
         try:
             return diagnose_gpio(args.gpiochip)
@@ -878,6 +1272,7 @@ def main():
     signal.signal(signal.SIGTERM, interrupted)
     signal.signal(signal.SIGHUP, interrupted)
     pin_factory = None
+    camera = None
     try:
         pin_factory = make_gpio_factory(args.gpiochip)
         with SMBus(args.bus) as bus:
@@ -888,12 +1283,23 @@ def main():
                 else:
                     from sen0140 import Sen0140
                 imu = Sen0140(bus)
-            controller = MotorController(I2CPwm(bus, i2c_msg, args.address),
+            if args.trace_motors or args.pwm_map != DEFAULT_PWM_MAP:
+                print("Motor PWM mapping: " + ", ".join(
+                    f"M{motor + 1}=ESP32 GPIO{PWM_GPIO_PINS[channel]} (channel {channel + 1})"
+                    for motor, channel in enumerate(args.pwm_map)))
+            controller = MotorController(I2CPwm(bus, i2c_msg, args.address, args.pwm_map),
                                          make_output_factory(pin_factory, DigitalOutputDevice),
-                                         imu=imu)
+                                         imu=imu, trace=args.trace_motors)
             try:
                 if args.gui:
-                    run_gui(controller)
+                    if not args.no_camera:
+                        if __package__:
+                            from .camera_control import CameraConfig, CameraSession
+                        else:
+                            from camera_control import CameraConfig, CameraSession
+                        camera = CameraSession(CameraConfig(args.camera_backend, args.camera_model,
+                                                            args.camera_python, args.camera_conf, args.camera_fps))
+                    run_gui(controller, camera=camera)
                     return 1 if controller.fault is not None else 0
                 print(f"Six motors ready; I2C /dev/i2c-{args.bus}, address 0x{args.address:02x}.")
                 print(HELP)
@@ -916,7 +1322,11 @@ def main():
                 if controller.fault is not None:
                     raise OSError(str(controller.fault))
             finally:
-                controller.close()
+                try:
+                    controller.close()
+                finally:
+                    if camera is not None:
+                        camera.close()
     except (KeyboardInterrupt, EOFError):
         print("\nStopped and exited.")
     except Exception as error:

@@ -104,7 +104,7 @@ class GpioSetupTests(unittest.TestCase):
         self.assertIs(caught.exception, original)
         output.off.assert_called_once()
         output.close.assert_called_once()
-        pwm.set_percentages.assert_not_called()
+        pwm.set_percentages.assert_called_once_with((0,) * 6)
 
     def test_diagnose_reports_pin_owner_without_claiming_any_lines(self):
         lgpio = Mock()
@@ -120,7 +120,7 @@ class GpioSetupTests(unittest.TestCase):
         self.assertIn("Header GPIO chip: /dev/gpiochip1", output.getvalue())
         self.assertIn("Motor1 GPIO26: line 26 (GPIO26), CLAIMED, consumer='spi0'", output.getvalue())
         details.assert_called_once_with("gpiochip1")
-        self.assertEqual(lgpio.gpio_get_line_info.call_count, 12)
+        self.assertEqual(lgpio.gpio_get_line_info.call_count, 6)
         lgpio.gpio_claim_input.assert_not_called()
         lgpio.gpio_claim_output.assert_not_called()
         lgpio.gpiochip_close.assert_called_once_with(10)
@@ -142,10 +142,10 @@ class GpioSetupTests(unittest.TestCase):
     def test_preflight_lists_all_claimed_motor_pins_without_claiming_more(self):
         lgpio = Mock()
         lgpio.gpiochip_open.return_value = 10
-        lgpio.gpio_get_line_info.side_effect = lambda handle, pin: [0, pin, int(pin in (13, 5, 9, 4)), f"GPIO{pin}", ""]
+        lgpio.gpio_get_line_info.side_effect = lambda handle, pin: [0, pin, int(pin in (13, 5, 6, 11)), f"GPIO{pin}", ""]
         with self.assertRaises(RuntimeError) as caught:
             motors.ensure_motor_gpio_available(lgpio, 0)
-        for pin in (13, 5, 9, 4):
+        for pin in (13, 5, 6, 11):
             self.assertIn(f"GPIO{pin}", str(caught.exception))
         lgpio.gpio_claim_input.assert_not_called()
         lgpio.gpio_claim_output.assert_not_called()
@@ -155,6 +155,16 @@ class GpioSetupTests(unittest.TestCase):
         text = "pos:\t0\ngpio-chip:\tgpiochip4\ngpio-line:\t13\ngpio-line:\t5\n"
         self.assertEqual(motors.parse_gpio_fdinfo(text), ("gpiochip4", [13, 5]))
         self.assertEqual(motors.parse_gpio_fdinfo("pos: 0\ngpio-line: invalid\n"), (None, []))
+
+    def test_unused_direction_pins_are_not_inspected_or_claimed(self):
+        lgpio = Mock()
+        lgpio.gpiochip_open.return_value = 10
+        unused_pins = {4, 9, 10, 17, 22, 27}
+        lgpio.gpio_get_line_info.side_effect = lambda handle, pin: [
+            0, pin, int(pin in unused_pins), f"GPIO{pin}", "spi0" if pin in unused_pins else ""]
+        motors.ensure_motor_gpio_available(lgpio, 0)
+        self.assertEqual({call.args[1] for call in lgpio.gpio_get_line_info.call_args_list},
+                         {26, 19, 13, 6, 5, 11})
 
     def test_process_scan_identifies_motor_line_holder_and_ignores_other_chip(self):
         with tempfile.TemporaryDirectory() as directory:

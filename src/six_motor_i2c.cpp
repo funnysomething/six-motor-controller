@@ -5,7 +5,7 @@
 #include <freertos/semphr.h>
 
 namespace {
-// GPIO numbers from the ESP32 screenshot, ordered Motor1 through Motor6.
+// Firmware PWM channel order; the Pi maps logical motors to these channels.
 constexpr uint8_t PWM_PINS[] = {4, 13, 12, 16, 17, 18};
 constexpr size_t MOTOR_COUNT = sizeof(PWM_PINS);
 constexpr uint8_t I2C_ADDRESS = 0x32, I2C_SDA = 23, I2C_SCL = 22;

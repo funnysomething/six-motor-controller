@@ -4,6 +4,7 @@ import threading
 import time
 import unittest
 from unittest.mock import patch
+from types import SimpleNamespace
 
 from raspberry_pi.motor_control import MotorGui
 from raspberry_pi.sen0140 import ImuReading, Sen0140
@@ -18,17 +19,23 @@ class Controller:
     def __init__(self):
         self.speeds = (0,) * 6
         self.fault = None
+        self.depth_control = None
         self.calls = []
         self.release = threading.Event()
         self.release.set()
         self.started = threading.Event()
 
     def set_speeds(self, speeds):
+        self.depth_control = None
         self.calls.append(speeds)
         self.started.set()
         if not self.release.wait(2):
             raise RuntimeError("Test did not release request")
         self.speeds = speeds
+
+    def enable_depth_control(self, settings):
+        self.set_speeds((0,) * 6)
+        self.depth_control = settings
 
 
 @unittest.skipIf(tk is None, "Optional Tk is not installed")
@@ -70,6 +77,51 @@ class GuiTests(unittest.TestCase):
         self.assertEqual(self.controller.speeds, (-45,) * 6)
         self.assertEqual([v.get() for v in self.app.applied], ["-45%"] * 6)
 
+    def attach_camera(self):
+        from unittest.mock import Mock
+        camera = SimpleNamespace(running=True, stopping_at=None, status="YOLO11n PyTorch / Pi CPU",
+                                 latest=None, start=Mock(), stop=Mock(), poll=Mock())
+        self.app.camera = camera
+        self.app.tabs.select(self.app.camera_tab)
+        return camera
+
+    def test_camera_preview_displays_real_pixels_without_commanding_motors(self):
+        camera = self.attach_camera()
+        camera.latest = (time.monotonic(), {"image": b"P6\n1 1\n255\n\xff\x00\x00"})
+        self.app.update_camera()
+        self.assertEqual(self.app.camera_image.get(0, 0), (255, 0, 0))
+        self.assertEqual(self.controller.calls, [])
+        self.assertIn("Pi CPU", self.app.camera_status.get())
+
+    def test_camera_error_keeps_manual_motion_and_stop_available(self):
+        camera = self.attach_camera()
+        camera.running = False
+        camera.status = "Camera failed: unplugged"
+        self.app.update_camera()
+        self.assertIn("unplugged", self.app.camera_status.get())
+        self.app.values[0].set(40)
+        self.app.apply()
+        self.wait_until(lambda: not self.app.busy)
+        self.assertEqual(self.controller.speeds, (40, 0, 0, 0, 0, 0))
+        self.app.stop()
+        self.wait_until(lambda: not self.app.busy)
+        self.assertEqual(self.controller.speeds, (0,) * 6)
+
+    def test_stale_camera_frame_is_cleared_without_changing_motor_settings(self):
+        camera = self.attach_camera()
+        camera.latest = (time.monotonic() - 4, {"image": b"old frame"})
+        self.controller.speeds = (50,) * 6
+        self.app.update_camera()
+        self.assertIn("stale", self.app.camera_status.get())
+        self.assertIsNone(self.app.camera_image)
+        self.assertEqual(self.controller.speeds, (50,) * 6)
+
+    def test_closing_gui_requests_camera_stop(self):
+        camera = self.attach_camera()
+        with patch.object(self.root, "destroy"):
+            self.app.close()
+        camera.stop.assert_called_once()
+
     def test_invalid_input_never_reaches_hardware(self):
         for value in ("oops", "101", "1.5", ""):
             self.app.values[0].set(value)
@@ -78,6 +130,81 @@ class GuiTests(unittest.TestCase):
         self.app.copy_group()
         self.assertEqual(self.controller.calls, [])
         self.assertFalse(self.app.busy)
+
+    def test_automatic_mode_defaults_pairing_and_stop_returns_to_manual(self):
+        self.assertFalse(self.app.auto_enabled.get())
+        self.app.depth_speeds[1].set(-80)
+        self.app.auto_enabled.set(True)
+        self.app.toggle_auto()
+        self.wait_until(lambda: not self.app.busy)
+        self.assertEqual(self.controller.depth_control.pair_speeds, (100, -80, 100))
+        self.assertTrue(all(str(widget.cget("state")) == "disabled" for widget in self.app.controls))
+        self.assertEqual(str(self.app.auto_toggle.cget("state")), "normal")
+        self.app.apply()
+        self.assertEqual(self.controller.calls, [(0,) * 6])
+        self.app.stop()
+        self.wait_until(lambda: not self.app.busy)
+        self.assertFalse(self.app.auto_enabled.get())
+        self.assertIsNone(self.controller.depth_control)
+        self.assertEqual(self.controller.speeds, (0,) * 6)
+        self.assertTrue(all(str(widget.cget("state")) == "normal" for widget in self.app.controls))
+
+    def test_disabling_automatic_mode_stops_all_motors(self):
+        self.app.auto_enabled.set(True)
+        self.app.toggle_auto()
+        self.wait_until(lambda: not self.app.busy)
+        self.controller.speeds = (60,) * 6
+        self.app.auto_enabled.set(False)
+        self.app.toggle_auto()
+        self.wait_until(lambda: not self.app.busy)
+        self.assertIsNone(self.controller.depth_control)
+        self.assertEqual(self.controller.speeds, (0,) * 6)
+
+    def test_invalid_automatic_settings_do_not_enable_motion(self):
+        for value in ("oops", "101", "1.5", ""):
+            self.app.depth_speeds[0].set(value)
+            self.app.auto_enabled.set(True)
+            self.app.toggle_auto()
+            self.assertFalse(self.app.auto_enabled.get())
+        self.assertEqual(self.controller.calls, [])
+
+    def test_custom_distance_limits_and_max_speeds_reach_automatic_controller(self):
+        for sensor, (low, high, speed) in enumerate(((2.5, 8, 90), (5, 15, -80), (10, 30, 60))):
+            self.app.depth_min_distances[sensor].set(str(low))
+            self.app.depth_max_distances[sensor].set(str(high))
+            self.app.depth_speeds[sensor].set(str(speed))
+        self.app.auto_enabled.set(True)
+        self.app.toggle_auto()
+        self.wait_until(lambda: not self.app.busy)
+        settings = self.controller.depth_control
+        self.assertEqual(settings.min_distances_cm, (2.5, 5, 10))
+        self.assertEqual(settings.max_distances_cm, (8, 15, 30))
+        self.assertEqual(settings.pair_speeds, (90, -80, 60))
+        self.assertTrue(all(str(widget.cget("state")) == "disabled" for widget in self.app.controls))
+
+    def test_invalid_distance_limits_leave_automatic_mode_disabled(self):
+        for low, high in (("", "10"), ("nan", "10"), ("3", "inf"),
+                          ("1", "10"), ("3", "301"), ("10", "10"), ("11", "10")):
+            self.app.depth_min_distances[0].set(low)
+            self.app.depth_max_distances[0].set(high)
+            self.app.auto_enabled.set(True)
+            self.app.toggle_auto()
+            self.assertFalse(self.app.auto_enabled.get())
+            self.assertFalse(self.app.busy)
+        self.assertEqual(self.controller.calls, [])
+
+    def test_stop_during_enable_cancels_automatic_mode_as_next_request(self):
+        self.controller.release.clear()
+        self.app.auto_enabled.set(True)
+        self.app.toggle_auto()
+        self.assertTrue(self.controller.started.wait(1))
+        self.app.stop()
+        self.assertTrue(self.app.stop_requested)
+        self.controller.release.set()
+        self.wait_until(lambda: not self.app.busy)
+        self.assertFalse(self.app.auto_enabled.get())
+        self.assertIsNone(self.controller.depth_control)
+        self.assertEqual(self.controller.calls, [(0,) * 6, (0,) * 6])
 
     def test_apply_keeps_ui_responsive_and_stop_is_next_command(self):
         self.controller.release.clear()
@@ -102,6 +229,21 @@ class GuiTests(unittest.TestCase):
         self.assertTrue(all(str(widget.cget("state")) == "disabled" for widget in self.app.controls))
         self.app.apply()
         self.assertEqual(self.controller.calls, [])
+
+    def test_output_feedback_flags_reverse_dir_despite_positive_applied_pwm(self):
+        self.controller.speeds = (100,) * 6
+        self.controller.last_pwm_ack_at = time.monotonic()
+        self.controller.output_sample = ((100,) * 6, (0,) * 6, "")
+        self.wait_until(lambda: "GPIO feedback disagrees" in self.app.status.get())
+        self.assertIn("M1=0", self.app.output_status.get())
+        self.assertEqual([value.get() for value in self.app.applied], ["+100%"] * 6)
+
+    def test_stalled_motor_worker_feedback_warns_that_pwm_may_have_stopped(self):
+        self.controller.speeds = (100,) * 6
+        self.controller.output_sample = ((100,) * 6, (1,) * 6, "")
+        self.controller.last_pwm_ack_at = time.monotonic() - 2
+        self.wait_until(lambda: "Motor updates stale" in self.app.status.get())
+        self.assertIn("watchdog", self.app.status.get())
 
     def test_distance_updates_and_invalid_or_stale_readings_clear_value(self):
         self.controller.ultrasonic_sample = (time.monotonic(), 1, 1234)
@@ -206,6 +348,22 @@ class GuiTests(unittest.TestCase):
             self.app.shutdown_requested.set()
             self.wait_until(lambda: destroy.called)
         self.assertTrue(self.app.closing)
+
+
+    def test_reconnecting_status_disables_motion_then_recovers_without_restart(self):
+        self.controller.ultrasonic_samples = ((time.monotonic(), 1, 30),) * 3
+        self.controller.recovering = True
+        self.controller.link_notice = "I2C reconnecting (1/5); all motors stopped."
+        self.wait_until(lambda: "reconnecting" in self.app.status.get())
+        self.assertTrue(all(str(widget.cget("state")) == "disabled" for widget in self.app.controls))
+        self.assertTrue(all("reconnecting" in variable.get() for variable in self.app.distances))
+        self.app.apply()
+        self.assertEqual(self.controller.calls, [])
+        self.controller.recovering = False
+        self.controller.link_notice = "I2C recovered; all motors stopped."
+        self.wait_until(lambda: "recovered" in self.app.status.get())
+        self.assertTrue(all(str(widget.cget("state")) == "normal" for widget in self.app.controls))
+        self.assertIsNone(self.controller.fault)
 
 
 if __name__ == "__main__":

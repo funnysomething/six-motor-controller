@@ -3,28 +3,30 @@
 For camera preview, dataset capture, training, model export, and detection, use
 the [computer vision launcher scripts](scripts/vision/README.md).
 
-The default `six-motor-i2c` firmware controls six brushed DC motors through three L298N modules. The Pi sets twelve direction GPIO outputs and sends all six PWM percentages to the ESP32 in one I2C command. Each motor has its own 1 kHz, 8-bit PWM channel, so all six can run together at independent speeds and directions.
+The default `six-motor-i2c` firmware controls six brushed DC motors through PWM+DIR H-bridges. The Pi sets one direction GPIO per motor and sends all six PWM percentages to the ESP32 in one I2C command. Each motor has its own 1 kHz, 8-bit PWM channel, so all six can run together at independent speeds and directions. The new interface assumes DIR HIGH selects forward, DIR LOW selects reverse, and zero PWM stops the motor.
 
 ## Pin map from the supplied diagrams
 
 Pi numbers in the code are **BCM GPIO numbers**, not physical header positions. ESP32 numbers are GPIO numbers, not J2/J3 connector positions.
 
-| Motor | L298N module/channel | ESP32 PWM GPIO | Pi forward input GPIO (physical pin) | Pi reverse input GPIO (physical pin) |
-| --- | --- | --- | --- | --- |
-| 1 | Module 1, A: ENA / IN1 / IN2 | 4 | 26 (37) | 19 (35) |
-| 2 | Module 1, B: ENB / IN3 / IN4 | 13 | 13 (33) | 6 (31) |
-| 3 | Module 2, A: ENA / IN1 / IN2 | 12 | 5 (29) | 11 (23) |
-| 4 | Module 2, B: ENB / IN3 / IN4 | 16 | 9 (21) | 10 (19) |
-| 5 | Module 3, A: ENA / IN1 / IN2 | 17 | 22 (15) | 27 (13) |
-| 6 | Module 3, B: ENB / IN3 / IN4 | 18 | 17 (11) | 4 (7) |
+| Motor | ESP32 PWM GPIO | Pi DIR GPIO (physical pin) |
+| --- | --- | --- |
+| 1 | 16 | 26 (37) |
+| 2 | 17 | 19 (35) |
+| 3 | 18 | 13 (33) |
+| 4 | 4 | 6 (31) |
+| 5 | 13 | 5 (29) |
+| 6 | 12 | 11 (23) |
 
-**Diagram assumption:** all four direction inputs on module 3 are labeled Motor6 in the Pi screenshot. This implementation assigns its IN1/IN2 pair to Motor5 and IN3/IN4 to Motor6, consistent with the other two modules. If wired oppositely, swap the last two pairs in `DIRECTION_PINS` in `raspberry_pi/motor_control.py`.
+The table uses the confirmed wiring. The Pi defaults to PWM channel map **4,5,6,1,2,3** for logical Motors 1-6; firmware channels 1-6 remain ESP32 GPIOs 4,13,12,16,17,18. No command-line override or firmware change is needed for this mapping.
 
-Connect Pi GPIO2 SDA1 (physical pin 3) to **ESP32 GPIO23 SDA**, and Pi GPIO3 SCL1 (physical pin 5) to **ESP32 GPIO22 SCL**. These ESP32 SDA/SCL assignments follow the screenshot and differ from the old accelerometer program. Connect Pi GND, ESP32 GND, all three L298N grounds, and motor-supply negative together. The Pi is I2C master; the ESP32 is slave at **7-bit address 0x32**, using bus 1 at 100 kHz. I2C pull-ups must go to 3.3 V.
+The DIR assignments follow the updated Pi diagram: Motors 1-6 connect to physical header pins 37, 35, 33, 31, 29 and 23 respectively. `DIRECTION_PINS` in `raspberry_pi/motor_control.py` lists their BCM GPIO numbers in motor order. Pi GPIO4, 9, 10, 17, 22 and 27 are no longer claimed for motor direction. Copy the updated Pi script when switching drivers; the ESP32 firmware and PWM mapping need no changes.
 
-Remove **both ENA and ENB jumpers on each of the three modules** so the ESP32 can control the enable inputs. Connect channel A motors to OUT1/OUT2 and channel B motors to OUT3/OUT4. Add a 10 kohm pull-down on each ENA/ENB input to keep the motors disabled during ESP32 reset. Use an external motor supply and follow the module's instructions for its separate 5 V logic/regulator jumper. GPIO signals are 3.3 V; do not connect motor power or the L298N 5 V terminal to a GPIO/3V3 rail.
+Connect Pi GPIO2 SDA1 (physical pin 3) to **ESP32 GPIO23 SDA**, and Pi GPIO3 SCL1 (physical pin 5) to **ESP32 GPIO22 SCL**. These ESP32 SDA/SCL assignments follow the screenshot and differ from the old accelerometer program. Connect Pi GND, ESP32 GND, all H-bridge grounds, and motor-supply negative together. The Pi is I2C master; the ESP32 is slave at **7-bit address 0x32**, using bus 1 at 100 kHz. I2C pull-ups must go to 3.3 V.
 
-The direction map occupies Pi SPI0 pins GPIO9/10/11; disable SPI and any overlays claiming those pins. The six-motor runtime uses ESP32 GPIO16/17 for PWM, so do not leave the old UART2 wiring connected there. It does not initialize the accelerometer or accept USB/UART motor commands. TX0/GPIO1 and RX0/GPIO3 now read the ultrasonic sensor as described below.
+Connect each driver's PWM input to its ESP32 GPIO and DIR input to its Pi GPIO in the table. Use the new driver's specified motor outputs, power connections and any enable/sleep configuration. Keep PWM low during reset, using a 10 kohm pull-down if appropriate for the driver. Use an external motor supply and 3.3 V-compatible control inputs; follow the new module's voltage/current requirements. A LOW DIR signal selects reverse and does not disable the bridge.
+
+The direction map occupies Pi SPI0 pin GPIO11; disable SPI and any overlays claiming that pin. The six-motor runtime uses ESP32 GPIO16/17 for PWM, so do not leave the old UART2 wiring connected there. It does not initialize the accelerometer or accept USB/UART motor commands. TX0/GPIO1 and RX0/GPIO3 now read the ultrasonic sensor as described below.
 
 ## Ultrasonic sensor in the GUI
 
@@ -78,6 +80,13 @@ See [Pi setup and commands](raspberry_pi/README.md#six-motor-i2c-controller) for
 
 For the optional desktop GUI, install `python3-tk` on the Pi and run `python3 raspberry_pi/motor_control.py --gui`. It has six signed-speed sliders, a group speed control, Apply, Stop All, and applied-speed/link status. See [GUI instructions](raspberry_pi/README.md#optional-desktop-gui). The terminal controller remains the default.
 
+The GUI also starts the trained Testudo detector in a separate process and shows
+its live preview in a **Testudo camera** tab, with **STOP ALL MOTORS** visible on
+both tabs. It uses the IMX500 processor when a camera export is present, otherwise
+the trained `testudo_imx500/weights/best.pt` on the Pi CPU. Use `--no-camera` to
+disable it, or `--camera-backend imx500` to require camera-side inference. Keep
+`camera_control.py` alongside the updated motor script. See [camera setup and model options](raspberry_pi/README.md#camera-detection-in-the-motor-gui).
+
 ```text
 m 60                  # all six at +60%
 m 60 -60 40 40 0 75    # Motors 1-6, each with its own signed speed
@@ -86,13 +95,13 @@ s                     # stop all six
 q                     # stop and quit
 ```
 
-Values are integer percentages from -100 to 100. Positive raises the forward input; negative raises the reverse input; zero lowers both direction inputs and disables PWM. Actual forward rotation depends on motor wiring. All six channels run concurrently; PWM register and GPIO updates occur sequentially, not at exactly the same clock edge.
+Values are integer percentages from -100 to 100. Positive sets DIR HIGH; negative sets DIR LOW; zero disables PWM and sets DIR LOW after acknowledgement. Actual forward rotation depends on motor wiring. All six channels run concurrently; PWM register and GPIO updates occur sequentially, not at exactly the same clock edge.
 
 ## Reversal and communication behavior
 
-Before changing a motor's direction, the Pi requests zero PWM for the affected channels and waits for matching applied-status acknowledgement. It then lowers those direction inputs, waits the remaining part of a 0.5-second coast interval if reversing, selects the new direction, and sends the new six-channel PWM frame. Unaffected motors retain their settings. A 0.5-second interval is not a measurement of mechanical stopping time.
+Before changing a motor's direction, the Pi requests zero PWM for the affected channels and waits for matching applied-status acknowledgement. It then sets DIR LOW with PWM disabled, waits the remaining part of a 0.5-second coast interval if reversing, selects the new direction, and sends the new six-channel PWM frame. Unaffected motors retain their settings. A 0.5-second interval is not a measurement of mechanical stopping time.
 
-The Pi refreshes PWM every 0.2 seconds while waiting for commands. The ESP32 starts disabled and disables all PWM if no valid command arrives for one second. After reset or timeout it rejects nonzero commands until receiving an all-zero frame. An I2C failure latches a Pi-side fault, lowers all direction outputs, and attempts to disable PWM; restart the controller to resume. Quit, Ctrl+C, EOF, SIGTERM and SSH hangup attempt a stop and release the GPIOs. A stop coasts rather than brakes.
+The Pi refreshes PWM every 0.2 seconds while waiting for commands. The ESP32 starts disabled and disables all PWM if no valid command arrives for one second. After reset or timeout it rejects nonzero commands until receiving an all-zero frame. Startup acknowledges zero PWM before configuring any DIR outputs. On an I2C error or acknowledgement timeout, the Pi holds DIR steady and makes up to five recovery attempts using only all-zero frames. It lowers DIR only after zero PWM is acknowledged. If the final fault-stop command also fails, it holds DIR for 1.1 seconds without further writes so the ESP32 watchdog can disable PWM before DIR is lowered or released. Recovery starts a new reversal coast interval after the zero acknowledgement. A successful recovery keeps the app running: manual commands must be applied again, while automatic depth control resumes from fresh sensor telemetry. Only exhausted retries latch a fault requiring a controller restart. See [I2C retries and recovery](raspberry_pi/README.md#i2c-retries-and-recovery). Quit, Ctrl+C, EOF, SIGTERM and SSH hangup attempt a stop and release the GPIOs. The driver determines whether zero PWM coasts or brakes; DIR alone cannot stop a motor.
 
 Only run one motor controller at a time. Use the `MotorController.set_speeds((m1, m2, m3, m4, m5, m6))` API for coordinated control from another Pi program, and call `close()` in `finally` when finished.
 
@@ -102,8 +111,10 @@ The Pi uses raw `smbus2.i2c_rdwr` write and read operations with STOP between th
 
 | Frame | Bytes in order |
 | --- | --- |
-| Command, 13 bytes | `0xA5`, version `1`, 32-bit little-endian sequence, six percentages `0..100` in Motor1-6 order, XOR of the preceding 12 bytes |
+| Command, 13 bytes | `0xA5`, version `1`, 32-bit little-endian sequence, six percentages `0..100` in ESP32 PWM-channel order, XOR of the preceding 12 bytes |
 | Status, 14 bytes | `0x5A`, version `1`, applied sequence, flags, six applied percentages, XOR of the preceding 13 bytes |
+
+PWM-channel order on the wire is ESP32 GPIOs 4,13,12,16,17,18. The Pi reorders logical motor commands using its default map 4,5,6,1,2,3 and validates acknowledgements against those reordered values. GUI and terminal motor numbers stay in the direction-pin order shown above.
 
 The updated firmware appends a five-byte ultrasonic extension to status, giving 19 bytes total. Byte 14 is `0xD1`; byte 15 is sensor state `0` waiting, `1` valid, `2` no underwater echo/outside 2-300 cm, or `3` no valid UART reply before timeout. Bytes 16-17 hold unsigned little-endian distance in millimeters, zero when invalid. Byte 18 is the XOR of bytes 0-17. The original motor prefix and its checksum are unchanged. The Pi validates the motor acknowledgement before caching the extension, and a missing or corrupt extension cannot acknowledge an invalid motor frame. Older firmware can still acknowledge motors; the GUI reports sensor firmware unavailable. Cached readings expire after one second without valid telemetry.
 
