@@ -32,8 +32,9 @@ pio run -e six-motor-i2c
 pio run -e six-motor-i2c -t upload --upload-port /dev/ttyUSB0
 ```
 
-Replace the port with the actual device. The repository's PlatformIO default is
-Windows COM10. No upload occurs during tests. Status-v1 firmware remains usable
+Replace the port with the actual device. PlatformIO otherwise auto-detects the
+port; use an explicit override when more than one board is connected. No upload
+occurs during tests. Status-v1 firmware remains usable
 for manual control with the updated Pi application; automatic control requires
 status v2. Old Pi applications must be upgraded together with this firmware.
 
