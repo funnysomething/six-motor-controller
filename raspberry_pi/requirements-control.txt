@@ -1,0 +1,4 @@
+# Install in the GUI/control interpreter, not only the camera environment.
+imufusion==1.2.11
+numpy==2.2.6
+smbus2==0.5.0

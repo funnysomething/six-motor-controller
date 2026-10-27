@@ -1,0 +1,174 @@
+{
+  "verified": false,
+  "magnetic_verified": false,
+  "depth_sensor": 1,
+  "sensor_offset_m": [
+    0.0,
+    0.0,
+    0.0
+  ],
+  "motor_polarity": [
+    1,
+    1,
+    1,
+    1,
+    1,
+    1
+  ],
+  "motor_gain": [
+    1.0,
+    1.0,
+    1.0,
+    1.0,
+    1.0,
+    1.0
+  ],
+  "reverse_gain": [
+    1.0,
+    1.0,
+    1.0,
+    1.0,
+    1.0,
+    1.0
+  ],
+  "pwm_limit": 20.0,
+  "reversal_seconds": 0.5,
+  "level_roll_deg": 0.0,
+  "level_pitch_deg": 0.0,
+  "angle_kp": 1.0,
+  "rate_kp": 0.02,
+  "rate_ki": 0.0,
+  "clearance_kp": 1.0,
+  "clearance_ki": 0.0,
+  "clearance_kd": 0.3,
+  "buoyancy_trim": 0.0,
+  "max_rate_dps": 10.0,
+  "target_slew_mps": 0.05,
+  "heading_slew_dps": 5.0,
+  "mag_magnitude_tolerance": 0.2,
+  "mag_innovation_deg": 15.0,
+  "mag_step_deg": 10.0,
+  "accel": {
+    "bias": [
+      0.0,
+      0.0,
+      0.0
+    ],
+    "matrix": [
+      [
+        1.0,
+        0.0,
+        0.0
+      ],
+      [
+        0.0,
+        1.0,
+        0.0
+      ],
+      [
+        0.0,
+        0.0,
+        1.0
+      ]
+    ],
+    "body_rotation": [
+      [
+        1.0,
+        0.0,
+        0.0
+      ],
+      [
+        0.0,
+        1.0,
+        0.0
+      ],
+      [
+        0.0,
+        0.0,
+        1.0
+      ]
+    ]
+  },
+  "gyro": {
+    "bias": [
+      0.0,
+      0.0,
+      0.0
+    ],
+    "matrix": [
+      [
+        1.0,
+        0.0,
+        0.0
+      ],
+      [
+        0.0,
+        1.0,
+        0.0
+      ],
+      [
+        0.0,
+        0.0,
+        1.0
+      ]
+    ],
+    "body_rotation": [
+      [
+        1.0,
+        0.0,
+        0.0
+      ],
+      [
+        0.0,
+        1.0,
+        0.0
+      ],
+      [
+        0.0,
+        0.0,
+        1.0
+      ]
+    ]
+  },
+  "mag": {
+    "bias": [
+      0.0,
+      0.0,
+      0.0
+    ],
+    "matrix": [
+      [
+        1.0,
+        0.0,
+        0.0
+      ],
+      [
+        0.0,
+        1.0,
+        0.0
+      ],
+      [
+        0.0,
+        0.0,
+        1.0
+      ]
+    ],
+    "body_rotation": [
+      [
+        1.0,
+        0.0,
+        0.0
+      ],
+      [
+        0.0,
+        1.0,
+        0.0
+      ],
+      [
+        0.0,
+        0.0,
+        1.0
+      ]
+    ]
+  }
+}
