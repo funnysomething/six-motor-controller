@@ -1,6 +1,7 @@
 #include <Arduino.h>
 #include <Wire.h>
 #include "underwater_uart.h"
+#include "motor_status.h"
 #include <freertos/FreeRTOS.h>
 #include <freertos/semphr.h>
 
@@ -10,7 +11,7 @@ constexpr uint8_t PWM_PINS[] = {4, 13, 12, 16, 17, 18};
 constexpr size_t MOTOR_COUNT = sizeof(PWM_PINS);
 constexpr uint8_t I2C_ADDRESS = 0x32, I2C_SDA = 23, I2C_SCL = 22;
 constexpr uint32_t WATCHDOG_MS = 1000;
-constexpr size_t COMMAND_SIZE = 13, STATUS_SIZE = 29;
+constexpr size_t COMMAND_SIZE = 13, STATUS_SIZE = 32;
 constexpr uint8_t ULTRASONIC_TX = 1, ULTRASONIC_RX = 3; // TX0, RX0.
 constexpr uint8_t ULTRASONIC_2_TX = 19, ULTRASONIC_2_RX = 21;
 constexpr uint8_t ULTRASONIC_3_TX = 26, ULTRASONIC_3_RX = 25;
@@ -30,6 +31,9 @@ uint32_t lastCommandAt = 0;
 uint16_t distanceMm[SENSOR_COUNT] = {};
 // 0 = waiting, 1 = valid, 2 = no underwater echo/range, 3 = no valid UART reply.
 uint8_t ultrasonicState[SENSOR_COUNT] = {};
+uint8_t measurementSequence[SENSOR_COUNT] = {};
+uint32_t measurementAt[SENSOR_COUNT] = {};
+bool measurementSeen[SENSOR_COUNT] = {};
 
 uint8_t checksum(const uint8_t *data, size_t count) {
   uint8_t result = 0;
@@ -48,33 +52,28 @@ void applyPwm(const uint8_t *values) {
 void makeStatus(uint8_t *reply) {
   xSemaphoreTake(stateMutex, portMAX_DELAY);
   reply[0] = STATUS_MAGIC;
-  reply[1] = VERSION;
+  reply[1] = 2; // Status v2; command format stays at v1.
   memcpy(reply + 2, sequence, sizeof(sequence));
   reply[6] = flags;
   memcpy(reply + 7, percentages, MOTOR_COUNT);
-  reply[14] = 0xD1; // Optional distance extension; keep the v1 motor prefix.
-  reply[15] = ultrasonicState[0];
-  reply[16] = distanceMm[0] & 0xFF;
-  reply[17] = distanceMm[0] >> 8;
-  reply[19] = 0xD2;
-  reply[20] = ultrasonicState[1];
-  reply[21] = distanceMm[1] & 0xFF;
-  reply[22] = distanceMm[1] >> 8;
-  reply[24] = 0xD3;
-  reply[25] = ultrasonicState[2];
-  reply[26] = distanceMm[2] & 0xFF;
-  reply[27] = distanceMm[2] >> 8;
+  const uint32_t now = millis();
+  for (size_t sensor = 0; sensor < SENSOR_COUNT; ++sensor) {
+    const size_t offset = 14 + sensor * 6;
+    writeRangeStatusV2(reply + offset, sensor, ultrasonicState[sensor],
+                       measurementSequence[sensor], distanceMm[sensor],
+                       measurementSeen[sensor], measurementAt[sensor], now);
+  }
   xSemaphoreGive(stateMutex);
   reply[13] = checksum(reply, 13);
-  reply[18] = checksum(reply, 18);
-  reply[23] = checksum(reply + 19, 4); // Independently checked sensor 2 block.
-  reply[28] = checksum(reply + 24, 4); // Independently checked sensor 3 block.
 }
 
 void publishUltrasonic(size_t sensor) {
   xSemaphoreTake(stateMutex, portMAX_DELAY);
   distanceMm[sensor] = sensors[sensor].distance;
   ultrasonicState[sensor] = sensors[sensor].state;
+  measurementSequence[sensor] = (measurementSequence[sensor] + 1) & 63;
+  measurementAt[sensor] = millis();
+  measurementSeen[sensor] = true;
   xSemaphoreGive(stateMutex);
 }
 

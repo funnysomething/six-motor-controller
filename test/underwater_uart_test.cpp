@@ -2,6 +2,7 @@
 #include <deque>
 #include <vector>
 #include "underwater_uart.h"
+#include "motor_status.h"
 
 struct FakePort {
   std::deque<uint8_t> input;
@@ -18,6 +19,17 @@ struct FakePort {
 };
 
 int main() {
+  uint8_t block[6];
+  writeRangeStatusV2(block, 0, 1, 1, 1000, true, 100, 100);
+  assert(block[0] == 0xD1 && block[1] == 5 && block[2] == 0xE8 && block[3] == 3 && block[4] == 1);
+  assert(block[5] == (0xD1 ^ 5 ^ 0xE8 ^ 3 ^ 1));
+  writeRangeStatusV2(block, 2, 3, 64, 0, false, 100, 100);
+  assert(block[0] == 0xD3 && block[1] == 3 && block[4] == 255);
+  writeRangeStatusV2(block, 0, 1, 63, 1000, true, 100, 2640);
+  assert(block[1] == 253 && block[4] == 255);
+  writeRangeStatusV2(block, 0, 1, 1, 1000, true, 0xFFFFFFFAU, 4);
+  assert(block[4] == 2); // ten milliseconds across millis() rollover
+
   UnderwaterUartDecoder decoder;
   uint16_t mm = 9999;
   // Manufacturer's example: FF 07 A1 A7 = 1953 mm, sum wraps at 255.

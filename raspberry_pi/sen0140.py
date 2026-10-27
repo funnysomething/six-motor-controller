@@ -160,6 +160,15 @@ class Sen0140:
             raise OSError("BMP280 reading outside specified range")
         return values
 
+    def poll_due(self, now):
+        """50 Hz inertial, 10 Hz magnetic, 1 Hz barometer, one bus owner."""
+        if not hasattr(self, "due"):
+            self.due = dict.fromkeys(self.GROUPS, 0.)
+        for group, period in (("accel", .02), ("gyro", .02), ("mag", .1), ("barometer", 1.)):
+            if now >= self.due[group]:
+                self.due[group] = now + period
+                self._poll_group(group)
+
     def poll_next(self):
         """One component per heartbeat; caller serializes access to the bus.
 
@@ -168,6 +177,9 @@ class Sen0140:
         """
         group = self.GROUPS[self.next_group]
         self.next_group = (self.next_group + 1) % len(self.GROUPS)
+        self._poll_group(group)
+
+    def _poll_group(self, group):
         now = time.monotonic()
         if now < self.ready_at.get(group, 0):
             return
