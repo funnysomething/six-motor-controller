@@ -201,6 +201,8 @@ class OrientationEstimator:
         a, g = self.config.accel.apply(accel.values), self.config.gyro.apply(gyro.values)
         if not finite((*a, *g)):
             raise ValueError("Nonfinite IMU measurement")
+        if math.sqrt(sum(x*x for x in a)) < .05 or any(abs(x) >= 1.99 for x in a):
+            raise ValueError("Accelerometer zero or saturated; verify calibration and sensor")
         dt = .02 if self.previous is None else gyro.at-self.previous
         if not 0 < dt <= .1:
             raise ValueError("IMU sampling deadline missed; estimator restart required")
@@ -242,7 +244,8 @@ class OrientationEstimator:
         if not magnetic_ok:
             self.good_since = None
         flags = self.filter.flags
-        ready = now-self.started_at >= 3 and not flags.initialising and not flags.angular_rate_recovery
+        ready = (now-self.started_at >= 3 and not flags.initialising
+                 and not flags.angular_rate_recovery and not flags.acceleration_recovery)
         self.latest = Attitude(gyro.at, roll, pitch, self.heading or 0., g, ready,
                                magnetic_ok, self.good_since, self.last_mag_at)
         return self.latest
@@ -419,7 +422,8 @@ class Stabilizer:
             self.reason = (f"Clearance {measured:.3f}/{self.target:.3f} m; "
                            f"roll {attitude.roll:+.1f}/{c.level_roll_deg:+.1f}; "
                            f"pitch {attitude.pitch:+.1f}/{c.level_pitch_deg:+.1f}; "
-                           f"heading {attitude.heading:+.1f}/{self.heading_target:+.1f}; yaw {self.yaw_mode}")
+                           f"heading {attitude.heading:+.1f}/{self.heading_target:+.1f}; yaw {self.yaw_mode}"
+                           + (" (gyro bridge)" if self.yaw_mode == "heading" and not attitude.magnetic_ok else ""))
             self.requested = output
             return output
         except Exception as error:

@@ -729,7 +729,17 @@ class MotorGui:
             else:
                 self.auto_enabled.set(False)
                 self.status.set(getattr(self.controller, "control_notice", "Automatic control stopped"))
-        self.stabilization_status.set(getattr(self.controller, "control_notice", "Stabilization unavailable"))
+        detail = getattr(self.controller, "control_notice", "Stabilization unavailable")
+        attitude = getattr(self.controller, "attitude", None)
+        if attitude is not None:
+            magnetic_age = (f"{max(0., time.monotonic()-attitude.last_magnetic_at):.1f} s"
+                            if attitude.last_magnetic_at is not None else "never")
+            detail += (f"\nMagnetic data {'accepted' if attitude.magnetic_ok else 'unavailable/rejected'}; "
+                       f"last trusted: {magnetic_age}.")
+        stabilizer = getattr(self.controller, "stabilizer", None)
+        if stabilizer is not None and stabilizer.allocator.limited:
+            detail += "\nThrust saturated; roll/pitch take priority over vertical effort."
+        self.stabilization_status.set(detail)
         self.update_distance()
         self.update_imu()
         self.update_camera()
@@ -752,7 +762,10 @@ class MotorGui:
         pins = (" ".join(f"M{motor + 1}={direction}"
                          for motor, direction in enumerate(directions))
                 if directions is not None else f"read error: {error}")
-        self.output_status.set(f"PWM acknowledged: {ack_text}. Pi direction GPIO: {pins}\n"
+        requested = getattr(self.controller, "requested", speeds)
+        coasting = getattr(self.controller, "coasting", (False,)*6)
+        pending = ", ".join(str(i+1) for i, value in enumerate(coasting) if value) or "none"
+        self.output_status.set(f"Requested: {requested}. Reversing motors: {pending}\nPWM acknowledged: {ack_text}. Pi direction GPIO: {pins}\n"
                                "DIR 1 = forward; DIR 0 = reverse; zero PWM = stopped. Feedback does not measure rotation.")
         if age is None or age > 1.0:
             return "Motor updates stale; the ESP32 watchdog may have stopped PWM. Check terminal output."

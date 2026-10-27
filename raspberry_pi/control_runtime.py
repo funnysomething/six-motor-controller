@@ -211,7 +211,10 @@ class MotorController:
             if self.release_at is not None:
                 if now >= self.release_at:
                     for output in self.outputs:
-                        output.off()
+                        try:
+                            output.off()
+                        except Exception as error:
+                            self.link_notice += f'; GPIO release failed: {error}'
                     self.speeds = ZERO
                     self.wire_directions = [0]*6
                     self.recovering = False
@@ -327,7 +330,13 @@ class MotorController:
                 time.sleep(1.1)
             finally:
                 self.speeds = ZERO
+                cleanup_error = None
                 for output in self.outputs:
-                    output.off()
-                    output.close()
+                    for cleanup in (output.off, output.close):
+                        try:
+                            cleanup()
+                        except Exception as error:
+                            cleanup_error = cleanup_error or error
                 self._record_outputs()
+                if cleanup_error is not None:
+                    raise cleanup_error

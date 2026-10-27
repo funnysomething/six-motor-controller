@@ -38,7 +38,7 @@ class Controller:
     def enable_stabilization(self):
         self.set_speeds((0,)*6)
         self.automatic = True
-        self.stabilizer = SimpleNamespace(target=1., heading_target=30., yaw_mode="heading")
+        self.stabilizer = SimpleNamespace(target=1., heading_target=30., yaw_mode="heading", allocator=SimpleNamespace(limited=False))
 
     def set_targets(self, clearance, heading):
         if not .02 <= clearance <= 3 or not self.automatic:

@@ -286,6 +286,14 @@ class RuntimeTests(unittest.TestCase):
         self.assertEqual(self.bus.applied,(0,)*6)
         self.assertTrue(all(p.closed for p in self.pins.values()))
 
+    def test_shutdown_failure_still_releases_remaining_gpio_resources(self):
+        outputs=list(self.pins.values())
+        outputs[0].close=Mock(side_effect=RuntimeError('close failed'))
+        with self.assertRaisesRegex(RuntimeError,'close failed'):
+            self.controller.close()
+        self.assertTrue(all(output.closed for output in outputs[1:]))
+        self.assertEqual(self.bus.applied,(0,)*6)
+
     def prepare_auto(self):
         from raspberry_pi.stabilization import OrientationEstimator
         from raspberry_pi.sen0140 import ImuReading

@@ -191,3 +191,8 @@ class EstimatorTests(unittest.TestCase):
         self.c.gyro.bias=(0,0,2)
         a=self.feed(1.,gyro=(0,0,2))
         self.assertEqual(a.rates,(0,0,0))
+
+    def test_zero_and_saturated_acceleration_rejected(self):
+        for accel in ((0,0,0),(2,0,-1),(float('nan'),0,-1)):
+            with self.assertRaises(ValueError):
+                self.feed(1.,accel=accel)
