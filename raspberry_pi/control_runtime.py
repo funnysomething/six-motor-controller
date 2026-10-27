@@ -62,7 +62,11 @@ class MotorController:
                 self.worker.start()
         except BaseException:
             for output in self.outputs:
-                output.close()
+                for cleanup in (output.off, output.close):
+                    try:
+                        cleanup()
+                    except Exception:
+                        pass
             raise
 
     @property
@@ -117,7 +121,8 @@ class MotorController:
         with self.lock:
             if self.fault or self.recovering or self.closed or self.imu is None or self.estimator is None:
                 raise ValueError('Stabilization needs calibrated IMU, control dependencies and a healthy motor link')
-            if any(self.speeds) or any(self.requested) or self.pwm.pending:
+            if (any(self.speeds) or any(self.requested)
+                    or (self.pwm.pending is not None and any(self.pwm.pending[-1]))):
                 raise ValueError('STOP and wait for acknowledged zero before enabling')
             candidate = Stabilizer(self.config)
             candidate.enable(self.attitude, self.pwm.range_samples[self.config.depth_sensor-1],
@@ -131,7 +136,7 @@ class MotorController:
                 raise ValueError('Enable stabilization first')
             self.stabilizer.recapture_heading(self.attitude, self.clock())
 
-    def set_targets(self, clearance_m, heading_deg):
+    def set_targets(self, clearance_m, heading_deg=None):
         with self.lock:
             if not self.automatic:
                 raise ValueError('Enable stabilization first')
@@ -221,6 +226,7 @@ class MotorController:
             self.last_tick = now
             try:
                 ack = self.pwm.poll()
+                now = self.clock()
                 if ack is not None:
                     self._apply_ack(ack, now)
                 # Recovery serializes only zero frames and suppresses IMU traffic.
@@ -236,6 +242,7 @@ class MotorController:
                     return
                 if self.imu is not None:
                     self.imu.poll_due(now)
+                    now = self.clock()
                     if self.estimator is not None:
                         try:
                             self.attitude = self.estimator.update(self.imu.readings, now)

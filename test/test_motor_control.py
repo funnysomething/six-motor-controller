@@ -286,6 +286,75 @@ class RuntimeTests(unittest.TestCase):
         self.assertEqual(self.bus.applied,(0,)*6)
         self.assertTrue(all(p.closed for p in self.pins.values()))
 
+    def prepare_auto(self):
+        from raspberry_pi.stabilization import OrientationEstimator
+        from raspberry_pi.sen0140 import ImuReading
+        try:
+            import imufusion
+        except ImportError:
+            self.skipTest('Install requirements-control.txt for estimator integration')
+        class Imu:
+            def __init__(self):
+                self.readings={}
+                self.next=0.
+                self.gyro=(0,0,0)
+                self.mag=(1,0,0)
+            def poll_due(self, now):
+                if now >= self.next:
+                    self.next=now+.02
+                    self.readings={k:ImuReading(now,v) for k,v in
+                                   (('accel',(0,0,-1)),('gyro',self.gyro),('mag',self.mag))}
+        self.controller.config=VehicleConfig(verified=True,magnetic_verified=True)
+        self.controller.estimator=OrientationEstimator(self.controller.config)
+        self.controller.imu=Imu()
+        self.auto_advance(7.)
+        self.controller.enable_stabilization()
+        self.assertTrue(self.controller.automatic)
+
+    def auto_advance(self, seconds):
+        for _ in range(round(seconds/.002)):
+            self.clock.now+=.002
+            self.bus.sensor_sequence=int((self.clock.now-10)/.3)%64
+            self.controller._tick(self.clock.now)
+
+    def test_full_runtime_clearance_correction_and_compass_fallback(self):
+        self.prepare_auto()
+        self.assertEqual(self.controller.stabilizer.yaw_mode,'heading')
+        self.bus.mm=800
+        self.auto_advance(.5)
+        self.assertTrue(all(self.controller.requested[i]>0 for i in (2,3,4)))
+        self.controller.imu.mag=(0,1,0)
+        self.controller.imu.gyro=(0,0,5)
+        self.auto_advance(1.4)
+        self.assertTrue(self.controller.automatic)
+        self.assertEqual(self.controller.stabilizer.yaw_mode,'damping')
+        self.assertGreater(self.controller.requested[0],0)
+        self.assertEqual(self.controller.requested[5],0)
+
+    def test_full_runtime_stale_range_stops_and_never_auto_restarts(self):
+        self.prepare_auto()
+        self.bus.mm=800
+        self.auto_advance(.4)
+        self.bus.age=150
+        self.auto_advance(.4)
+        self.assertFalse(self.controller.automatic)
+        self.assertEqual(self.controller.requested,(0,)*6)
+        self.bus.age=1
+        self.auto_advance(.6)
+        self.assertFalse(self.controller.automatic)
+        self.assertEqual(self.controller.speeds,(0,)*6)
+
+    def test_full_runtime_link_recovery_disables_auto(self):
+        self.prepare_auto()
+        self.bus.fail=True
+        self.auto_advance(.1)
+        self.assertFalse(self.controller.automatic)
+        self.bus.fail=False
+        self.auto_advance(.8)
+        self.assertFalse(self.controller.recovering)
+        self.assertFalse(self.controller.automatic)
+        self.assertEqual(self.controller.speeds,(0,)*6)
+
     def test_invalid_command_parser(self):
         self.assertEqual(motors.parse_command('m 2 -50'),('motor',(2,-50)))
         self.assertIsNone(motors.parse_command('m 101'))

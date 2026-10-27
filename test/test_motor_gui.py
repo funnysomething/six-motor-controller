@@ -7,6 +7,7 @@ from unittest.mock import patch
 from types import SimpleNamespace
 
 from raspberry_pi.motor_control import MotorGui
+from raspberry_pi.stabilization import VehicleConfig
 from raspberry_pi.sen0140 import ImuReading, Sen0140
 
 try:
@@ -19,23 +20,35 @@ class Controller:
     def __init__(self):
         self.speeds = (0,) * 6
         self.fault = None
-        self.depth_control = None
+        self.automatic = False
+        self.config = VehicleConfig(verified=True)
         self.calls = []
         self.release = threading.Event()
         self.release.set()
         self.started = threading.Event()
 
     def set_speeds(self, speeds):
-        self.depth_control = None
+        self.automatic = False
         self.calls.append(speeds)
         self.started.set()
         if not self.release.wait(2):
             raise RuntimeError("Test did not release request")
         self.speeds = speeds
 
-    def enable_depth_control(self, settings):
-        self.set_speeds((0,) * 6)
-        self.depth_control = settings
+    def enable_stabilization(self):
+        self.set_speeds((0,)*6)
+        self.automatic = True
+        self.stabilizer = SimpleNamespace(target=1., heading_target=30., yaw_mode="heading")
+
+    def set_targets(self, clearance, heading):
+        if not .02 <= clearance <= 3 or not self.automatic:
+            raise ValueError("Invalid target or automatic mode disabled")
+        self.targets = clearance, heading
+
+    def recapture_heading(self):
+        if not self.automatic:
+            raise ValueError("Enable stabilization first")
+        self.stabilizer.heading_target = 45.
 
 
 @unittest.skipIf(tk is None, "Optional Tk is not installed")
@@ -131,23 +144,19 @@ class GuiTests(unittest.TestCase):
         self.assertEqual(self.controller.calls, [])
         self.assertFalse(self.app.busy)
 
-    def test_automatic_mode_defaults_pairing_and_stop_returns_to_manual(self):
+    def test_automatic_mode_captures_targets_and_stop_returns_to_manual(self):
         self.assertFalse(self.app.auto_enabled.get())
-        self.app.depth_speeds[1].set(-80)
         self.app.auto_enabled.set(True)
         self.app.toggle_auto()
         self.wait_until(lambda: not self.app.busy)
-        self.assertEqual(self.controller.depth_control.pair_speeds, (100, -80, 100))
+        self.assertTrue(self.controller.automatic)
+        self.assertEqual(self.app.clearance_target.get(), "100.0")
+        self.assertEqual(self.app.heading_target.get(), "30.0")
         self.assertTrue(all(str(widget.cget("state")) == "disabled" for widget in self.app.controls))
-        self.assertEqual(str(self.app.auto_toggle.cget("state")), "normal")
-        self.app.apply()
-        self.assertEqual(self.controller.calls, [(0,) * 6])
         self.app.stop()
         self.wait_until(lambda: not self.app.busy)
-        self.assertFalse(self.app.auto_enabled.get())
-        self.assertIsNone(self.controller.depth_control)
-        self.assertEqual(self.controller.speeds, (0,) * 6)
-        self.assertTrue(all(str(widget.cget("state")) == "normal" for widget in self.app.controls))
+        self.assertFalse(self.controller.automatic)
+        self.assertEqual(self.controller.speeds,(0,)*6)
 
     def test_disabling_automatic_mode_stops_all_motors(self):
         self.app.auto_enabled.set(True)
@@ -157,41 +166,34 @@ class GuiTests(unittest.TestCase):
         self.app.auto_enabled.set(False)
         self.app.toggle_auto()
         self.wait_until(lambda: not self.app.busy)
-        self.assertIsNone(self.controller.depth_control)
+        self.assertFalse(self.controller.automatic)
         self.assertEqual(self.controller.speeds, (0,) * 6)
 
-    def test_invalid_automatic_settings_do_not_enable_motion(self):
-        for value in ("oops", "101", "1.5", ""):
-            self.app.depth_speeds[0].set(value)
-            self.app.auto_enabled.set(True)
-            self.app.toggle_auto()
-            self.assertFalse(self.app.auto_enabled.get())
-        self.assertEqual(self.controller.calls, [])
+    def test_invalid_targets_do_not_reach_controller(self):
+        self.controller.automatic = True
+        self.controller.stabilizer = SimpleNamespace(yaw_mode="heading")
+        for value in ("oops", "nan", "inf", "", "1", "301"):
+            self.app.clearance_target.set(value)
+            self.app.heading_target.set("30")
+            self.app.apply_targets()
+        self.assertFalse(hasattr(self.controller,"targets"))
 
-    def test_custom_distance_limits_and_max_speeds_reach_automatic_controller(self):
-        for sensor, (low, high, speed) in enumerate(((2.5, 8, 90), (5, 15, -80), (10, 30, 60))):
-            self.app.depth_min_distances[sensor].set(str(low))
-            self.app.depth_max_distances[sensor].set(str(high))
-            self.app.depth_speeds[sensor].set(str(speed))
+    def test_targets_and_explicit_heading_recapture(self):
+        self.controller.enable_stabilization()
+        self.app.clearance_target.set("120")
+        self.app.heading_target.set("40")
+        self.app.apply_targets()
+        self.assertEqual(self.controller.targets,(1.2,40.))
+        self.app.recapture_heading()
+        self.assertEqual(self.app.heading_target.get(),"45.0")
+
+    def test_compass_degradation_does_not_uncheck_auto(self):
+        self.controller.enable_stabilization()
         self.app.auto_enabled.set(True)
-        self.app.toggle_auto()
-        self.wait_until(lambda: not self.app.busy)
-        settings = self.controller.depth_control
-        self.assertEqual(settings.min_distances_cm, (2.5, 5, 10))
-        self.assertEqual(settings.max_distances_cm, (8, 15, 30))
-        self.assertEqual(settings.pair_speeds, (90, -80, 60))
-        self.assertTrue(all(str(widget.cget("state")) == "disabled" for widget in self.app.controls))
-
-    def test_invalid_distance_limits_leave_automatic_mode_disabled(self):
-        for low, high in (("", "10"), ("nan", "10"), ("3", "inf"),
-                          ("1", "10"), ("3", "301"), ("10", "10"), ("11", "10")):
-            self.app.depth_min_distances[0].set(low)
-            self.app.depth_max_distances[0].set(high)
-            self.app.auto_enabled.set(True)
-            self.app.toggle_auto()
-            self.assertFalse(self.app.auto_enabled.get())
-            self.assertFalse(self.app.busy)
-        self.assertEqual(self.controller.calls, [])
+        self.controller.control_notice = "Clearance and leveling active; yaw damping"
+        self.app.poll()
+        self.assertTrue(self.app.auto_enabled.get())
+        self.assertIn("yaw damping", self.app.stabilization_status.get())
 
     def test_stop_during_enable_cancels_automatic_mode_as_next_request(self):
         self.controller.release.clear()
@@ -203,7 +205,7 @@ class GuiTests(unittest.TestCase):
         self.controller.release.set()
         self.wait_until(lambda: not self.app.busy)
         self.assertFalse(self.app.auto_enabled.get())
-        self.assertIsNone(self.controller.depth_control)
+        self.assertFalse(self.controller.automatic)
         self.assertEqual(self.controller.calls, [(0,) * 6, (0,) * 6])
 
     def test_apply_keeps_ui_responsive_and_stop_is_next_command(self):

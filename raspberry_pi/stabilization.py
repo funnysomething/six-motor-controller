@@ -353,12 +353,14 @@ class Stabilizer:
         self.magnetic_loss_at = None
         self.integral[2] = 0.
 
-    def set_targets(self, clearance_m, heading_deg):
-        if not finite((clearance_m, heading_deg)) or not .02 <= clearance_m <= 3:
+    def set_targets(self, clearance_m, heading_deg=None):
+        if not math.isfinite(clearance_m) or not .02 <= clearance_m <= 3:
             raise ValueError("Use clearance 2-300 cm and a finite heading")
-        if self.yaw_mode != "heading":
-            raise ValueError("Recapture healthy heading before editing heading target")
-        self.goal, self.heading_goal = clearance_m, wrap(heading_deg)
+        if heading_deg is not None:
+            if not math.isfinite(heading_deg) or self.yaw_mode != "heading":
+                raise ValueError("Recapture healthy heading before editing heading target")
+            self.heading_goal = wrap(heading_deg)
+        self.goal = clearance_m
 
     def stop(self, reason="Stopped"):
         self.active = False
@@ -391,7 +393,8 @@ class Stabilizer:
                     self.bad_mag_at = None
                 else:
                     if self.bad_mag_at is None:
-                        self.bad_mag_at = now
+                        self.bad_mag_at = (attitude.last_magnetic_at
+                                           if attitude.last_magnetic_at is not None else now)
                     if now-self.bad_mag_at >= 1.:
                         self.yaw_mode = "damping"
                         self.magnetic_loss_at = now
@@ -400,7 +403,11 @@ class Stabilizer:
                              clamp(c.angle_kp*(c.level_pitch_deg-attitude.pitch), -c.max_rate_dps, c.max_rate_dps),
                              clamp(c.angle_kp*wrap(self.heading_target-attitude.heading), -c.max_rate_dps, c.max_rate_dps)
                              if self.yaw_mode == "heading" else 0.]
-            errors = [desired_rates[i]-attitude.rates[i] for i in range(3)] + [self.target-measured]
+            r, p = math.radians(attitude.roll), math.radians(attitude.pitch)
+            dr, dp, dy = desired_rates
+            body_rates = (dr-dy*math.sin(p), dp*math.cos(r)+dy*math.sin(r)*math.cos(p),
+                          -dp*math.sin(r)+dy*math.cos(r)*math.cos(p))
+            errors = [body_rates[i]-attitude.rates[i] for i in range(3)] + [self.target-measured]
             freeze = constrained or self.allocator.limited
             candidate = [clamp(old + (0 if freeze else error*dt))
                          for old, error in zip(self.integral, errors)]
