@@ -14,3 +14,12 @@ raspberry_pi/.venv-pi4-cpu/
 .DS_Store
 .env
 .env.*
+
+# Local vehicle calibration and diagnostic recordings
+.venv-control/
+vehicle.local.json
+vehicle.calibrated.json
+control.jsonl
+stationary.jsonl
+six-faces.jsonl
+rotations.jsonl
