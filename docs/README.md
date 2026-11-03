@@ -1,5 +1,7 @@
 # Hoop vision documentation
 
+- [Slow-motion local continuity lock](hoop-continuity-lock.md) explains the
+  current tracking preference, maintenance limits and validation results.
 - [Live iPhone review and proposed improvements](live-hoop-review-2026-11-03.md)
   records observed boundary switching, dropouts and next implementation steps.
 - [HSV white-material gating and measured tradeoffs](hoop-hsv-color-gating.md)

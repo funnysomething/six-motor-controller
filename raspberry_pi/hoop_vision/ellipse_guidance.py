@@ -18,7 +18,7 @@ def guided_candidates(image, tracker, timestamp):
     result=[]
     for track in tracker.tracks:
         old=track.get("last_candidate",track.get("candidate"))
-        if old is None or timestamp-track['observed']>tracker.config.max_gap_seconds:
+        if old is None or timestamp-track['observed']>tracker.search_horizon(track):
             continue
         points=ellipse_points((old.center_px,old.axes_px,old.image_rotation_deg))*scale
         dt=timestamp-track['observed']

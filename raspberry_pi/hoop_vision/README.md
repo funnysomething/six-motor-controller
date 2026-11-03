@@ -1,5 +1,10 @@
 # Offline hoop vision
 
+The default ellipse tracker now uses a
+[slow-motion local continuity lock](../../docs/hoop-continuity-lock.md).
+It prefers the confirmed hoop's nearby current measurements and allows bounded
+weaker maintenance. Use `--no-continuity-lock` to disable that path for comparison.
+
 The current pipeline applies an [HSV white-material gate](../../docs/hoop-hsv-color-gating.md)
 to new ellipse proposals and current tracked refits. That document records its
 defaults, tuning options and the latest results. The older ellipse results below

@@ -173,7 +173,8 @@ def run(paths, output, config, sample_fps=10., save_video=False, tracking=False,
                     started = time.perf_counter()
                     if tracking:
                         tracker.update(observation,timestamp,provenance)
-                        if calibration and observation.accepted_target:
+                        if (calibration and observation.accepted_target and
+                                observation.accepted_target.get('boundary_stable',True)):
                             e=observation.accepted_target['ellipse']
                             observation.image_orientation=estimate_orientation((e['center_px'],e['axes_px'],e['image_rotation_deg']),observation.frame_size,calibration)
                     elif verification_only:
@@ -302,6 +303,7 @@ def main(argv=None):
     parser.add_argument("--save-video",action="store_true")
     parser.add_argument("--tracking",action="store_true",help="verify boundaries and track; image decisions only")
     parser.add_argument("--tracking-profile",choices=("ellipse","strict"),default="ellipse")
+    parser.add_argument("--no-continuity-lock",action="store_true",help="Disable the ellipse profile's slow-motion lock for comparison")
     parser.add_argument("--tracking-debug",action="store_true",help="also draw rejected candidates and predictions")
     parser.add_argument("--verification-only",action="store_true",help="strict per-frame comparison without tracking")
     parser.add_argument("--candidate-json",action="store_true",help="replay frozen candidate JSONL instead of media")
@@ -311,6 +313,8 @@ def main(argv=None):
     args = parser.parse_args(argv)
     try:
         overrides=json.loads(args.tracker_config.read_text()) if args.tracker_config else {}
+        if args.no_continuity_lock:
+            overrides['continuity_lock'] = False
         tracker_config = TrackerConfig.ellipse(**overrides) if args.tracking_profile=="ellipse" else TrackerConfig(**overrides)
         white_options = dict(saturation_max=args.saturation_max, value_min=args.value_min,
                              min_white_support=args.min_white_support)

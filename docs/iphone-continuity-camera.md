@@ -79,6 +79,9 @@ Useful options:
 - `--debug` draws unaccepted proposals and predictions as well as accepted
   measurements. Those extra drawings are diagnostic only.
 - `--tracking-profile strict` selects the slower, conservative tracker profile.
+- The ellipse profile uses the [local continuity lock](hoop-continuity-lock.md)
+  by default. `--no-continuity-lock` disables its location preference and weaker
+  maintenance path for comparison.
 - `--camera-calibration file.json` supplies intrinsics for this exact camera,
   image resolution and mode. Do not reuse the original media camera's calibration
   or the future submarine camera's calibration for the iPhone.

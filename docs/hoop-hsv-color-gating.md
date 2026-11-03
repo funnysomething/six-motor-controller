@@ -1,5 +1,10 @@
 # HSV white-material gating
 
+For the subsequent slow-motion tracking changes, see the
+[local continuity lock](hoop-continuity-lock.md). It retains the HSV color checks
+while adding a separate weaker-geometry maintenance path for confirmed local
+tracks. Results below describe the preceding HSV revision.
+
 The live and saved-media pipelines now require current white-material evidence
 before an ellipse can become an accepted measurement. This is active by default
 on `codex/iphone-live-hoop-tracking` for both ellipse and strict profiles.

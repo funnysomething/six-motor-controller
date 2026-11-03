@@ -71,13 +71,14 @@ class LiveState:
 
 
 class VisionWorker:
-    def __init__(self, capture, state, profile="ellipse", calibration=None, debug=False, color_options=None):
+    def __init__(self, capture, state, profile="ellipse", calibration=None, debug=False, color_options=None,
+                 continuity_lock=True):
         self.capture, self.state = capture, state
         self.calibration, self.debug = calibration, debug
         color_options = color_options or {}
         self.detector = DetectorConfig(rim_hypotheses=profile=="ellipse", max_candidates=18, **color_options)
         self.verifier = VerificationConfig(profile=profile, **color_options)
-        self.tracker = HoopTracker(TrackerConfig.ellipse() if profile=="ellipse" else TrackerConfig())
+        self.tracker = HoopTracker(TrackerConfig.ellipse(continuity_lock=continuity_lock) if profile=="ellipse" else TrackerConfig())
         self.stop = threading.Event()
         self.thread = threading.Thread(target=self.run, daemon=True)
 
@@ -96,7 +97,8 @@ class VisionWorker:
         # Host age is measurable. Wireless sensor-to-host latency is not.
         self.tracker.update(observation, timestamp, packet.metadata["timestamp_provenance"],
                             age_seconds=time.monotonic()-packet.received_at)
-        if self.calibration and observation.accepted_target:
+        if (self.calibration and observation.accepted_target and
+                observation.accepted_target.get('boundary_stable',True)):
             e = observation.accepted_target["ellipse"]
             observation.image_orientation = estimate_orientation(
                 (e["center_px"], e["axes_px"], e["image_rotation_deg"]), observation.frame_size, self.calibration)
@@ -213,6 +215,7 @@ def main(argv=None):
     parser.add_argument("--saturation-max", type=int, default=WHITE_SATURATION_MAX, help="White HSV saturation ceiling, 0..255 (default: %(default)s)")
     parser.add_argument("--value-min", type=int, default=WHITE_VALUE_MIN, help="White HSV brightness floor, 0..255 (default: %(default)s)")
     parser.add_argument("--min-white-support", type=float, default=WHITE_MIN_SUPPORT, help="Minimum supported white perimeter fraction (default: %(default)s)")
+    parser.add_argument("--no-continuity-lock", action="store_true", help="Disable the ellipse profile's slow-motion local preference and weaker maintenance")
     args = parser.parse_args(argv)
     if not math.isfinite(args.fps) or not 0 < args.fps <= 60:
         parser.error("--fps must be finite and in (0,60]")
@@ -236,7 +239,8 @@ def main(argv=None):
         device = select_camera(devices, args.device_id, args.camera_name)
         capture = BridgeCapture(binary, device, args.fps)
         state = LiveState(device)
-        worker = VisionWorker(capture, state, args.tracking_profile, calibration, args.debug, color_options)
+        worker = VisionWorker(capture, state, args.tracking_profile, calibration, args.debug, color_options,
+                              continuity_lock=not args.no_continuity_lock)
         server, url = start_preview(state)
         worker.thread.start()
         print(f"Selected camera: {device['name']}\nLocal preview: {url}\nCtrl+C stops capture. No motor output.", flush=True)

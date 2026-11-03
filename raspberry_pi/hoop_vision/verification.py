@@ -43,6 +43,17 @@ class VerificationConfig:
             raise ValueError("White support must be in (0,1] and white sectors in 1..8")
 
 
+def maintenance_supported(candidate, profile='ellipse'):
+    """Lower geometry threshold only; requires existing current-pixel diagnostics."""
+    check = candidate.verification or {}
+    return bool(profile=='ellipse' and
+        check.get('white_color_passed') is True and not candidate.clipped and
+        'clipped' not in check.get('reasons',[]) and
+        check.get('oriented_coverage',0)>=.35 and check.get('sectors',0)>=4 and
+        check.get('material_support',0)>=.4 and
+        (candidate.kind=='rim_arc' or check.get('polarity',0)>=.2))
+
+
 def verify(image, observation, config=None):
     """Attach diagnostics without removing raw proposals or changing pose flags."""
     config = config or VerificationConfig()
@@ -173,4 +184,9 @@ def verify(image, observation, config=None):
                     c.verification.update(passed=True,strong=c.verification["oriented_coverage"]>=.6,
                                           reasons=[],paired_boundary=True)
                     break
+    for candidate in observation.candidates:
+        check = candidate.verification
+        # Weaker geometry may maintain an already confirmed *local* track.
+        # Acquisition, HSV, clipping and missing-edge checks are never waived.
+        check['maintenance_passed'] = maintenance_supported(candidate,config.profile)
     return observation
