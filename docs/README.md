@@ -1,5 +1,11 @@
 # Hoop vision documentation
 
+- [Live iPhone review and proposed improvements](live-hoop-review-2026-11-03.md)
+  records observed boundary switching, dropouts and next implementation steps.
+- [HSV white-material gating and measured tradeoffs](hoop-hsv-color-gating.md)
+  records the current color checks and the latest media rerun.
+- [Live iPhone / Continuity Camera setup](iphone-continuity-camera.md) explains
+  wireless camera selection, the local preview and freshness limits.
 - [Production development reference and improvement roadmap](underwater-vision-production-reference.md)
   is the starting point for the final camera, housing and submarine inside water.
 - [Latest tracker results and limitations](hoop-ellipse-tracking-results.md)

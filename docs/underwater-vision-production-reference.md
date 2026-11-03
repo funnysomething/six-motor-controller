@@ -2,6 +2,11 @@
 
 Evidence snapshot: November 1, 2026. Branch `codex/hoop-temporal-tracking`.
 
+For subsequent implementation changes, see the
+[HSV white-material gate and its measured tradeoffs](hoop-hsv-color-gating.md)
+and the [live iPhone setup guide](iphone-continuity-camera.md). Results below are
+the earlier evidence snapshot and have not been replaced by the newer runs.
+
 This is the starting reference for developing the final vision system with the
 actual submarine camera, housing and production assembly **inside the water**.
 It consolidates current results, failure cases and requirements that must be

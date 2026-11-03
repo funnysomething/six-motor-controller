@@ -11,24 +11,30 @@ import cv2
 import numpy as np
 
 from .geometry import bbox, ellipse_points, fit_hypotheses, overlap, sample
+from .color import (WHITE_SATURATION_MAX, WHITE_VALUE_MIN, WHITE_MIN_SUPPORT,
+                    WHITE_MIN_SECTORS, WHITE_MIN_BOUNDED_SUPPORT, validate_hsv, white_mask, white_band_evidence)
 from .types import Candidate, Observation
 
 
 @dataclass(frozen=True)
 class DetectorConfig:
     max_dimension: int = 640
-    saturation_max: int = 100
-    value_min: int = 95
+    saturation_max: int = WHITE_SATURATION_MAX
+    value_min: int = WHITE_VALUE_MIN
     min_area_fraction: float = .035
     min_edge_coverage: float = .62
     max_candidates: int = 6
     rim_hypotheses: bool = False
+    min_white_support: float = WHITE_MIN_SUPPORT
+    min_white_sectors: int = WHITE_MIN_SECTORS
 
     def __post_init__(self):
         if self.max_dimension < 128 or self.max_candidates < 1:
             raise ValueError("max_dimension >= 128 and max_candidates >= 1 required")
-        if not 0 <= self.saturation_max <= 255 or not 0 <= self.value_min <= 255:
-            raise ValueError("HSV saturation/value thresholds must be in 0..255")
+        validate_hsv(self.saturation_max, self.value_min)
+        if (not math.isfinite(self.min_white_support) or not 0 < self.min_white_support <= 1 or
+                type(self.min_white_sectors) is not int or not 1 <= self.min_white_sectors <= 8):
+            raise ValueError("White support must be in (0,1] and white sectors in 1..8")
         if not 0 < self.min_area_fraction < 1 or not 0 < self.min_edge_coverage <= 1:
             raise ValueError("area and coverage fractions must be in (0,1]")
 
@@ -43,7 +49,8 @@ def detect(image, config=None):
     h, w = frame.shape[:2]
     # Exact per-axis mapping matters when rounding the resized dimensions.
     sx, sy = width/w, height/h
-    hsv = cv2.cvtColor(cv2.GaussianBlur(frame, (3, 3), 0), cv2.COLOR_BGR2HSV)
+    hsv = cv2.cvtColor(frame, cv2.COLOR_BGR2HSV)
+    raw_white = white_mask(hsv, config.saturation_max, config.value_min)
     masks = []
     contours = []
     kernel = cv2.getStructuringElement(cv2.MORPH_ELLIPSE, (5, 5))
@@ -87,6 +94,10 @@ def detect(image, config=None):
             coverage = float(np.mean((values <= 3.) & valid))
             if coverage < config.min_edge_coverage:
                 continue
+            color = white_band_evidence(raw_white, points)
+            if (color['support'] < config.min_white_support or color['sectors'] < config.min_white_sectors or
+                    color['bounded_support'] < WHITE_MIN_BOUNDED_SUPPORT):
+                continue
             inner, _ = sample(white, ellipse_points(ellipse, scale=.9))
             outer, _ = sample(white, ellipse_points(ellipse, scale=1.1))
             material = float(np.mean(np.maximum(inner, outer)))
@@ -96,7 +107,7 @@ def detect(image, config=None):
             if material < .45 or (neutral and not config.rim_hypotheses):
                 continue
             clipped = bool(box[0] < 3 or box[1] < 3 or box[2] > w-4 or box[3] > h-4)
-            score = .4*coverage + .2*material + .4*min(1., area/(w*h*.20)) - .1*clipped
+            score = .4*coverage + .1*material + .1*color['support'] + .4*min(1., area/(w*h*.20)) - .1*clipped
             # Nonuniform rounding of the resize needs a refit, not a naive
             # multiplication of rotated ellipse axis lengths.
             mapped = (ellipse_points(ellipse)*[sx, sy]).astype(np.float32)

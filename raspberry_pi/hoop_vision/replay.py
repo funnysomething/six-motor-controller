@@ -21,6 +21,7 @@ from .verification import verify, VerificationConfig
 from .types import Candidate, Observation
 from .ellipse_guidance import guided_candidates
 from .orientation import estimate_orientation, validate_calibration
+from .color import WHITE_SATURATION_MAX, WHITE_VALUE_MIN, WHITE_MIN_SUPPORT
 
 
 IMAGE_EXTENSIONS = {".jpg", ".jpeg", ".png", ".bmp", ".tif", ".tiff"}
@@ -135,10 +136,15 @@ def run(paths, output, config, sample_fps=10., save_video=False, tracking=False,
     if calibration and not tracking:
         raise ValueError('Camera orientation calibration requires tracking mode')
     output = Path(output)
-    output.mkdir(parents=True, exist_ok=False)
     timings, counts, media = [], Counter(), []
     tracker_config = tracker_config or TrackerConfig()
-    verification_config = verification_config or VerificationConfig()
+    verification_config = verification_config or VerificationConfig(
+        profile=tracker_config.profile, saturation_max=config.saturation_max, value_min=config.value_min,
+        min_white_support=config.min_white_support, min_white_sectors=config.min_white_sectors)
+    if any(getattr(config,key)!=getattr(verification_config,key) for key in
+           ("saturation_max","value_min","min_white_support","min_white_sectors")):
+        raise ValueError("Detector and verification HSV white settings must match")
+    output.mkdir(parents=True, exist_ok=False)
     temporal_timings, verification_timings, decisions = [], [], Counter()
     photo_previews, video_previews = [], []
     with (output/"observations.jsonl").open("w") as log:
@@ -290,8 +296,9 @@ def main(argv=None):
     parser.add_argument("--output",required=True,type=Path,help="new output directory; existing results are never overwritten")
     parser.add_argument("--sample-fps",type=float,default=10.,help="video timestamp sampling, 0 for all frames")
     parser.add_argument("--max-dimension",type=int,default=640)
-    parser.add_argument("--saturation-max",type=int,default=100)
-    parser.add_argument("--value-min",type=int,default=95)
+    parser.add_argument("--saturation-max",type=int,default=WHITE_SATURATION_MAX)
+    parser.add_argument("--value-min",type=int,default=WHITE_VALUE_MIN)
+    parser.add_argument("--min-white-support",type=float,default=WHITE_MIN_SUPPORT)
     parser.add_argument("--save-video",action="store_true")
     parser.add_argument("--tracking",action="store_true",help="verify boundaries and track; image decisions only")
     parser.add_argument("--tracking-profile",choices=("ellipse","strict"),default="ellipse")
@@ -305,7 +312,12 @@ def main(argv=None):
     try:
         overrides=json.loads(args.tracker_config.read_text()) if args.tracker_config else {}
         tracker_config = TrackerConfig.ellipse(**overrides) if args.tracking_profile=="ellipse" else TrackerConfig(**overrides)
-        verification_config = VerificationConfig(**json.loads(args.verification_config.read_text())) if args.verification_config else VerificationConfig(profile=args.tracking_profile)
+        white_options = dict(saturation_max=args.saturation_max, value_min=args.value_min,
+                             min_white_support=args.min_white_support)
+        verification_options = dict(profile=args.tracking_profile, **white_options)
+        if args.verification_config:
+            verification_options.update(json.loads(args.verification_config.read_text()))
+        verification_config = VerificationConfig(**verification_options)
         calibration=validate_calibration(json.loads(args.camera_calibration.read_text())) if args.camera_calibration else None
         if calibration and not args.tracking:
             raise ValueError('--camera-calibration requires --tracking')
@@ -330,7 +342,9 @@ def main(argv=None):
             raise ValueError(f"Input does not exist: {args.input}")
         if not paths:
             raise ValueError("Input contains no supported media")
-        summary = run(paths,args.output,DetectorConfig(max_dimension=args.max_dimension,saturation_max=args.saturation_max,value_min=args.value_min,
+        summary = run(paths,args.output,DetectorConfig(max_dimension=args.max_dimension,
+                      saturation_max=verification_config.saturation_max,value_min=verification_config.value_min,
+                      min_white_support=verification_config.min_white_support,min_white_sectors=verification_config.min_white_sectors,
                       rim_hypotheses=(args.tracking or args.verification_only) and args.tracking_profile=="ellipse",
                       max_candidates=18 if (args.tracking or args.verification_only) and args.tracking_profile=="ellipse" else 6),args.sample_fps,args.save_video,
                       tracking=args.tracking,debug=args.tracking_debug,tracker_config=tracker_config,

@@ -7,6 +7,8 @@ import cv2
 import numpy as np
 
 from .geometry import ellipse_points, sample
+from .color import (WHITE_SATURATION_MAX, WHITE_VALUE_MIN, WHITE_MIN_SUPPORT,
+                    WHITE_MIN_SECTORS, WHITE_MIN_BOUNDED_SUPPORT, validate_hsv, white_mask, white_band_evidence)
 
 
 @dataclass(frozen=True)
@@ -18,6 +20,10 @@ class VerificationConfig:
     min_material: float = .65
     min_polarity: float = .65
     strong_coverage: float = .82
+    saturation_max: int = WHITE_SATURATION_MAX
+    value_min: int = WHITE_VALUE_MIN
+    min_white_support: float = WHITE_MIN_SUPPORT
+    min_white_sectors: int = WHITE_MIN_SECTORS
 
     def __post_init__(self):
         if self.profile not in ("strict","ellipse"):
@@ -31,6 +37,10 @@ class VerificationConfig:
             raise ValueError("Verification fractions must be finite in (0,1]")
         if self.strong_coverage < self.min_coverage:
             raise ValueError("Acquisition coverage cannot be weaker than maintenance")
+        validate_hsv(self.saturation_max, self.value_min)
+        if (not math.isfinite(self.min_white_support) or not 0 < self.min_white_support <= 1 or
+                type(self.min_white_sectors) is not int or not 1 <= self.min_white_sectors <= 8):
+            raise ValueError("White support must be in (0,1] and white sectors in 1..8")
 
 
 def verify(image, observation, config=None):
@@ -46,8 +56,7 @@ def verify(image, observation, config=None):
     gx = cv2.Sobel(gray, cv2.CV_32F, 1, 0)
     gy = cv2.Sobel(gray, cv2.CV_32F, 0, 1)
     hsv = cv2.cvtColor(frame, cv2.COLOR_BGR2HSV)
-    whites = [((hsv[:, :, 1] <= 100) & (hsv[:, :, 2] >= value)).astype(float)
-              for value in (95, 140)]
+    whites = [white_mask(hsv, config.saturation_max, config.value_min)]
     for candidate in observation.candidates:
         ellipse = (candidate.center_px, candidate.axes_px, candidate.image_rotation_deg)
         numbers = (*candidate.center_px, *candidate.axes_px, candidate.image_rotation_deg,
@@ -60,6 +69,7 @@ def verify(image, observation, config=None):
         tangent = np.roll(points, -1, axis=0)-np.roll(points, 1, axis=0)
         normals = np.column_stack((-tangent[:, 1], tangent[:, 0]))
         normals /= np.maximum(1e-6, np.linalg.norm(normals, axis=1))[:, None]
+        color = white_band_evidence(whites[0], points, normals)
         support = np.zeros(len(points), bool)
         for offset in (-3, -2, -1, 0, 1, 2, 3):
             probe = points+offset*normals
@@ -118,12 +128,25 @@ def verify(image, observation, config=None):
                 reasons=[r for r in reasons if r!="insufficient_rim_edges"]
                 if secondary_coverage<.08 and candidate.source!='confirmed_temporal_refit':
                     reasons.append("no_secondary_boundary")
+        # A hard gate for every profile/source. Neither history nor a paired
+        # curve may rescue a candidate with insufficient current white pixels.
+        if color['support'] < config.min_white_support:
+            reasons.append("outside_white_hsv_range")
+        if color['sectors'] < config.min_white_sectors:
+            reasons.append("insufficient_white_arc_distribution")
+        if color['bounded_support'] < WHITE_MIN_BOUNDED_SUPPORT:
+            reasons.append("unbounded_white_background")
         candidate.verification = dict(
             passed=not reasons, strong=not reasons and coverage >= config.strong_coverage,
             reasons=reasons, oriented_coverage=coverage, sectors=sectors,
             material_support=min(material), polarity=max(polarity),
             interior_boundary_coverage=secondary_coverage,
-            quality_score=.4*candidate.score+.4*coverage+.2*sectors/8)
+            white_support=color['support'], white_bounded_support=color['bounded_support'],
+            white_sectors=color['sectors'], white_side=color['side'],
+            white_hsv=dict(h_min=0,h_max=179,s_max=config.saturation_max,v_min=config.value_min),
+            white_color_passed=(color['support']>=config.min_white_support and color['sectors']>=config.min_white_sectors and
+                                color['bounded_support']>=WHITE_MIN_BOUNDED_SUPPORT),
+            quality_score=.4*candidate.score+.3*coverage+.2*sectors/8+.1*color['support'])
         if config.profile == "ellipse" and not reasons:
             candidate.verification["strong"] = coverage >= .55 or (candidate.kind=="rim_arc" and candidate.score>=.8)
             if candidate.kind=='rim_arc' and secondary_coverage<.08:
@@ -145,7 +168,8 @@ def verify(image, observation, config=None):
                 distinct = separation > .04*min(a) or abs(max(a)-max(b)) > .08*max(a)
                 near = separation < .65*max(a)
                 ov = other.verification or {}
-                if similar and distinct and near and ov.get("oriented_coverage",0) >= .6:
+                if (similar and distinct and near and ov.get("oriented_coverage",0) >= .6 and
+                        ov.get("white_color_passed",False)):
                     c.verification.update(passed=True,strong=c.verification["oriented_coverage"]>=.6,
                                           reasons=[],paired_boundary=True)
                     break

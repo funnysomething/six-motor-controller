@@ -1,0 +1,13 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0"><dict>
+  <key>CFBundleIdentifier</key><string>org.hoopvision.CameraBridge</string>
+  <key>CFBundleName</key><string>Hoop Camera Bridge</string>
+  <key>CFBundleExecutable</key><string>HoopCameraBridge</string>
+  <key>CFBundlePackageType</key><string>APPL</string>
+  <key>CFBundleVersion</key><string>1</string>
+  <key>LSMinimumSystemVersion</key><string>13.0</string>
+  <key>LSUIElement</key><true/>
+  <key>NSCameraUsageDescription</key><string>Use the camera you select for local live hoop detection. No microphone is used.</string>
+  <key>NSCameraUseContinuityCameraDeviceType</key><true/>
+</dict></plist>

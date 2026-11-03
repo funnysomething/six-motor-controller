@@ -1,5 +1,15 @@
 # Offline hoop vision
 
+The current pipeline applies an [HSV white-material gate](../../docs/hoop-hsv-color-gating.md)
+to new ellipse proposals and current tracked refits. That document records its
+defaults, tuning options and the latest results. The older ellipse results below
+describe the revision before this color gate.
+
+For a live wireless iPhone stream on macOS, see the
+[Continuity Camera setup and live tracker guide](../../docs/iphone-continuity-camera.md).
+Run `scripts/vision/hoop_live.py --list-cameras` with the environment below, then
+select the iPhone explicitly using `--camera-name` or `--device-id`.
+
 Start with the [underwater production reference and roadmap](../../docs/underwater-vision-production-reference.md)
 for the final camera, housing and vehicle inside the water. See the
 [latest measured results](../../docs/hoop-ellipse-tracking-results.md) for the
@@ -45,7 +55,9 @@ Useful options:
 - `--max-dimension 640` controls processing size while preserving aspect ratio.
   Photo EXIF orientation and video display rotation are applied first.
 - `--saturation-max` and `--value-min` expose material-mask thresholds. Tuning on
-  phone footage does not establish that they work underwater.
+  phone footage does not establish that they work underwater. Defaults are
+  S <= 60 and V >= 160 on OpenCV's 0..255 S/V scale. `--min-white-support`
+  defaults to 0.65; detector and verification use the same white settings.
 - `--tracker-config file.json` and `--verification-config file.json` override
   validated configuration fields. Their profiles must match `--tracking-profile`.
 

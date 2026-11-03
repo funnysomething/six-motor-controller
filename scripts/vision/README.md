@@ -1,5 +1,9 @@
 # Computer vision launchers
 
+For live hoop tracking using a wireless iPhone on macOS, use
+[`hoop_live.py`](../../docs/iphone-continuity-camera.md) with `.venv-hoop/bin/python`.
+The linked guide covers Continuity Camera setup and explicit device selection.
+
 For hardware-free hoop detection on saved photos/video, use
 [`hoop_replay.py`](../../raspberry_pi/hoop_vision/README.md). It has a separate,
 lightweight environment and does not load the Testudo model or control motors.
