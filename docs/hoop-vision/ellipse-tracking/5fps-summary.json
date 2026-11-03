@@ -1,0 +1,84 @@
+{
+  "schema_version": 1,
+  "config": {
+    "max_dimension": 640,
+    "saturation_max": 100,
+    "value_min": 95,
+    "min_area_fraction": 0.035,
+    "min_edge_coverage": 0.62,
+    "max_candidates": 18,
+    "rim_hypotheses": true
+  },
+  "sample_fps": 5,
+  "camera_calibration": null,
+  "tracking": true,
+  "verification_only": false,
+  "tracker_config": {
+    "profile": "ellipse",
+    "acquire_seconds": 0.1,
+    "acquire_observations": 2,
+    "reacquire_seconds": 0.05,
+    "reacquire_observations": 2,
+    "max_gap_seconds": 0.3,
+    "retain_seconds": 1.0,
+    "max_age_seconds": 0.2,
+    "max_tracks": 8,
+    "association_gate": 16.0,
+    "ambiguity_margin": 0.5,
+    "measurement_center_std": 0.035,
+    "measurement_logsize_std": 0.18
+  },
+  "verification_config": {
+    "profile": "ellipse",
+    "max_dimension": 640,
+    "min_coverage": 0.72,
+    "min_sectors": 6,
+    "min_material": 0.65,
+    "min_polarity": 0.65,
+    "strong_coverage": 0.82
+  },
+  "decision_counts": {
+    "unknown": 45,
+    "accepted": 29
+  },
+  "verification_ms": {
+    "p50": 5.919687499999826,
+    "p95": 6.817212499999902,
+    "p99": 7.183778070000068
+  },
+  "tracking_ms": {
+    "p50": 0.2508334999999917,
+    "p95": 0.5188750000000407,
+    "p99": 0.67473125
+  },
+  "runtime": {
+    "python": "3.9.6",
+    "opencv": "4.14.0",
+    "numpy": "2.0.2",
+    "machine": "arm64"
+  },
+  "media": [
+    {
+      "source": "IMG_7329.MOV",
+      "source_id": "IMG_7329-d48fdb9d",
+      "processed_frames": 74,
+      "frame_size": [
+        1080,
+        1920
+      ]
+    }
+  ],
+  "processed_frames": 74,
+  "status_counts": {
+    "uncalibrated_candidates": 74
+  },
+  "processing_ms": {
+    "p50": 20.17156199999981,
+    "p95": 38.549818300000126,
+    "p99": 43.72296808999995
+  },
+  "timing_scope": "detect() only on this host; excludes decode, overlay, capture and transport",
+  "pose_valid_frames": 0,
+  "target_identity_verified_frames": 0,
+  "caveat": "Development footage from a different camera outside the water. Scores are heuristic, not probabilities. No underwater or metric-pose validation."
+}

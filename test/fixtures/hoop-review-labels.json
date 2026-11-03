@@ -1,0 +1,736 @@
+{
+  "schema_version": 1,
+  "annotation_method": "Manual coarse region review, with additional contiguous intervals on the existing development clip. Shared broad boxes describe the real-hoop region in clear intervals, not exact rims. The glass-corner interval forbids acceptance. Not independent test data or pose truth. Eight apparent-opening boxes were added after visual inspection of accepted outputs; these development annotations are not an unbiased precision estimate. Opening and band boxes are scored separately by measurement kind.",
+  "coordinate_system": "normalized display-oriented xyxy",
+  "labels": [
+    {
+      "source": "IMG_7316.JPG",
+      "time_s": null,
+      "box": [
+        0.18,
+        0.13,
+        0.99,
+        0.77
+      ],
+      "condition": "open_blue_background"
+    },
+    {
+      "source": "IMG_7317.JPG",
+      "time_s": null,
+      "box": [
+        0.13,
+        0.17,
+        0.86,
+        0.75
+      ],
+      "condition": "open_blue_background"
+    },
+    {
+      "source": "IMG_7318.JPG",
+      "time_s": null,
+      "box": [
+        0.12,
+        0.25,
+        0.71,
+        0.76
+      ],
+      "condition": "oblique_blue_background"
+    },
+    {
+      "source": "IMG_7319.JPG",
+      "time_s": null,
+      "box": [
+        0.2,
+        0.24,
+        0.72,
+        0.76
+      ],
+      "condition": "oblique_blue_background"
+    },
+    {
+      "source": "IMG_7320.JPG",
+      "time_s": null,
+      "box": [
+        0.18,
+        0.19,
+        0.58,
+        0.77
+      ],
+      "condition": "edge_on_glare"
+    },
+    {
+      "source": "IMG_7321.JPG",
+      "time_s": null,
+      "box": [
+        0.02,
+        0.15,
+        0.41,
+        0.73
+      ],
+      "condition": "edge_on_glare"
+    },
+    {
+      "source": "IMG_7322.JPG",
+      "time_s": null,
+      "box": [
+        0.0,
+        0.25,
+        0.61,
+        0.91
+      ],
+      "condition": "clipped_gray_background"
+    },
+    {
+      "source": "IMG_7323.JPG",
+      "time_s": null,
+      "box": [
+        0.0,
+        0.26,
+        0.6,
+        0.93
+      ],
+      "condition": "clipped_gray_background"
+    },
+    {
+      "source": "IMG_7324.JPG",
+      "time_s": null,
+      "box": [
+        0.15,
+        0.28,
+        0.85,
+        0.88
+      ],
+      "condition": "oblique_gray_background"
+    },
+    {
+      "source": "IMG_7325.JPG",
+      "time_s": null,
+      "box": [
+        0.36,
+        0.29,
+        1.0,
+        0.93
+      ],
+      "condition": "oblique_gray_background"
+    },
+    {
+      "source": "IMG_7326.JPG",
+      "time_s": null,
+      "box": [
+        0.39,
+        0.34,
+        0.99,
+        0.88
+      ],
+      "condition": "oblique_gray_background"
+    },
+    {
+      "source": "IMG_7327.JPG",
+      "time_s": null,
+      "box": [
+        0.4,
+        0.36,
+        0.85,
+        0.89
+      ],
+      "condition": "edge_on_gray_background"
+    },
+    {
+      "source": "IMG_7328.JPG",
+      "time_s": null,
+      "box": [
+        0.4,
+        0.41,
+        0.86,
+        0.93
+      ],
+      "condition": "edge_on_gray_background"
+    },
+    {
+      "source": "IMG_7329.MOV",
+      "time_s": 0,
+      "box": [
+        0.34,
+        0.19,
+        0.85,
+        0.79
+      ],
+      "condition": "oblique_gray_background"
+    },
+    {
+      "source": "IMG_7329.MOV",
+      "time_s": 1,
+      "box": [
+        0.35,
+        0.22,
+        0.94,
+        0.79
+      ],
+      "condition": "oblique_gray_background"
+    },
+    {
+      "source": "IMG_7329.MOV",
+      "time_s": 2,
+      "box": [
+        0.45,
+        0.27,
+        1.0,
+        0.81
+      ],
+      "condition": "clipped_gray_background"
+    },
+    {
+      "source": "IMG_7329.MOV",
+      "time_s": 3,
+      "box": [
+        0.45,
+        0.28,
+        1.0,
+        0.82
+      ],
+      "condition": "clipped_gray_background"
+    },
+    {
+      "source": "IMG_7329.MOV",
+      "time_s": 4,
+      "box": [
+        0.18,
+        0.27,
+        0.89,
+        0.76
+      ],
+      "condition": "oblique_blue_background"
+    },
+    {
+      "source": "IMG_7329.MOV",
+      "time_s": 6,
+      "box": [
+        0.65,
+        0.35,
+        1.0,
+        0.69
+      ],
+      "condition": "clipped_blue_background"
+    },
+    {
+      "source": "IMG_7329.MOV",
+      "time_s": 7,
+      "box": [
+        0.2,
+        0.34,
+        0.96,
+        0.78
+      ],
+      "condition": "open_blue_background"
+    },
+    {
+      "source": "IMG_7329.MOV",
+      "time_s": 8,
+      "box": [
+        0.1,
+        0.25,
+        0.91,
+        0.77
+      ],
+      "condition": "open_blue_background"
+    },
+    {
+      "source": "IMG_7329.MOV",
+      "time_s": 9,
+      "box": [
+        0.1,
+        0.24,
+        0.78,
+        0.8
+      ],
+      "condition": "oblique_blue_background"
+    },
+    {
+      "source": "IMG_7329.MOV",
+      "time_s": 10,
+      "box": [
+        0.13,
+        0.24,
+        0.66,
+        0.8
+      ],
+      "condition": "edge_on_blue_background"
+    },
+    {
+      "source": "IMG_7329.MOV",
+      "time_s": 11,
+      "box": [
+        0.14,
+        0.21,
+        0.49,
+        0.81
+      ],
+      "condition": "edge_on_glare"
+    },
+    {
+      "source": "IMG_7329.MOV",
+      "time_s": 12,
+      "box": [
+        0.0,
+        0.2,
+        0.36,
+        0.82
+      ],
+      "condition": "clipped_edge_on"
+    },
+    {
+      "source": "IMG_7329.MOV",
+      "time_s": 13,
+      "box": [
+        0.04,
+        0.29,
+        0.64,
+        0.8
+      ],
+      "condition": "oblique_blue_background"
+    },
+    {
+      "source": "IMG_7329.MOV",
+      "time_s": 14,
+      "box": [
+        0.14,
+        0.25,
+        0.97,
+        0.83
+      ],
+      "condition": "oblique_blue_background"
+    },
+    {
+      "source": "IMG_7329.MOV",
+      "time_s": 6.9,
+      "box": [
+        0.08,
+        0.31,
+        1.0,
+        0.85
+      ],
+      "condition": "clear_blue_sequence",
+      "acceptance_allowed": true
+    },
+    {
+      "source": "IMG_7329.MOV",
+      "time_s": 7.1,
+      "box": [
+        0.08,
+        0.31,
+        1.0,
+        0.85
+      ],
+      "condition": "clear_blue_sequence",
+      "acceptance_allowed": true
+    },
+    {
+      "source": "IMG_7329.MOV",
+      "time_s": 7.2,
+      "box": [
+        0.08,
+        0.31,
+        1.0,
+        0.85
+      ],
+      "condition": "clear_blue_sequence",
+      "acceptance_allowed": true
+    },
+    {
+      "source": "IMG_7329.MOV",
+      "time_s": 7.3,
+      "box": [
+        0.08,
+        0.31,
+        1.0,
+        0.85
+      ],
+      "condition": "clear_blue_sequence",
+      "acceptance_allowed": true
+    },
+    {
+      "source": "IMG_7329.MOV",
+      "time_s": 7.4,
+      "box": [
+        0.08,
+        0.31,
+        1.0,
+        0.85
+      ],
+      "condition": "clear_blue_sequence",
+      "acceptance_allowed": true,
+      "measurement_boxes": {
+        "apparent_opening": [
+          0.1,
+          0.4,
+          0.85,
+          0.82
+        ]
+      }
+    },
+    {
+      "source": "IMG_7329.MOV",
+      "time_s": 13.6,
+      "box": [
+        0.1,
+        0.17,
+        1.0,
+        0.88
+      ],
+      "condition": "clear_blue_sequence",
+      "acceptance_allowed": true
+    },
+    {
+      "source": "IMG_7329.MOV",
+      "time_s": 13.7,
+      "box": [
+        0.1,
+        0.17,
+        1.0,
+        0.88
+      ],
+      "condition": "clear_blue_sequence",
+      "acceptance_allowed": true
+    },
+    {
+      "source": "IMG_7329.MOV",
+      "time_s": 13.8,
+      "box": [
+        0.1,
+        0.17,
+        1.0,
+        0.88
+      ],
+      "condition": "clear_blue_sequence",
+      "acceptance_allowed": true
+    },
+    {
+      "source": "IMG_7329.MOV",
+      "time_s": 13.9,
+      "box": [
+        0.1,
+        0.17,
+        1.0,
+        0.88
+      ],
+      "condition": "clear_blue_sequence",
+      "acceptance_allowed": true
+    },
+    {
+      "source": "IMG_7329.MOV",
+      "time_s": 14.1,
+      "box": [
+        0.1,
+        0.17,
+        1.0,
+        0.88
+      ],
+      "condition": "clear_blue_sequence",
+      "acceptance_allowed": true,
+      "measurement_boxes": {
+        "apparent_opening": [
+          0.41,
+          0.28,
+          0.95,
+          0.68
+        ]
+      }
+    },
+    {
+      "source": "IMG_7329.MOV",
+      "time_s": 14.2,
+      "box": [
+        0.1,
+        0.17,
+        1.0,
+        0.88
+      ],
+      "condition": "clear_blue_sequence",
+      "acceptance_allowed": true,
+      "measurement_boxes": {
+        "apparent_opening": [
+          0.39,
+          0.26,
+          0.95,
+          0.66
+        ]
+      }
+    },
+    {
+      "source": "IMG_7329.MOV",
+      "time_s": 14.3,
+      "box": [
+        0.1,
+        0.17,
+        1.0,
+        0.88
+      ],
+      "condition": "clear_blue_sequence",
+      "acceptance_allowed": true,
+      "measurement_boxes": {
+        "apparent_opening": [
+          0.35,
+          0.26,
+          0.91,
+          0.65
+        ]
+      }
+    },
+    {
+      "source": "IMG_7329.MOV",
+      "time_s": 14.4,
+      "box": [
+        0.1,
+        0.17,
+        1.0,
+        0.88
+      ],
+      "condition": "clear_blue_sequence",
+      "acceptance_allowed": true,
+      "measurement_boxes": {
+        "apparent_opening": [
+          0.34,
+          0.28,
+          0.9,
+          0.66
+        ]
+      }
+    },
+    {
+      "source": "IMG_7329.MOV",
+      "time_s": 14.5,
+      "box": [
+        0.1,
+        0.17,
+        1.0,
+        0.88
+      ],
+      "condition": "clear_blue_sequence",
+      "acceptance_allowed": true,
+      "measurement_boxes": {
+        "apparent_opening": [
+          0.33,
+          0.28,
+          0.87,
+          0.66
+        ]
+      }
+    },
+    {
+      "source": "IMG_7329.MOV",
+      "time_s": 14.6,
+      "box": [
+        0.1,
+        0.17,
+        1.0,
+        0.88
+      ],
+      "condition": "clear_blue_sequence",
+      "acceptance_allowed": true,
+      "measurement_boxes": {
+        "apparent_opening": [
+          0.32,
+          0.29,
+          0.85,
+          0.66
+        ]
+      }
+    },
+    {
+      "source": "IMG_7329.MOV",
+      "time_s": 14.7,
+      "box": [
+        0.1,
+        0.17,
+        1.0,
+        0.88
+      ],
+      "condition": "clear_blue_sequence",
+      "acceptance_allowed": true,
+      "measurement_boxes": {
+        "apparent_opening": [
+          0.32,
+          0.3,
+          0.84,
+          0.67
+        ]
+      }
+    },
+    {
+      "source": "IMG_7329.MOV",
+      "time_s": 5.0,
+      "box": [
+        0.0,
+        0.1,
+        1.0,
+        0.95
+      ],
+      "condition": "ambiguous_glass_corner",
+      "acceptance_allowed": false
+    },
+    {
+      "source": "IMG_7329.MOV",
+      "time_s": 5.1,
+      "box": [
+        0.0,
+        0.1,
+        1.0,
+        0.95
+      ],
+      "condition": "ambiguous_glass_corner",
+      "acceptance_allowed": false
+    },
+    {
+      "source": "IMG_7329.MOV",
+      "time_s": 5.2,
+      "box": [
+        0.0,
+        0.1,
+        1.0,
+        0.95
+      ],
+      "condition": "ambiguous_glass_corner",
+      "acceptance_allowed": false
+    },
+    {
+      "source": "IMG_7329.MOV",
+      "time_s": 5.3,
+      "box": [
+        0.0,
+        0.1,
+        1.0,
+        0.95
+      ],
+      "condition": "ambiguous_glass_corner",
+      "acceptance_allowed": false
+    },
+    {
+      "source": "IMG_7329.MOV",
+      "time_s": 5.4,
+      "box": [
+        0.0,
+        0.1,
+        1.0,
+        0.95
+      ],
+      "condition": "ambiguous_glass_corner",
+      "acceptance_allowed": false
+    },
+    {
+      "source": "IMG_7329.MOV",
+      "time_s": 5.5,
+      "box": [
+        0.0,
+        0.1,
+        1.0,
+        0.95
+      ],
+      "condition": "ambiguous_glass_corner",
+      "acceptance_allowed": false
+    },
+    {
+      "source": "IMG_7329.MOV",
+      "time_s": 5.6,
+      "box": [
+        0.0,
+        0.1,
+        1.0,
+        0.95
+      ],
+      "condition": "ambiguous_glass_corner",
+      "acceptance_allowed": false
+    },
+    {
+      "source": "IMG_7329.MOV",
+      "time_s": 5.7,
+      "box": [
+        0.0,
+        0.1,
+        1.0,
+        0.95
+      ],
+      "condition": "ambiguous_glass_corner",
+      "acceptance_allowed": false
+    },
+    {
+      "source": "IMG_7329.MOV",
+      "time_s": 5.8,
+      "box": [
+        0.0,
+        0.1,
+        1.0,
+        0.95
+      ],
+      "condition": "ambiguous_glass_corner",
+      "acceptance_allowed": false
+    }
+  ],
+  "excluded_video_times": [
+    {
+      "time_s": 5,
+      "reason": "Glass corner shows competing real/reflected images; target identity not confidently labeled"
+    }
+  ],
+  "negative_regions": [
+    {
+      "source": "IMG_7325.JPG",
+      "box": [
+        0.65,
+        0.01,
+        0.99,
+        0.25
+      ],
+      "kind": "gray_background"
+    },
+    {
+      "source": "IMG_7326.JPG",
+      "box": [
+        0.7,
+        0.02,
+        0.99,
+        0.29
+      ],
+      "kind": "background_attachments"
+    },
+    {
+      "source": "IMG_7327.JPG",
+      "box": [
+        0.65,
+        0.02,
+        0.99,
+        0.3
+      ],
+      "kind": "background_attachments"
+    },
+    {
+      "source": "IMG_7328.JPG",
+      "box": [
+        0.4,
+        0.01,
+        0.99,
+        0.38
+      ],
+      "kind": "gray_background"
+    },
+    {
+      "source": "IMG_7321.JPG",
+      "box": [
+        0.55,
+        0.3,
+        0.99,
+        0.75
+      ],
+      "kind": "plants"
+    },
+    {
+      "source": "IMG_7316.JPG",
+      "box": [
+        0.15,
+        0.83,
+        0.95,
+        0.99
+      ],
+      "kind": "floor_reflection"
+    }
+  ]
+}

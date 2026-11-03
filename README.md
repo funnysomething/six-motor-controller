@@ -1,5 +1,10 @@
 # Six motors with Raspberry Pi direction and ESP32 PWM
 
+For the final in-water hoop vision system, start with the
+[underwater vision production reference](docs/underwater-vision-production-reference.md).
+It documents the prototype results, current limitations and required validation
+with the real camera, housing and submarine assembly.
+
 For camera preview, dataset capture, training, model export, and detection, use
 the [computer vision launcher scripts](scripts/vision/README.md).
 

@@ -1,0 +1,271 @@
+{
+  "snapshot_date": "2026-11-01",
+  "repository": "https://github.com/funnysomething/six-motor-controller",
+  "branch": "codex/hoop-temporal-tracking",
+  "committed_base": "b2dc9be92355b6a434a966d489d9f87d2cd2bdcf",
+  "working_tree_uncommitted": true,
+  "scope": "Current file hashes and retained experiment artifacts. Not proof that every historical run used exactly these current source bytes. Not a production release.",
+  "source_files": [
+    {
+      "path": "README.md",
+      "bytes": 24274,
+      "sha256": "ae82d977cb66c417d9250167d098e836edf56e133ec7249f5c5e07bd5bd4abbe"
+    },
+    {
+      "path": "docs/README.md",
+      "bytes": 1173,
+      "sha256": "52e7515c094e00c8f44571d2aa5cd8eb0b3192706638f803a791a8282b32c0b9"
+    },
+    {
+      "path": "docs/hoop-ellipse-tracking-results.md",
+      "bytes": 6673,
+      "sha256": "3d400b8c9dbdeae437f2f39c2d07cdd3a064aa00f38323839a63fe8a1ec0bd66"
+    },
+    {
+      "path": "docs/underwater-vision-production-reference.md",
+      "bytes": 29820,
+      "sha256": "b9149f1547321d9c1d5f55453ac32f6e19ecb56cc2538d32b28ca0d54609c52f"
+    },
+    {
+      "path": "raspberry_pi/hoop_vision/README.md",
+      "bytes": 8182,
+      "sha256": "0117a0bbc540b7703696f74c975b5502309fb9a07a852d9b1b15c59cf1073b3f"
+    },
+    {
+      "path": "raspberry_pi/hoop_vision/__init__.py",
+      "bytes": 170,
+      "sha256": "2889dc500cc32eecba2bdfc4656421693b33f97e2ca5ca3d189ec55c50ba4c1e"
+    },
+    {
+      "path": "raspberry_pi/hoop_vision/detector.py",
+      "bytes": 6187,
+      "sha256": "c726071b66120e118f9fcfda60bb38915edb0948e16658678ae276f6d2f02079"
+    },
+    {
+      "path": "raspberry_pi/hoop_vision/ellipse_guidance.py",
+      "bytes": 2655,
+      "sha256": "559368aea33e7bde500760e261ad417ddf1c19cbc5dfd435c4b6eee79ede85f1"
+    },
+    {
+      "path": "raspberry_pi/hoop_vision/geometry.py",
+      "bytes": 2188,
+      "sha256": "7d5e73ad54254a8cb56ef164b3def532a3b8f4afef6ccf87280940f23f4d58d6"
+    },
+    {
+      "path": "raspberry_pi/hoop_vision/orientation.py",
+      "bytes": 3449,
+      "sha256": "38ca746c47c50b9502efcbb5dc5bb1a6fbfac5b20009c87378d0582d5a36912f"
+    },
+    {
+      "path": "raspberry_pi/hoop_vision/replay.py",
+      "bytes": 20107,
+      "sha256": "fe83e7bb9177a484b9a760f47e4994695b1f09f153c0eb8017233ab36997806e"
+    },
+    {
+      "path": "raspberry_pi/hoop_vision/tracker.py",
+      "bytes": 18291,
+      "sha256": "30f433f5bd878b4b71d6ed9fa7f87d8f0fb5ce8d9eb185797fbc7fa0976ee6bd"
+    },
+    {
+      "path": "raspberry_pi/hoop_vision/types.py",
+      "bytes": 1229,
+      "sha256": "5a4dfa242a0b2515ceb189d4b31e57232d892922fe76914f25ea8f8f0874ae68"
+    },
+    {
+      "path": "raspberry_pi/hoop_vision/verification.py",
+      "bytes": 8114,
+      "sha256": "8c16d704bb834778a9cd0c9ceb883f0eef19d1bd37e0f16ea403eebfdfe050f4"
+    },
+    {
+      "path": "raspberry_pi/requirements-hoop.txt",
+      "bytes": 141,
+      "sha256": "a291a5c7a61d79f5be916b44763228fb860b495f466fa82b566f239d3cdc4531"
+    },
+    {
+      "path": "scripts/vision/README.md",
+      "bytes": 9527,
+      "sha256": "589a60d8b56593ee0e5bae4bc84525e5e6e0df3a0228bba01bdf5b7a3d9a9844"
+    },
+    {
+      "path": "scripts/vision/evaluate_hoop.py",
+      "bytes": 8544,
+      "sha256": "d606b61dfa009f5e8e87f59b44d57b561a9b509564985189156678d24de58234"
+    },
+    {
+      "path": "scripts/vision/hoop_replay.py",
+      "bytes": 307,
+      "sha256": "189a3a6401529827c11939ee830fd311efff00b02b5d2a44ba4ca64cf6a6ea94"
+    },
+    {
+      "path": "test/test_hoop_ellipse_tracking.py",
+      "bytes": 4129,
+      "sha256": "a374b301229aa73c9a2015774816535b2c6bc5776ea5b6afcf6ab199975d3952"
+    },
+    {
+      "path": "test/test_hoop_orientation.py",
+      "bytes": 2414,
+      "sha256": "5cd1f80914969d044fce9907435a3bb37a9f087695750b34063b8ceefbfa1771"
+    },
+    {
+      "path": "test/test_hoop_tracking.py",
+      "bytes": 10476,
+      "sha256": "74c3dbf0d5fc300df3137b2d2d5a894b402316e26e39d43ab0754b6c8165340d"
+    },
+    {
+      "path": "test/test_hoop_verification.py",
+      "bytes": 3106,
+      "sha256": "457330fcf3cf53fcfc6c2025f1ceed3d0eea53b2582bd64f3203c4dd2fd7e751"
+    },
+    {
+      "path": "test/test_hoop_vision.py",
+      "bytes": 8601,
+      "sha256": "af679eb16be55bb663c162643e6794405533d088c6bf889df6a8d374f7f9a8f9"
+    }
+  ],
+  "annotation_files": [
+    {
+      "path": "test/fixtures/hoop-review-labels.json",
+      "bytes": 13431,
+      "sha256": "a3dbaa42e10082279d352b353fe508e6dbaf5fe7c296c8b3014e1e7d57150a00"
+    }
+  ],
+  "retained_results": [
+    {
+      "path": "docs/hoop-vision/ellipse-tracking/0fps-summary.json",
+      "bytes": 2086,
+      "sha256": "21796a1ddc8d0ba2d786c8ae3951f78f310890734f47b82768263361d601eec6"
+    },
+    {
+      "path": "docs/hoop-vision/ellipse-tracking/10fps-summary.json",
+      "bytes": 4312,
+      "sha256": "a2ed6f7fdc5e96ebb9664d9b86f5de28a6c613896e833787e6462db329ae81e8"
+    },
+    {
+      "path": "docs/hoop-vision/ellipse-tracking/15fps-summary.json",
+      "bytes": 2088,
+      "sha256": "352094709348156ee42766822e527aec36134d661daefb65db37d2d8c49b9c42"
+    },
+    {
+      "path": "docs/hoop-vision/ellipse-tracking/5fps-summary.json",
+      "bytes": 2075,
+      "sha256": "53e3ee648ed3056e393680c5e497f943cd1f3dde541f394c3a300b142cd7842f"
+    },
+    {
+      "path": "docs/hoop-vision/ellipse-tracking/evaluation.json",
+      "bytes": 27588,
+      "sha256": "a77da4e58bd4330045586d0efbefe55d18e886664984173f63a75ab61a5149a4"
+    }
+  ],
+  "input_media": [
+    {
+      "path": "ENEE408V Hoop/IMG_7316.JPG",
+      "bytes": 3345511,
+      "sha256": "5b89c4b56dbf89f99d13795f94cbfed638b3b0f37a9afa9e8579f7fed869c50f"
+    },
+    {
+      "path": "ENEE408V Hoop/IMG_7317.JPG",
+      "bytes": 3246339,
+      "sha256": "518992637ec4ee249c12a47daab78025bcc4d959e21dc0cc66487992ca180dd1"
+    },
+    {
+      "path": "ENEE408V Hoop/IMG_7318.JPG",
+      "bytes": 3196573,
+      "sha256": "a452e35a1eccb5aae6af882a9b40e246e2ab5e7741a9075a04c021beb1617668"
+    },
+    {
+      "path": "ENEE408V Hoop/IMG_7319.JPG",
+      "bytes": 3465930,
+      "sha256": "0221e99e376613a307b96f96ce46c9343293a0c06497754a7863c4374a122ba7"
+    },
+    {
+      "path": "ENEE408V Hoop/IMG_7320.JPG",
+      "bytes": 3752384,
+      "sha256": "66ea1a092f296ada7c79b25ae46b0ac259d2e11a229334efa1d6b1da2548885c"
+    },
+    {
+      "path": "ENEE408V Hoop/IMG_7321.JPG",
+      "bytes": 4038542,
+      "sha256": "7302a6b254a98ef96413a13a0254478b7a0503e7185933dfcda123b5ea612e61"
+    },
+    {
+      "path": "ENEE408V Hoop/IMG_7322.JPG",
+      "bytes": 2863583,
+      "sha256": "4e16480ee226b8daddce87758a36daacb0dd3ff57c1122dda5f9883ac375ed16"
+    },
+    {
+      "path": "ENEE408V Hoop/IMG_7323.JPG",
+      "bytes": 2928803,
+      "sha256": "b33132d83bd5a80c5817b5e5335ee24b86da804e04ac80185d32979aa406cf40"
+    },
+    {
+      "path": "ENEE408V Hoop/IMG_7324.JPG",
+      "bytes": 3013157,
+      "sha256": "6920594c25b293579f799fd89a351b9e2b4430681074eb957a87aa73ef9c28f1"
+    },
+    {
+      "path": "ENEE408V Hoop/IMG_7325.JPG",
+      "bytes": 3257603,
+      "sha256": "fa73c16bb94782e835ebd7eb50d4d7dec13f63d6e1346c274587256208566e3f"
+    },
+    {
+      "path": "ENEE408V Hoop/IMG_7326.JPG",
+      "bytes": 3094713,
+      "sha256": "9d1b48fc1f03635fb9b1f68aed9f9ef3ae85dc0f753307553fa9a7c19690941e"
+    },
+    {
+      "path": "ENEE408V Hoop/IMG_7327.JPG",
+      "bytes": 3258825,
+      "sha256": "df03fb6aae83f1d823f4200ca99ebbff88ce81a4f3f7b7934973685c1ba72891"
+    },
+    {
+      "path": "ENEE408V Hoop/IMG_7328.JPG",
+      "bytes": 3203532,
+      "sha256": "0edba5fe441df50f408fd463f9f2ae571cafc280b61ebc439273495490e3af32"
+    },
+    {
+      "path": "ENEE408V Hoop/IMG_7329.MOV",
+      "bytes": 43362190,
+      "sha256": "4311395f46fabcfffe50ea9f6ecb4bf61cabbd258b0af3daa6c9e446a193fe08"
+    }
+  ],
+  "local_generated_artifacts": [
+    {
+      "path": "camera_results/hoop-ellipse-tracking-release/ellipse-tracking.mp4",
+      "bytes": 3275245,
+      "sha256": "350926a1446db054ea62ab6c11d722fd6228eaa4aa8a21698d7be72f3c3059e1"
+    },
+    {
+      "path": "camera_results/hoop-ellipse-tracking-release/observations.jsonl",
+      "bytes": 2192562,
+      "sha256": "1700c401a190edd57bc3fd95316b15f95c050c29497078b43cd78edbceaefdfb"
+    },
+    {
+      "path": "camera_results/hoop-ellipse-tracking-release/summary.json",
+      "bytes": 4312,
+      "sha256": "a2ed6f7fdc5e96ebb9664d9b86f5de28a6c613896e833787e6462db329ae81e8"
+    },
+    {
+      "path": "camera_results/hoop-ellipse-tracking-release/evaluation.json",
+      "bytes": 27588,
+      "sha256": "a77da4e58bd4330045586d0efbefe55d18e886664984173f63a75ab61a5149a4"
+    }
+  ],
+  "cleanup": {
+    "date": "2026-11-01",
+    "removed_intermediate_runs": 33,
+    "retained_generated_runs": [
+      "camera_results/hoop-ellipse-tracking-release",
+      "camera_results/hoop-ellipse-release-5fps",
+      "camera_results/hoop-ellipse-release-15fps",
+      "camera_results/hoop-ellipse-release-0fps"
+    ],
+    "annotations": "Expanded review is consolidated at test/fixtures/hoop-review-labels.json. Superseded plans, reports and duplicate generated media removed."
+  },
+  "published_preview": {
+    "path": "docs/hoop-vision/ellipse-tracking/ellipse-tracking.mp4",
+    "bytes": 3275245,
+    "sha256": "350926a1446db054ea62ab6c11d722fd6228eaa4aa8a21698d7be72f3c3059e1"
+  },
+  "publication_date": "2026-11-02",
+  "publication_note": "Latest annotated preview included in git; documentation links and current source hashes refreshed. Experimental result dates remain unchanged."
+}

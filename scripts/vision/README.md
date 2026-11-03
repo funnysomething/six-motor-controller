@@ -1,5 +1,9 @@
 # Computer vision launchers
 
+For hardware-free hoop detection on saved photos/video, use
+[`hoop_replay.py`](../../raspberry_pi/hoop_vision/README.md). It has a separate,
+lightweight environment and does not load the Testudo model or control motors.
+
 Run these scripts from the repo root. They also work when called by absolute path
 from another directory. Each changes to the repository root and selects the
 appropriate Python environment. You do not need to run `source .../activate`.
