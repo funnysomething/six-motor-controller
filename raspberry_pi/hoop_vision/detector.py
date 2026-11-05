@@ -120,7 +120,17 @@ def detect(image, config=None):
     candidates.sort(key=lambda c: c.score, reverse=True)
     kept = []
     for candidate in candidates:
-        if all(overlap(candidate.bbox_xyxy, other.bbox_xyxy) < .65 for other in kept):
+        # Nested, overlapping curves may be different physical boundaries.
+        # Suppress only near-identical geometry of the same proposal kind.
+        def duplicate(other):
+            if candidate.kind != other.kind:return False
+            center=np.linalg.norm(np.array(candidate.center_px)-other.center_px)
+            sizes=np.max(np.abs(np.log(np.sort(candidate.axes_px)/np.sort(other.axes_px))))
+            angle=lambda c:(c.image_rotation_deg+(90 if c.axes_px[0]<c.axes_px[1] else 0))%180
+            rotation=abs((angle(candidate)-angle(other)+90)%180-90)
+            circular=min(candidate.axes_px)/max(candidate.axes_px)>.95
+            return center<.04*min(candidate.axes_px) and sizes<.06 and (circular or rotation<8)
+        if all(not duplicate(other) for other in kept):
             kept.append(candidate)
         if len(kept) >= config.max_candidates:
             break

@@ -137,7 +137,7 @@ class VisionWorker:
         if self.tracker.size is not None and observation.frame_size != self.tracker.size:
             self.tracker.reset()
         if self.verifier.profile == "ellipse":
-            observation.candidates = guided_candidates(image, self.tracker, timestamp) + observation.candidates
+            observation.candidates = guided_candidates(image, self.tracker, timestamp, self.verifier) + observation.candidates
         verify(image, observation, self.verifier)
         # Host age is measurable. Wireless sensor-to-host latency is not.
         self.tracker.update(observation, timestamp, packet.metadata["timestamp_provenance"],

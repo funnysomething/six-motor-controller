@@ -1,5 +1,7 @@
 # Hoop vision documentation
 
+- [Experimental boundary tracking improvements](hoop-boundary-improvements.md)
+  describes the new local refitter and the manual comparison procedure.
 - [Slow-motion local continuity lock](hoop-continuity-lock.md) explains the
   current tracking preference, maintenance limits and validation results.
 - [Live iPhone review and proposed improvements](live-hoop-review-2026-11-03.md)

@@ -7,6 +7,7 @@ import numpy as np
 
 from .geometry import overlap
 from .orientation import estimate_orientation
+from .ellipse_filter import update_geometry
 
 
 def mm(a, b):
@@ -86,6 +87,8 @@ class HoopTracker:
         self.reset()
 
     def reset(self):
+        self.flow_gray = None
+        self.flow_time = None
         self.tracks = []
         self.last_time = None
         self.size = None
@@ -357,6 +360,8 @@ class HoopTracker:
             previous = track['last_candidate']
             shape_change = float(np.max(np.abs(np.log(np.sort(candidate.axes_px)/np.sort(previous.axes_px)))))
             same_boundary = candidate.kind==previous.kind and shape_change <= cfg.lock_logsize_gate
+            if age_seconds <= cfg.max_age_seconds:
+                track['filtered_ellipse']=update_geometry(track,candidate,timestamp,reset=not same_boundary)
             track['boundary_history'] = track.get('boundary_history',1)+1 if same_boundary else 0
             if track['kind']!=candidate.kind:
                 # Preserve object-level history, but restart the geometry filter
@@ -432,6 +437,7 @@ class HoopTracker:
                                  axes_px=list(chosen["candidate"].axes_px),
                                  image_rotation_deg=chosen["candidate"].image_rotation_deg),
                     bbox_xyxy=list(chosen["candidate"].bbox_xyxy),
+                    filtered_ellipse=chosen.get('filtered_ellipse'),
                     filtered_bbox_xyxy=state_box(chosen["x"], self.size),
                     observed_time_s=timestamp, age_seconds=age_seconds,
                     evidence='verified' if chosen['candidate'].verification.get('passed') else 'local_maintenance',

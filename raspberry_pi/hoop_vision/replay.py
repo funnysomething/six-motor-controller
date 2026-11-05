@@ -98,7 +98,7 @@ def overlay(image, observation, label, max_dimension=800, debug=False, show_capt
         if observation.accepted_target:
             x0,y0,x1,y1 = np.rint(np.array(observation.accepted_target["bbox_xyxy"])*[sx,sy,sx,sy]).astype(int)
             cv2.rectangle(view,(x0,y0),(x1,y1),(40,230,40),2)
-            ellipse=observation.accepted_target.get('ellipse')
+            ellipse=observation.accepted_target.get('filtered_ellipse') or observation.accepted_target.get('ellipse')
             if ellipse:
                 points=np.rint(ellipse_points((ellipse['center_px'],ellipse['axes_px'],ellipse['image_rotation_deg']))*[sx,sy]).astype(np.int32)
                 cv2.polylines(view,[points],True,(40,230,40),2,cv2.LINE_AA)
@@ -163,7 +163,7 @@ def run(paths, output, config, sample_fps=10., save_video=False, tracking=False,
                     started = time.perf_counter()
                     observation = detect(image,config)
                     if tracking and tracker_config.profile=="ellipse":
-                        guides=guided_candidates(image,tracker,timestamp)
+                        guides=guided_candidates(image,tracker,timestamp,verification_config)
                         observation.candidates=guides+observation.candidates
                     elapsed = (time.perf_counter()-started)*1000
                     timings.append(elapsed)
