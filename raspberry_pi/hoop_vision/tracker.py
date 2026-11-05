@@ -238,7 +238,7 @@ class HoopTracker:
             observation.tracking_reason = "invalid_frame_size"
             return observation
         if (timestamp is None or not math.isfinite(timestamp) or timestamp < 0 or
-                provenance not in ("decoder_pts", "avfoundation_pts") or not math.isfinite(age_seconds) or age_seconds < 0):
+                provenance not in ("decoder_pts", "avfoundation_pts", "picamera2_sensor_timestamp") or not math.isfinite(age_seconds) or age_seconds < 0):
             self.reset()
             observation.tracking_reason = "untrusted_timestamp"
             return observation

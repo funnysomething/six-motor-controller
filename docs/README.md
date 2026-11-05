@@ -1,5 +1,7 @@
 # Hoop vision documentation
 
+- [Raspberry Pi underwater recording and live testing](pi-underwater-testing.md) covers clean training video, browser preview and optional live hoop tracking.
+
 - [Paired boundaries and alignment/view cues](hoop-paired-alignment.md) describes
   the inner/outer overlays, near-front-on indication and side-view handling.
 - [Experimental boundary tracking improvements](hoop-boundary-improvements.md)
