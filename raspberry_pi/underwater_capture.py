@@ -8,6 +8,7 @@ import json
 import math
 from pathlib import Path
 import signal
+import shutil
 import subprocess
 import sys
 import threading
@@ -25,6 +26,32 @@ def positive(value):
     return number
 
 
+def capture_rate(value):
+    return 'max' if value == 'max' else positive(value)
+
+
+def make_10fps_copy(directory):
+    """Resample presentation times after capture; never slow the master recording."""
+    destination = directory / 'clean-10fps.mp4'
+    temporary = directory / 'clean-10fps.partial.mp4'
+    command = ['ffmpeg', '-nostdin', '-hide_banner', '-loglevel', 'error', '-n',
+               '-i', str(directory / 'clean.mp4'), '-map', '0:v:0', '-an',
+               '-vf', 'fps=10', '-c:v', 'libx264', '-preset', 'veryfast',
+               '-crf', '18', '-pix_fmt', 'yuv420p', '-movflags', '+faststart', str(temporary)]
+    if destination.exists():
+        raise RuntimeError(f'Refusing to overwrite {destination}')
+    print('Capture stopped. Creating clean-10fps.mp4; this can take time on the Pi.', flush=True)
+    log_path = directory / '10fps-conversion.log'
+    try:
+        with log_path.open('w') as log:
+            subprocess.run(command, stdout=log, stderr=log, check=True)
+        temporary.rename(destination)
+    except (OSError, subprocess.CalledProcessError) as error:
+        raise RuntimeError(f'10 FPS conversion failed. Master clean.mp4 is retained. See {log_path}') from error
+    return dict(status='completed', path=destination.name, fps=10,
+                timing='constant frame rate, normal speed; may repeat frames if capture falls below 10 FPS')
+
+
 def parse_args(argv=None):
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument('--output', type=Path, required=True, help='new session directory')
@@ -32,7 +59,8 @@ def parse_args(argv=None):
     parser.add_argument('--camera', type=int, default=0)
     parser.add_argument('--width', type=int, default=1280)
     parser.add_argument('--height', type=int, default=720)
-    parser.add_argument('--fps', type=positive, default=10)
+    parser.add_argument('--fps', type=capture_rate, default='max',
+                        help='max for the configured sensor mode, or a positive numeric capture rate')
     parser.add_argument('--process-fps', type=positive, default=10)
     parser.add_argument('--bitrate', type=int, default=8_000_000)
     parser.add_argument('--seconds', type=positive, default=120)
@@ -159,6 +187,8 @@ def run(args):
     from picamera2.encoders import H264Encoder
     from picamera2.outputs import PyavOutput
 
+    if shutil.which('ffmpeg') is None:
+        raise RuntimeError('Install ffmpeg with sudo apt install ffmpeg before recording')
     args.output.mkdir(parents=True, exist_ok=False)
     stop = threading.Event()
     for signum in (signal.SIGINT, signal.SIGTERM, signal.SIGHUP):
@@ -195,7 +225,16 @@ def run(args):
         camera.configure(camera.create_video_configuration(
             main={'size': (args.width, args.height), 'format': 'YUV420'},
             lores={'size': (640, lores_height), 'format': 'YUV420'},
-            controls={'FrameRate': args.fps}, buffer_count=6, queue=False))
+            controls={} if args.fps == 'max' else {'FrameRate': args.fps}, buffer_count=6, queue=False))
+        if args.fps == 'max':
+            minimum_duration = int(camera.camera_controls['FrameDurationLimits'][0])
+            if minimum_duration <= 0:
+                raise RuntimeError('Camera did not report a valid minimum frame duration')
+            camera.set_controls({'FrameDurationLimits': (minimum_duration, minimum_duration)})
+            summary['requested_capture_fps'] = 1_000_000 / minimum_duration
+            print(f"Requesting configured sensor mode maximum: {summary['requested_capture_fps']:.2f} FPS", flush=True)
+        else:
+            summary['requested_capture_fps'] = args.fps
         summary['camera_configuration'] = camera.camera_configuration()
         summary['camera_properties'] = camera.camera_properties
         output = PyavOutput(str(args.output / 'clean.mp4'), pts=str(args.output / 'video-pts.txt'))
@@ -296,8 +335,19 @@ def run(args):
                         summary['max_encoded_gap_ms'] = max(b-a for a, b in zip(pts, pts[1:]))
                 except (OSError, ValueError) as error:
                     summary['pts_read_error'] = str(error)
-            (args.output / 'session.json').write_text(json.dumps(summary, indent=2, default=str) + '\n')
+            session_path = args.output / 'session.json'
+            summary['derived_10fps'] = {'status': 'pending' if status != 'failed' else 'not_attempted'}
+            session_path.write_text(json.dumps(summary, indent=2, default=str) + '\n')
             print(f'Session {status}: {count} processed frames. Files: {args.output.resolve()}', flush=True)
+            if status != 'failed':
+                # Recording and the camera are closed before this CPU-intensive step.
+                try:
+                    summary['derived_10fps'] = make_10fps_copy(args.output)
+                except BaseException as error:
+                    summary['derived_10fps'] = {'status': 'failed', 'error': str(error)}
+                    raise
+                finally:
+                    session_path.write_text(json.dumps(summary, indent=2, default=str) + '\n')
 
 
 def main(argv=None):

@@ -68,19 +68,21 @@ ssh -N -L 8080:127.0.0.1:8080 pi@raspberrypi.local
 
 Open `http://localhost:8080`. Preview uses MJPEG and needs a working network or tether; recording continues locally when a browser disconnects. Wi-Fi through water may be unreliable, so keep the network endpoint above water or use the available wired connection. The default server binds only to loopback for the SSH tunnel. `--host 0.0.0.0` exposes it directly on the local network without authentication.
 
-Stop with Ctrl-C or wait for the duration. Then repeat with tracking enabled:
+Stop with Ctrl-C or wait for the duration, then leave the process running until the 10 FPS conversion finishes. This second step can take time on the Pi. It runs after the camera closes so a second encoder does not compete with capture. The browser preview ends when capture stops. Then repeat with tracking enabled:
 
 ```sh
 .venv-hoop/bin/python raspberry_pi/underwater_capture.py \
   --output camera_results/underwater-hoop-01 --seconds 120 --hoop \
-  --fps 10 --process-fps 10 --notes "Hoop test; final housing and underwater illumination"
+  --fps max --process-fps 10 --notes "Hoop test; final housing and underwater illumination"
 ```
 
-Defaults record at 1280x720, requested 10 FPS and 8 Mbps. Preview/tracking use a 640-pixel-wide stream with the same aspect ratio. `--process-fps 5` reduces processing load without changing the requested recording FPS. `--width 1920 --height 1080` increases recording detail for training if the Pi sustains it. Requested rates are targets, not measured guarantees. Allow automatic exposure/white balance to settle before collecting the useful part of a session; startup frames remain in the recording.
+Defaults record at 1280x720, the configured sensor mode's maximum requested FPS and 8 Mbps. `--fps max` reads the configured camera's minimum frame duration and requests that rate; it does not change sensor mode or resolution to chase a faster advertised rate. `--fps 30` or another positive number requests a specific capture rate instead. Actual capture speed depends on the camera mode, illumination/exposure, encoder and disk. `session.json` reports the requested rate and achieved encoded frame rate. Preview/tracking use a 640-pixel-wide stream with the same aspect ratio. Live preview and hoop processing remain capped at 10 FPS by default. `--process-fps 5` reduces processing load without changing the requested recording FPS. `--width 1920 --height 1080` increases recording detail for training if the Pi sustains it. Requested rates are targets, not measured guarantees. Allow automatic exposure/white balance to settle before collecting the useful part of a session; startup frames remain in the recording.
 
 Each new output directory contains:
 
-- `clean.mp4`: unannotated main-stream video for labeling and offline replay.
+- `clean.mp4`: unannotated main-stream video at the achieved capture rate for labeling and offline replay.
+- `clean-10fps.mp4`: a clean 10 FPS copy of the same session, generated automatically after recording stops. It has the same resolution and plays at normal speed. FFmpeg samples frames by presentation time; if capture falls below 10 FPS, frames may repeat to maintain a constant 10 FPS output.
+- `10fps-conversion.log`: FFmpeg output for diagnosing conversion errors.
 - `video-pts.txt`: encoded-frame presentation timestamps in milliseconds, useful for spotting gaps and counting encoded frames.
 - `frames.jsonl`: sampled processing-frame sensor timestamps and exposure/gain/color metadata. This is not a log of every recorded frame.
 - `hoop-observations.jsonl`: accepted/unknown decisions, candidates and alignment diagnostics when `--hoop` is enabled; empty otherwise.
@@ -88,7 +90,15 @@ Each new output directory contains:
 
 Sensor timestamps use libcamera's boot-time clock; hoop time starts at the first processed sensor timestamp. MP4 timestamps start at the encoder's timeline. Do not assume their first frames coincide. The original sensor timestamp is retained in each processing log. Preview omits stale accepted overlays and reports unknown when processing is too old; it is a test display, not a navigation command.
 
-The MP4 container is finalized on normal exit, Ctrl-C, SIGTERM and SIGHUP. Sudden power loss or SIGKILL can leave an unusable MP4. Prefer short sessions and confirm playback after each. A failing camera read can require stopping the process externally; no automatic CSI recovery is implemented.
+The master MP4 container is finalized on normal exit, Ctrl-C, SIGTERM and SIGHUP. The 10 FPS conversion follows a successful or user-stopped capture; failed captures retain any master footage but do not automatically attempt conversion. If conversion fails, `clean.mp4` remains and `session.json` records the conversion failure separately. To retry manually after removing any incomplete `clean-10fps.partial.mp4`, run:
+
+```sh
+ffmpeg -n -i camera_results/underwater-hoop-01/clean.mp4 \
+  -an -vf fps=10 -c:v libx264 -preset veryfast -crf 18 -pix_fmt yuv420p \
+  camera_results/underwater-hoop-01/clean-10fps.mp4
+```
+
+ Sudden power loss or SIGKILL can leave an unusable MP4. Prefer short sessions and confirm playback after each. A failing camera read can require stopping the process externally; no automatic CSI recovery is implemented.
 
 ## Replay and make a training dataset
 
