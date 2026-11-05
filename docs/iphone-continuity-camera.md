@@ -76,6 +76,11 @@ Useful options:
 
 - `--seconds 60` stops automatically after one minute.
 - `--no-browser` prints the URL without opening it.
+- `--preview-timeout 1.0` sets how long to keep an unannotated image through
+  delivery gaps. Detection geometry still expires after 0.2 seconds.
+- `--capture-max-dimension 960` caps the delivered JPEG size while preserving
+  aspect ratio. Set `0` to use the device's default capture mode without this
+  downscaling. Verify the actual dimensions before supplying camera calibration.
 - `--debug` draws unaccepted proposals and predictions as well as accepted
   measurements. Those extra drawings are diagnostic only.
 - `--tracking-profile strict` selects the slower, conservative tracker profile.
@@ -97,8 +102,11 @@ image evidence fails the geometry or white-color checks. The color gate does not
 remove the documented reflection failures. Use `--saturation-max`, `--value-min`
 and `--min-white-support` to configure its range and required support.
 
-The native helper explicitly opens the selected camera ID, requests 640×480 when
-supported, and samples at no more than the requested rate. `--fps 10` is a sampling
+The native helper explicitly opens the selected camera ID and queries capture
+presets after attaching that input. It tries 640×480, then 1280×720 when supported,
+and caps the delivered JPEG's longest dimension at 960 pixels by default. The
+native-resolution option disables both the smaller-preset preference and JPEG
+downscaling. `--fps 10` is a sampling
 ceiling, not a guaranteed delivery or processing rate. AVFoundation drops late
 frames; a Python reader drains packets continuously into one latest-frame slot,
 so a slower detector skips frames instead of accumulating a processing backlog.
@@ -106,9 +114,15 @@ The tracker uses the frames' actual AVFoundation presentation timestamps rather
 than an assumed frame interval. The helper disables output mirroring where the
 camera supports that setting.
 
-The preview clears the image and accepted geometry when more than **200 ms** have
-elapsed since Python received that frame. Processing time counts toward this
-limit. The browser also expires the image locally between requests. A disconnect
+Camera preview and detection freshness have separate lifetimes. The capture
+reader updates the raw preview independently of the detector. Accepted geometry
+and the annotated image expire **200 ms** after Python receives the corresponding
+frame, including processing time. The browser then shows an **unannotated** raw
+image instead of blanking the video. During short delivery gaps it can retain
+that image for up to **one second** from receipt, with a delayed-camera message.
+It never renews an old image's lifetime merely because the browser polls again.
+If the camera stalls beyond that timeout, the image clears; new frames restore
+the preview automatically. A disconnect
 or capture error stops the run; restarting requires explicit camera selection.
 The program does not open another camera as a fallback.
 
@@ -128,19 +142,27 @@ default. The compiled helper is the only persistent generated artifact.
    stable ellipse placement, then approach several oblique angles slowly.
 2. Cover the hoop or point away. Accepted output should disappear when evidence
    is lost. Returning to the hoop should require confirmation again.
-3. Pause/disconnect the phone. The preview should clear and the command should
-   stop on a reported disconnect. A pause without a disconnect may leave the
-   command running with an unavailable preview until frames resume.
-4. Watch processing time. If results repeatedly expire, try a slower sampling
-   rate to reduce load; the 200 ms age gate remains unchanged. A persistent
-   processing-time excess needs profiling rather than a weaker freshness gate.
+3. Pause/disconnect the phone. A pause first removes annotations, then clears the
+   raw image after the preview timeout. Frames resume automatically after an
+   ordinary pause. A reported disconnect stops the command.
+4. Watch capture fps, capture age and processing time in the preview. A moving
+   raw picture with no detections indicates delayed/rejected vision results.
+   A retained image with increasing capture age indicates a delivery gap.
+   `--preview-timeout 1.5` can bridge longer brief gaps without extending detection
+   validity. If processing time is high, lower `--capture-max-dimension` to 640.
 
-The native helper build and command-line help were checked on the development
-Mac. Automated tests exercise transport validation, explicit camera identity,
-latest-frame replacement, disconnect/expiry behavior, the local HTTP preview,
-and JPEG decoding through ellipse detection and temporal confirmation. Actual
-iPhone discovery, camera permission behavior and wireless delivery still require
-an end-to-end test with your phone.
+The November 5, 2026 preview-stability fix was checked with the iPhone 17 over
+Continuity Camera. A bounded live check received 121 frames at 960×540 over 12.05
+seconds, with a reported capture rate of 9.9 fps. All 225 preview polls after the
+first result had fresh annotated results. Capture was then stopped. This short
+check does not measure sensor-to-host latency or establish reliability during
+long wireless interruptions.
+
+Automated tests also exercise independent raw-frame delivery, 300–500 ms capture
+gaps, slow vision, expiry of annotations before raw pixels, eventual stall
+clearing, disconnects, and protection against late results replacing newer raw
+frames. Browser timer checks verify the transition from annotated to raw to
+hidden during a stall.
 
 A separate transport simulation before the HSV gate was added sent the supplied video's first three seconds
 through JPEG packets and the live processing path at 10 samples per source

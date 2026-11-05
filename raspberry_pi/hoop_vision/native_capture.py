@@ -148,11 +148,13 @@ class LatestSlot:
 
 
 class BridgeCapture:
-    def __init__(self,binary,device,fps):
+    def __init__(self,binary,device,fps,on_frame=None,max_dimension=960):
         self.device=device
         self.slot=LatestSlot()
         self.logs=deque(maxlen=12)
-        self.process=subprocess.Popen([str(binary),"--device-id",device["id"],"--fps",str(fps)],
+        self.on_frame=on_frame
+        self.process=subprocess.Popen([str(binary),"--device-id",device["id"],"--fps",str(fps),
+                                       "--max-dimension",str(max_dimension)],
             stdout=subprocess.PIPE,stderr=subprocess.PIPE,stdin=subprocess.DEVNULL)
         self.error_reader=threading.Thread(target=self._errors,daemon=True)
         self.reader=threading.Thread(target=self._read,daemon=True)
@@ -172,6 +174,8 @@ class BridgeCapture:
                     break
                 if packet.metadata["device_id"]!=self.device["id"]:
                     raise ValueError("Camera identity changed; stream rejected")
+                if self.on_frame:
+                    self.on_frame(packet)
                 self.slot.publish(packet)
         except (ValueError,EOFError,OSError) as exc:
             error=str(exc)

@@ -75,7 +75,7 @@ def frames(path, sample_fps=10.):
         capture.release()
 
 
-def overlay(image, observation, label, max_dimension=800, debug=False):
+def overlay(image, observation, label, max_dimension=800, debug=False, show_caption=True):
     h, w = image.shape[:2]
     scale = min(1., max_dimension/max(h,w))
     view = cv2.resize(image, (round(w*scale), round(h*scale)))
@@ -102,6 +102,8 @@ def overlay(image, observation, label, max_dimension=800, debug=False):
             if ellipse:
                 points=np.rint(ellipse_points((ellipse['center_px'],ellipse['axes_px'],ellipse['image_rotation_deg']))*[sx,sy]).astype(np.int32)
                 cv2.polylines(view,[points],True,(40,230,40),2,cv2.LINE_AA)
+    if not show_caption:
+        return view
     # A separate caption strip never obscures the target.
     caption = np.zeros((66, view.shape[1], 3), np.uint8)
     status = (observation.decision+" | "+observation.tracking_reason if observation.schema_version == 2

@@ -1,5 +1,6 @@
 """Live transport, freshness and camera identity tests; no physical camera opened."""
 import contextlib
+import base64
 import io
 import json
 import struct
@@ -101,22 +102,98 @@ class TransportTests(unittest.TestCase):
             process.terminate.assert_called()
             capture.close()
 
+    def test_capture_callback_delivers_frames_without_a_vision_consumer(self):
+        delivered=[]
+        data=wire(packet(sequence=1))+wire(packet(sequence=2))
+        process=MagicMock(stdout=io.BytesIO(data),stderr=io.BytesIO())
+        process.poll.return_value=None
+        with patch('raspberry_pi.hoop_vision.native_capture.subprocess.Popen',return_value=process):
+            capture=BridgeCapture('/fake/bridge',DEVICE,10,on_frame=delivered.append,max_dimension=960)
+            capture.reader.join(timeout=2)
+            self.assertEqual([p.metadata['sequence'] for p in delivered],[1,2])
+            capture.close()
+
 
 class FreshnessTests(unittest.TestCase):
     def setUp(self):
         self.now = 100.05
         self.state = LiveState(DEVICE, clock=lambda:self.now)
         self.observation = Observation((640,480), decision="accepted", accepted_target={"track_id":1})
-        self.state.publish(packet(), self.observation, b"jpeg", 25)
+        self.state.publish(packet(), self.observation, b"annotated jpeg", 25)
 
-    def test_expiry_removes_accepted_geometry_and_image(self):
+    def test_measurement_expiry_keeps_only_unannotated_preview(self):
         self.assertEqual(self.state.snapshot()["decision"], "accepted")
+        self.assertEqual(base64.b64decode(self.state.snapshot()['image']),b'annotated jpeg')
         self.now = 100.201
         expired = self.state.snapshot()
         self.assertEqual(expired["decision"], "unknown")
-        self.assertIsNone(expired["image"])
+        self.assertEqual(base64.b64decode(expired['image']),b'jpeg')
         self.assertIsNone(expired["observation"])
-        self.assertFalse(expired["available"])
+        self.assertFalse(expired['detection_fresh'])
+        self.assertTrue(expired['available'])
+        self.assertEqual(expired['remaining_ms'],0)
+
+    def test_preview_expires_if_camera_really_stops_delivering(self):
+        self.now=101.001
+        expired=self.state.snapshot()
+        self.assertFalse(expired['available'])
+        self.assertIsNone(expired['image'])
+        self.assertIsNone(expired['observation'])
+        self.assertEqual(expired['preview_state'],'stalled')
+
+    def test_preview_updates_even_when_vision_has_not_finished(self):
+        self.now=100.6
+        self.state.receive(packet(received=100.58,sequence=2,jpeg=b'new raw frame'))
+        status=self.state.snapshot()
+        self.assertEqual(base64.b64decode(status['image']),b'new raw frame')
+        self.assertIsNone(status['observation'])
+        self.assertEqual(status['decision'],'unknown')
+        self.assertEqual(status['capture_sequence'],2)
+
+    def test_late_vision_result_does_not_roll_capture_back(self):
+        self.now=100.5
+        self.state.receive(packet(received=100.49,sequence=2,jpeg=b'latest raw'))
+        self.state.publish(packet(),self.observation,b'old annotation',300)
+        status=self.state.snapshot()
+        self.assertEqual(status['capture_sequence'],2)
+        self.assertEqual(base64.b64decode(status['image']),b'latest raw')
+        self.assertIsNone(status['observation'])
+
+    def test_repeated_polls_do_not_extend_the_lifetime_of_old_pixels(self):
+        self.now=100.8
+        first=self.state.snapshot()
+        self.now=100.9
+        second=self.state.snapshot()
+        self.assertLess(second['preview_remaining_ms'],first['preview_remaining_ms'])
+        self.now=101.01
+        self.assertIsNone(self.state.snapshot()['image'])
+
+    def test_short_delivery_gaps_do_not_blank_preview_or_serve_stale_detections(self):
+        arrivals=iter([100.,100.1,100.4,100.9])
+        next_arrival=next(arrivals,None)
+        sequence=0
+        for step in range(96):
+            self.now=100.+step*.02
+            while next_arrival is not None and next_arrival<=self.now+1e-9:
+                sequence+=1
+                self.state.publish(packet(received=next_arrival,sequence=sequence),self.observation,b'green ellipse',25)
+                next_arrival=next(arrivals,None)
+            status=self.state.snapshot()
+            self.assertIsNotNone(status['image'])
+            if not status['detection_fresh']:
+                self.assertIsNone(status['observation'])
+                self.assertEqual(base64.b64decode(status['image']),b'jpeg')
+        self.now=102.
+        self.assertIsNone(self.state.snapshot()['image'])
+
+    def test_old_measurement_skip_does_not_remove_latest_capture(self):
+        self.state.clear_measurement('Vision skipped an old frame')
+        self.assertTrue(self.state.snapshot()['available'])
+        self.assertIsNone(self.state.snapshot()['observation'])
+
+    def test_invalid_preview_timeouts_are_rejected(self):
+        for timeout in (.1,float('nan'),float('inf')):
+            with self.assertRaises(ValueError):LiveState(DEVICE,preview_timeout=timeout)
 
     def test_disconnect_cannot_be_undone_by_inflight_processing(self):
         self.state.invalidate("Camera disconnected", terminal=True)
@@ -167,6 +244,8 @@ class LiveVisionTests(unittest.TestCase):
         self.assertFalse(result["observation"]["pose_valid"])
         self.assertFalse(result["motor_output"])
         self.assertEqual(result["capture_to_host_latency"], "unmeasured")
+        view=cv2.imdecode(np.frombuffer(base64.b64decode(result['image']),np.uint8),cv2.IMREAD_COLOR)
+        self.assertEqual(view.shape[:2],image.shape[:2])
 
     def test_bad_jpeg_stops_worker_and_clears_previous_result(self):
         capture = SimpleNamespace(device=DEVICE, slot=LatestSlot())
@@ -196,6 +275,14 @@ class LiveVisionTests(unittest.TestCase):
                               ["--camera-name","iPhone","--seconds","-1"]):
                 with contextlib.redirect_stderr(io.StringIO()), self.assertRaises(SystemExit):
                     main(arguments)
+            build.assert_not_called()
+
+    def test_invalid_capture_and_preview_limits_do_not_access_a_camera(self):
+        with patch('raspberry_pi.hoop_vision.live.build_bridge') as build:
+            for option,value in (('--preview-timeout','nan'),('--preview-timeout','0.1'),
+                                 ('--capture-max-dimension','1')):
+                with contextlib.redirect_stdout(io.StringIO()):
+                    self.assertEqual(main(['--camera-name','iPhone',option,value]),1)
             build.assert_not_called()
 
 

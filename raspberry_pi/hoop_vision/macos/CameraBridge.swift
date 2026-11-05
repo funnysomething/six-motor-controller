@@ -45,11 +45,14 @@ func authorize() {
 final class FrameWriter: NSObject, AVCaptureVideoDataOutputSampleBufferDelegate {
     let device: AVCaptureDevice
     let fps: Double
+    let maxDimension: Int
     let context = CIContext(options: [.cacheIntermediates: false])
     var lastPTS = -Double.infinity
     var sequence = 0
 
-    init(device: AVCaptureDevice, fps: Double) { self.device = device; self.fps = fps }
+    init(device: AVCaptureDevice, fps: Double, maxDimension: Int) {
+        self.device = device; self.fps = fps; self.maxDimension = maxDimension
+    }
 
     func captureOutput(_ output: AVCaptureOutput, didOutput sampleBuffer: CMSampleBuffer,
                        from connection: AVCaptureConnection) {
@@ -60,7 +63,11 @@ final class FrameWriter: NSObject, AVCaptureVideoDataOutputSampleBufferDelegate 
         if pts > lastPTS && pts - lastPTS < 1.0 / fps - 0.001 { return }
         lastPTS = pts
         guard let pixel = CMSampleBufferGetImageBuffer(sampleBuffer) else { return }
-        let image = CIImage(cvPixelBuffer: pixel)
+        var image = CIImage(cvPixelBuffer: pixel)
+        if maxDimension > 0 {
+            let scale = min(1.0, Double(maxDimension) / max(image.extent.width, image.extent.height))
+            image = image.transformed(by: CGAffineTransform(scaleX: scale, y: scale))
+        }
         guard let cg = context.createCGImage(image, from: image.extent) else { return }
         let bytes = NSMutableData()
         guard let destination = CGImageDestinationCreateWithData(bytes, UTType.jpeg.identifier as CFString, 1, nil) else { return }
@@ -82,7 +89,7 @@ final class FrameWriter: NSObject, AVCaptureVideoDataOutputSampleBufferDelegate 
 
 let args = Array(CommandLine.arguments.dropFirst())
 if args.contains("--help") {
-    print("HoopCameraBridge --list | --device-id ID [--fps 10]")
+    print("HoopCameraBridge --list | --device-id ID [--fps 10] [--max-dimension 960]")
     exit(0)
 }
 func argument(_ flag: String) -> String? {
@@ -106,16 +113,26 @@ guard let id = argument("--device-id"), let device = discovered.first(where: { $
 }
 let fps = Double(argument("--fps") ?? "10") ?? 0
 guard fps.isFinite && fps > 0 && fps <= 60 else { fail("FPS must be in (0, 60].") }
+let maxDimension = Int(argument("--max-dimension") ?? "960") ?? -1
+guard maxDimension == 0 || (320...8192).contains(maxDimension) else {
+    fail("Maximum dimension must be 0 (native) or in 320...8192.")
+}
 let session = AVCaptureSession()
-let writer = FrameWriter(device: device, fps: fps)
+let writer = FrameWriter(device: device, fps: fps, maxDimension: maxDimension)
 let delegateQueue = DispatchQueue(label: "org.hoopvision.camera-frames")
 session.beginConfiguration()
-if session.canSetSessionPreset(.vga640x480) { session.sessionPreset = .vga640x480 }
 do {
     let input = try AVCaptureDeviceInput(device: device)
     guard session.canAddInput(input) else { fail("Cannot add the selected camera input.") }
     session.addInput(input)
 } catch { fail("Cannot open selected camera: \(error.localizedDescription)") }
+// Query support with the selected input attached. Continuity Camera may not
+// support VGA, so explicitly try 720p before keeping the device default.
+if maxDimension > 0 && session.canSetSessionPreset(.vga640x480) {
+    session.sessionPreset = .vga640x480
+} else if maxDimension > 0 && session.canSetSessionPreset(.hd1280x720) {
+    session.sessionPreset = .hd1280x720
+}
 let output = AVCaptureVideoDataOutput()
 output.alwaysDiscardsLateVideoFrames = true
 output.videoSettings = [kCVPixelBufferPixelFormatTypeKey as String: kCVPixelFormatType_32BGRA]
