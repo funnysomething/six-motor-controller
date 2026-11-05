@@ -102,6 +102,29 @@ def overlay(image, observation, label, max_dimension=800, debug=False, show_capt
             if ellipse:
                 points=np.rint(ellipse_points((ellipse['center_px'],ellipse['axes_px'],ellipse['image_rotation_deg']))*[sx,sy]).astype(np.int32)
                 cv2.polylines(view,[points],True,(40,230,40),2,cv2.LINE_AA)
+    alignment=observation.alignment or {}
+    for key,color in (('outer',(255,180,30)),('inner',(40,230,40))):
+        ring=alignment.get(key)
+        if ring:
+            points=np.rint(ellipse_points((ring['center_px'],ring['axes_px'],ring['image_rotation_deg']))*[sx,sy]).astype(np.int32)
+            cv2.polylines(view,[points],True,color,2,cv2.LINE_AA)
+    axes=alignment.get('axes')
+    if axes:
+        for line,color in zip(axes['lines_px'],((255,200,0),(0,150,255))):
+            a,b=np.rint(np.array(line)*[sx,sy]).astype(int)
+            cv2.line(view,tuple(a),tuple(b),color,1,cv2.LINE_AA)
+        center=tuple(np.rint(np.array(axes['center_px'])*[sx,sy]).astype(int))
+        cv2.drawMarker(view,center,(40,230,40),cv2.MARKER_CROSS,18,2)
+        cv2.drawMarker(view,(view.shape[1]//2,view.shape[0]//2),(255,255,255),cv2.MARKER_CROSS,18,1)
+    if alignment.get('side_band_box_xyxy'):
+        a,b=np.rint(np.array(alignment['side_band_box_xyxy']).reshape(2,2)*[sx,sy]).astype(int)
+        cv2.rectangle(view,tuple(a),tuple(b),(0,180,255),2)
+    if alignment:
+        message=alignment.get('view','unknown').replace('_',' ').upper()
+        if axes:
+            dx,dy=alignment['center_error_px'];message+=f' | center dx {dx:+.0f}, dy {dy:+.0f} px'
+        cv2.putText(view,message,(8,22),cv2.FONT_HERSHEY_SIMPLEX,.48,(0,0,0),3,cv2.LINE_AA)
+        cv2.putText(view,message,(8,22),cv2.FONT_HERSHEY_SIMPLEX,.48,(255,255,255),1,cv2.LINE_AA)
     if not show_caption:
         return view
     # A separate caption strip never obscures the target.
@@ -175,6 +198,8 @@ def run(paths, output, config, sample_fps=10., save_video=False, tracking=False,
                     started = time.perf_counter()
                     if tracking:
                         tracker.update(observation,timestamp,provenance)
+                        from .ring_alignment import annotate_alignment
+                        annotate_alignment(image,observation,tracker,timestamp,verification_config)
                         if (calibration and observation.accepted_target and
                                 observation.accepted_target.get('boundary_stable',True)):
                             e=observation.accepted_target['ellipse']

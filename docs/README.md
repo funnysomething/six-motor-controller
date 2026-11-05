@@ -1,5 +1,7 @@
 # Hoop vision documentation
 
+- [Paired boundaries and alignment/view cues](hoop-paired-alignment.md) describes
+  the inner/outer overlays, near-front-on indication and side-view handling.
 - [Experimental boundary tracking improvements](hoop-boundary-improvements.md)
   describes the new local refitter and the manual comparison procedure.
 - [Slow-motion local continuity lock](hoop-continuity-lock.md) explains the

@@ -24,6 +24,7 @@ from .replay import overlay
 from .tracker import HoopTracker, TrackerConfig
 from .verification import VerificationConfig, verify
 from .color import WHITE_SATURATION_MAX, WHITE_VALUE_MIN, WHITE_MIN_SUPPORT
+from .ring_alignment import annotate_alignment
 
 
 class LiveState:
@@ -142,6 +143,8 @@ class VisionWorker:
         # Host age is measurable. Wireless sensor-to-host latency is not.
         self.tracker.update(observation, timestamp, packet.metadata["timestamp_provenance"],
                             age_seconds=time.monotonic()-packet.received_at)
+        annotate_alignment(image,observation,self.tracker,timestamp,self.verifier,
+                           age_seconds=time.monotonic()-packet.received_at)
         if (self.calibration and observation.accepted_target and
                 observation.accepted_target.get('boundary_stable',True)):
             e = observation.accepted_target["ellipse"]

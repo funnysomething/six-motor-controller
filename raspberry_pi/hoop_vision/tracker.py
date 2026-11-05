@@ -87,6 +87,7 @@ class HoopTracker:
         self.reset()
 
     def reset(self):
+        self.alignment_memory = None
         self.flow_gray = None
         self.flow_time = None
         self.tracks = []

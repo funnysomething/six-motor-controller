@@ -39,6 +39,7 @@ class Observation:
     tracks: list = field(default_factory=list)
     tracking_reason: str = "tracking_disabled"
     image_orientation: Optional[dict] = None
+    alignment: Optional[dict] = None
 
     def to_dict(self):
         return asdict(self)
