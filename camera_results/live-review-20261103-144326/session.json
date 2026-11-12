@@ -1,0 +1,17 @@
+{
+  "camera": "Chris\u2019 iPhone 17 Camera",
+  "device_id": "E510DE48-5AF1-4190-978C-458000000001",
+  "decisions": {
+    "unknown": 227,
+    "accepted": 218
+  },
+  "reasons": {
+    "accumulating_evidence": 35,
+    "no_verified_measurement": 190,
+    "fresh_confirmed_image_track": 218,
+    "ambiguous_targets_or_association": 2
+  },
+  "samples": 84,
+  "stopped": true,
+  "capture_to_host_latency": "unmeasured"
+}

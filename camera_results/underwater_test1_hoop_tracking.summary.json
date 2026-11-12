@@ -1,0 +1,20 @@
+{
+  "source": "/Users/chris/Documents/PlatformIO/Projects/six-motor-controller/camera_results/underwater_test1.mp4",
+  "output": "/Users/chris/Documents/PlatformIO/Projects/six-motor-controller/camera_results/underwater_test1_hoop_tracking.mp4",
+  "pipeline": "current ellipse detector, HSV white gating, guided refit, temporal continuity, paired alignment",
+  "frames": 2306,
+  "decision_counts": {
+    "unknown": 2306
+  },
+  "alignment_views": {
+    "unknown": 2306
+  },
+  "tracking_reasons": {
+    "no_verified_measurement": 2300,
+    "accumulating_evidence": 6
+  },
+  "output_fps": 10.00291347582345,
+  "wall_seconds": 37.991307,
+  "pose_valid": false,
+  "notes": "Underwater footage; uncalibrated image cues only. Accepted counts are not accuracy. Includes all 2306 decodable source frames; source container reports 2366."
+}

@@ -1,0 +1,964 @@
+{
+  "annotation_method": "Manual coarse region review, with additional contiguous intervals on the existing development clip. Shared broad boxes describe the real-hoop region in clear intervals, not exact rims. The glass-corner interval forbids acceptance. Not independent test data or pose truth. Eight apparent-opening boxes were added after visual inspection of accepted outputs; these development annotations are not an unbiased precision estimate. Opening and band boxes are scored separately by measurement kind.",
+  "tracking": {
+    "decision_counts": {
+      "unknown": 84,
+      "accepted": 77
+    },
+    "rejection_reasons": {
+      "untrusted_timestamp": 13,
+      "accumulating_evidence": 23,
+      "fresh_confirmed_image_track": 77,
+      "no_verified_measurement": 24,
+      "ambiguous_targets_or_association": 24
+    },
+    "accepted_segments": [
+      {
+        "source_id": "IMG_7329-d48fdb9d",
+        "track_id": 1,
+        "start_s": 0.1,
+        "end_s": 0.9,
+        "frames": 9
+      },
+      {
+        "source_id": "IMG_7329-d48fdb9d",
+        "track_id": 8,
+        "start_s": 3.7033333333333336,
+        "end_s": 3.8033333333333337,
+        "frames": 2
+      },
+      {
+        "source_id": "IMG_7329-d48fdb9d",
+        "track_id": 9,
+        "start_s": 3.9033333333333338,
+        "end_s": 4.1033333333333335,
+        "frames": 3
+      },
+      {
+        "source_id": "IMG_7329-d48fdb9d",
+        "track_id": 10,
+        "start_s": 4.203333333333334,
+        "end_s": 4.203333333333334,
+        "frames": 1
+      },
+      {
+        "source_id": "IMG_7329-d48fdb9d",
+        "track_id": 9,
+        "start_s": 4.303333333333334,
+        "end_s": 4.303333333333334,
+        "frames": 1
+      },
+      {
+        "source_id": "IMG_7329-d48fdb9d",
+        "track_id": 9,
+        "start_s": 4.903333333333333,
+        "end_s": 5.003333333333334,
+        "frames": 2
+      },
+      {
+        "source_id": "IMG_7329-d48fdb9d",
+        "track_id": 10,
+        "start_s": 5.1033333333333335,
+        "end_s": 5.303333333333334,
+        "frames": 3
+      },
+      {
+        "source_id": "IMG_7329-d48fdb9d",
+        "track_id": 13,
+        "start_s": 6.205,
+        "end_s": 6.805000000000001,
+        "frames": 7
+      },
+      {
+        "source_id": "IMG_7329-d48fdb9d",
+        "track_id": 15,
+        "start_s": 7.805000000000001,
+        "end_s": 7.805000000000001,
+        "frames": 1
+      },
+      {
+        "source_id": "IMG_7329-d48fdb9d",
+        "track_id": 13,
+        "start_s": 7.905,
+        "end_s": 8.906666666666668,
+        "frames": 11
+      },
+      {
+        "source_id": "IMG_7329-d48fdb9d",
+        "track_id": 15,
+        "start_s": 9.006666666666668,
+        "end_s": 9.306666666666667,
+        "frames": 4
+      },
+      {
+        "source_id": "IMG_7329-d48fdb9d",
+        "track_id": 13,
+        "start_s": 9.506666666666668,
+        "end_s": 9.906666666666668,
+        "frames": 5
+      },
+      {
+        "source_id": "IMG_7329-d48fdb9d",
+        "track_id": 19,
+        "start_s": 10.106666666666667,
+        "end_s": 10.206666666666667,
+        "frames": 2
+      },
+      {
+        "source_id": "IMG_7329-d48fdb9d",
+        "track_id": 20,
+        "start_s": 10.306666666666667,
+        "end_s": 10.606666666666667,
+        "frames": 4
+      },
+      {
+        "source_id": "IMG_7329-d48fdb9d",
+        "track_id": 19,
+        "start_s": 10.706666666666667,
+        "end_s": 11.208333333333334,
+        "frames": 6
+      },
+      {
+        "source_id": "IMG_7329-d48fdb9d",
+        "track_id": 20,
+        "start_s": 11.308333333333334,
+        "end_s": 11.308333333333334,
+        "frames": 1
+      },
+      {
+        "source_id": "IMG_7329-d48fdb9d",
+        "track_id": 19,
+        "start_s": 11.408333333333333,
+        "end_s": 11.608333333333334,
+        "frames": 3
+      },
+      {
+        "source_id": "IMG_7329-d48fdb9d",
+        "track_id": 21,
+        "start_s": 11.808333333333334,
+        "end_s": 12.108333333333334,
+        "frames": 4
+      },
+      {
+        "source_id": "IMG_7329-d48fdb9d",
+        "track_id": 23,
+        "start_s": 13.308333333333334,
+        "end_s": 13.510000000000002,
+        "frames": 3
+      },
+      {
+        "source_id": "IMG_7329-d48fdb9d",
+        "track_id": 24,
+        "start_s": 13.610000000000001,
+        "end_s": 13.81,
+        "frames": 3
+      },
+      {
+        "source_id": "IMG_7329-d48fdb9d",
+        "track_id": 23,
+        "start_s": 13.91,
+        "end_s": 14.010000000000002,
+        "frames": 2
+      }
+    ],
+    "accepted_track_id_changes": 19,
+    "caveat": "Segments cover consecutive accepted sampled frames, not inferred validity during gaps. ID changes are diagnostic, not ground-truth identity errors. Unlabeled frames do not establish precision.",
+    "labeled_accepted": 14,
+    "labeled_total": 52,
+    "labeled_accepted_coarse_matches": 5,
+    "labeled_forbidden_accepts": 4
+  },
+  "caveat": "Coarse band/region proposal overlap on development footage, not detector precision, pose accuracy, or independent generalization. A matched box can still have incorrect rim geometry.",
+  "photos": {
+    "labeled_views": 13,
+    "top1_iou_ge_03": 9,
+    "any_proposal_iou_ge_03": 12,
+    "any_proposal_iou_ge_05": 9
+  },
+  "video": {
+    "labeled_views": 39,
+    "top1_iou_ge_03": 17,
+    "any_proposal_iou_ge_03": 33,
+    "any_proposal_iou_ge_05": 25
+  },
+  "by_condition": {
+    "ambiguous_glass_corner": {
+      "labeled_views": 9,
+      "top1_iou_ge_03": 0,
+      "any_proposal_iou_ge_03": 4,
+      "any_proposal_iou_ge_05": 2
+    },
+    "clear_blue_sequence": {
+      "labeled_views": 16,
+      "top1_iou_ge_03": 6,
+      "any_proposal_iou_ge_03": 16,
+      "any_proposal_iou_ge_05": 13
+    },
+    "clipped_blue_background": {
+      "labeled_views": 1,
+      "top1_iou_ge_03": 1,
+      "any_proposal_iou_ge_03": 1,
+      "any_proposal_iou_ge_05": 1
+    },
+    "clipped_edge_on": {
+      "labeled_views": 1,
+      "top1_iou_ge_03": 1,
+      "any_proposal_iou_ge_03": 1,
+      "any_proposal_iou_ge_05": 0
+    },
+    "clipped_gray_background": {
+      "labeled_views": 4,
+      "top1_iou_ge_03": 0,
+      "any_proposal_iou_ge_03": 3,
+      "any_proposal_iou_ge_05": 2
+    },
+    "edge_on_blue_background": {
+      "labeled_views": 1,
+      "top1_iou_ge_03": 1,
+      "any_proposal_iou_ge_03": 1,
+      "any_proposal_iou_ge_05": 1
+    },
+    "edge_on_glare": {
+      "labeled_views": 3,
+      "top1_iou_ge_03": 3,
+      "any_proposal_iou_ge_03": 3,
+      "any_proposal_iou_ge_05": 3
+    },
+    "edge_on_gray_background": {
+      "labeled_views": 2,
+      "top1_iou_ge_03": 1,
+      "any_proposal_iou_ge_03": 2,
+      "any_proposal_iou_ge_05": 1
+    },
+    "oblique_blue_background": {
+      "labeled_views": 6,
+      "top1_iou_ge_03": 5,
+      "any_proposal_iou_ge_03": 6,
+      "any_proposal_iou_ge_05": 4
+    },
+    "oblique_gray_background": {
+      "labeled_views": 5,
+      "top1_iou_ge_03": 4,
+      "any_proposal_iou_ge_03": 4,
+      "any_proposal_iou_ge_05": 3
+    },
+    "open_blue_background": {
+      "labeled_views": 4,
+      "top1_iou_ge_03": 4,
+      "any_proposal_iou_ge_03": 4,
+      "any_proposal_iou_ge_05": 4
+    }
+  },
+  "views": [
+    {
+      "source": "IMG_7316.JPG",
+      "time_s": null,
+      "condition": "open_blue_background",
+      "proposals": 18,
+      "top1_iou": 0.4776204603455506,
+      "best_iou": 0.8663245886897244,
+      "accepted": false,
+      "accepted_iou": null,
+      "accepted_reference": "coarse_silhouette",
+      "acceptance_allowed": true
+    },
+    {
+      "source": "IMG_7317.JPG",
+      "time_s": null,
+      "condition": "open_blue_background",
+      "proposals": 18,
+      "top1_iou": 0.6230967670054177,
+      "best_iou": 0.9468972874450385,
+      "accepted": false,
+      "accepted_iou": null,
+      "accepted_reference": "coarse_silhouette",
+      "acceptance_allowed": true
+    },
+    {
+      "source": "IMG_7318.JPG",
+      "time_s": null,
+      "condition": "oblique_blue_background",
+      "proposals": 18,
+      "top1_iou": 0.8459446833586821,
+      "best_iou": 0.8459446833586821,
+      "accepted": false,
+      "accepted_iou": null,
+      "accepted_reference": "coarse_silhouette",
+      "acceptance_allowed": true
+    },
+    {
+      "source": "IMG_7319.JPG",
+      "time_s": null,
+      "condition": "oblique_blue_background",
+      "proposals": 18,
+      "top1_iou": 0.8779613522764125,
+      "best_iou": 0.8779613522764125,
+      "accepted": false,
+      "accepted_iou": null,
+      "accepted_reference": "coarse_silhouette",
+      "acceptance_allowed": true
+    },
+    {
+      "source": "IMG_7320.JPG",
+      "time_s": null,
+      "condition": "edge_on_glare",
+      "proposals": 18,
+      "top1_iou": 0.5874653621136018,
+      "best_iou": 0.7613790464700857,
+      "accepted": false,
+      "accepted_iou": null,
+      "accepted_reference": "coarse_silhouette",
+      "acceptance_allowed": true
+    },
+    {
+      "source": "IMG_7321.JPG",
+      "time_s": null,
+      "condition": "edge_on_glare",
+      "proposals": 18,
+      "top1_iou": 0.5950574465171931,
+      "best_iou": 0.7857017699003765,
+      "accepted": false,
+      "accepted_iou": null,
+      "accepted_reference": "coarse_silhouette",
+      "acceptance_allowed": true
+    },
+    {
+      "source": "IMG_7322.JPG",
+      "time_s": null,
+      "condition": "clipped_gray_background",
+      "proposals": 18,
+      "top1_iou": 0.014939259925674724,
+      "best_iou": 0.45498242619137536,
+      "accepted": false,
+      "accepted_iou": null,
+      "accepted_reference": "coarse_silhouette",
+      "acceptance_allowed": true
+    },
+    {
+      "source": "IMG_7323.JPG",
+      "time_s": null,
+      "condition": "clipped_gray_background",
+      "proposals": 18,
+      "top1_iou": 0.20117390051639017,
+      "best_iou": 0.5680190344349022,
+      "accepted": false,
+      "accepted_iou": null,
+      "accepted_reference": "coarse_silhouette",
+      "acceptance_allowed": true
+    },
+    {
+      "source": "IMG_7324.JPG",
+      "time_s": null,
+      "condition": "oblique_gray_background",
+      "proposals": 16,
+      "top1_iou": 0.5771655325564684,
+      "best_iou": 0.5771655325564684,
+      "accepted": false,
+      "accepted_iou": null,
+      "accepted_reference": "coarse_silhouette",
+      "acceptance_allowed": true
+    },
+    {
+      "source": "IMG_7325.JPG",
+      "time_s": null,
+      "condition": "oblique_gray_background",
+      "proposals": 1,
+      "top1_iou": 0.1497319614155023,
+      "best_iou": 0.1497319614155023,
+      "accepted": false,
+      "accepted_iou": null,
+      "accepted_reference": "coarse_silhouette",
+      "acceptance_allowed": true
+    },
+    {
+      "source": "IMG_7326.JPG",
+      "time_s": null,
+      "condition": "oblique_gray_background",
+      "proposals": 5,
+      "top1_iou": 0.3844936464288782,
+      "best_iou": 0.4128198418046498,
+      "accepted": false,
+      "accepted_iou": null,
+      "accepted_reference": "coarse_silhouette",
+      "acceptance_allowed": true
+    },
+    {
+      "source": "IMG_7327.JPG",
+      "time_s": null,
+      "condition": "edge_on_gray_background",
+      "proposals": 18,
+      "top1_iou": 0.0,
+      "best_iou": 0.3717926167108543,
+      "accepted": false,
+      "accepted_iou": null,
+      "accepted_reference": "coarse_silhouette",
+      "acceptance_allowed": true
+    },
+    {
+      "source": "IMG_7328.JPG",
+      "time_s": null,
+      "condition": "edge_on_gray_background",
+      "proposals": 14,
+      "top1_iou": 0.6987682863742164,
+      "best_iou": 0.6987682863742164,
+      "accepted": false,
+      "accepted_iou": null,
+      "accepted_reference": "coarse_silhouette",
+      "acceptance_allowed": true
+    },
+    {
+      "source": "IMG_7329.MOV",
+      "time_s": 0.0,
+      "condition": "oblique_gray_background",
+      "proposals": 9,
+      "top1_iou": 0.6961806872898672,
+      "best_iou": 0.6961806872898672,
+      "accepted": false,
+      "accepted_iou": null,
+      "accepted_reference": "coarse_silhouette",
+      "acceptance_allowed": true
+    },
+    {
+      "source": "IMG_7329.MOV",
+      "time_s": 1.0,
+      "condition": "oblique_gray_background",
+      "proposals": 7,
+      "top1_iou": 0.6187659148350697,
+      "best_iou": 0.6187659148350697,
+      "accepted": false,
+      "accepted_iou": null,
+      "accepted_reference": "coarse_silhouette",
+      "acceptance_allowed": true
+    },
+    {
+      "source": "IMG_7329.MOV",
+      "time_s": 2.001666666666667,
+      "condition": "clipped_gray_background",
+      "proposals": 20,
+      "top1_iou": 0.012915814079760965,
+      "best_iou": 0.653388697675088,
+      "accepted": false,
+      "accepted_iou": null,
+      "accepted_reference": "coarse_silhouette",
+      "acceptance_allowed": true
+    },
+    {
+      "source": "IMG_7329.MOV",
+      "time_s": 3.001666666666667,
+      "condition": "clipped_gray_background",
+      "proposals": 12,
+      "top1_iou": 0.06811256144686083,
+      "best_iou": 0.17433901546546446,
+      "accepted": false,
+      "accepted_iou": null,
+      "accepted_reference": "coarse_silhouette",
+      "acceptance_allowed": true
+    },
+    {
+      "source": "IMG_7329.MOV",
+      "time_s": 4.003333333333334,
+      "condition": "oblique_blue_background",
+      "proposals": 20,
+      "top1_iou": 0.6548717748772866,
+      "best_iou": 0.7067732050190982,
+      "accepted": true,
+      "accepted_iou": 0.7067732050190982,
+      "accepted_reference": "coarse_silhouette",
+      "acceptance_allowed": true
+    },
+    {
+      "source": "IMG_7329.MOV",
+      "time_s": 6.003333333333334,
+      "condition": "clipped_blue_background",
+      "proposals": 10,
+      "top1_iou": 0.417524340268269,
+      "best_iou": 0.7214322756173611,
+      "accepted": false,
+      "accepted_iou": null,
+      "accepted_reference": "coarse_silhouette",
+      "acceptance_allowed": true
+    },
+    {
+      "source": "IMG_7329.MOV",
+      "time_s": 7.005000000000001,
+      "condition": "open_blue_background",
+      "proposals": 21,
+      "top1_iou": 0.7762726350754687,
+      "best_iou": 0.7762726350754687,
+      "accepted": false,
+      "accepted_iou": null,
+      "accepted_reference": "coarse_silhouette",
+      "acceptance_allowed": true
+    },
+    {
+      "source": "IMG_7329.MOV",
+      "time_s": 8.005,
+      "condition": "open_blue_background",
+      "proposals": 20,
+      "top1_iou": 0.39800909190759653,
+      "best_iou": 0.5236169704944561,
+      "accepted": true,
+      "accepted_iou": 0.3763356007987169,
+      "accepted_reference": "coarse_silhouette",
+      "acceptance_allowed": true
+    },
+    {
+      "source": "IMG_7329.MOV",
+      "time_s": 9.006666666666668,
+      "condition": "oblique_blue_background",
+      "proposals": 19,
+      "top1_iou": 0.23853171175198876,
+      "best_iou": 0.6541711910560688,
+      "accepted": true,
+      "accepted_iou": 0.23368824107116543,
+      "accepted_reference": "coarse_silhouette",
+      "acceptance_allowed": true
+    },
+    {
+      "source": "IMG_7329.MOV",
+      "time_s": 10.006666666666668,
+      "condition": "edge_on_blue_background",
+      "proposals": 14,
+      "top1_iou": 0.5648759009438421,
+      "best_iou": 0.6330382388153893,
+      "accepted": false,
+      "accepted_iou": null,
+      "accepted_reference": "coarse_silhouette",
+      "acceptance_allowed": true
+    },
+    {
+      "source": "IMG_7329.MOV",
+      "time_s": 11.008333333333335,
+      "condition": "edge_on_glare",
+      "proposals": 17,
+      "top1_iou": 0.4383888514730596,
+      "best_iou": 0.5189384889817994,
+      "accepted": true,
+      "accepted_iou": 0.4383888514730596,
+      "accepted_reference": "coarse_silhouette",
+      "acceptance_allowed": true
+    },
+    {
+      "source": "IMG_7329.MOV",
+      "time_s": 12.008333333333335,
+      "condition": "clipped_edge_on",
+      "proposals": 19,
+      "top1_iou": 0.3134076211589782,
+      "best_iou": 0.45304807975687356,
+      "accepted": true,
+      "accepted_iou": 0.3134076211589782,
+      "accepted_reference": "coarse_silhouette",
+      "acceptance_allowed": true
+    },
+    {
+      "source": "IMG_7329.MOV",
+      "time_s": 13.008333333333335,
+      "condition": "oblique_blue_background",
+      "proposals": 4,
+      "top1_iou": 0.3929776125121706,
+      "best_iou": 0.4852810264905242,
+      "accepted": false,
+      "accepted_iou": null,
+      "accepted_reference": "coarse_silhouette",
+      "acceptance_allowed": true
+    },
+    {
+      "source": "IMG_7329.MOV",
+      "time_s": 14.010000000000002,
+      "condition": "oblique_blue_background",
+      "proposals": 17,
+      "top1_iou": 0.3480101108589173,
+      "best_iou": 0.4281801670628934,
+      "accepted": true,
+      "accepted_iou": 0.3480101108589173,
+      "accepted_reference": "coarse_silhouette",
+      "acceptance_allowed": true
+    },
+    {
+      "source": "IMG_7329.MOV",
+      "time_s": 6.905,
+      "condition": "clear_blue_sequence",
+      "proposals": 19,
+      "top1_iou": 0.2268684602408867,
+      "best_iou": 0.6719237280829411,
+      "accepted": false,
+      "accepted_iou": null,
+      "accepted_reference": "coarse_silhouette",
+      "acceptance_allowed": true
+    },
+    {
+      "source": "IMG_7329.MOV",
+      "time_s": 7.105,
+      "condition": "clear_blue_sequence",
+      "proposals": 22,
+      "top1_iou": 0.49399399367578073,
+      "best_iou": 0.6683102284044048,
+      "accepted": false,
+      "accepted_iou": null,
+      "accepted_reference": "coarse_silhouette",
+      "acceptance_allowed": true
+    },
+    {
+      "source": "IMG_7329.MOV",
+      "time_s": 7.205,
+      "condition": "clear_blue_sequence",
+      "proposals": 22,
+      "top1_iou": 0.2776699760480769,
+      "best_iou": 0.5768675534599031,
+      "accepted": false,
+      "accepted_iou": null,
+      "accepted_reference": "coarse_silhouette",
+      "acceptance_allowed": true
+    },
+    {
+      "source": "IMG_7329.MOV",
+      "time_s": 7.305000000000001,
+      "condition": "clear_blue_sequence",
+      "proposals": 22,
+      "top1_iou": 0.2890495937676413,
+      "best_iou": 0.6745750199319136,
+      "accepted": false,
+      "accepted_iou": null,
+      "accepted_reference": "coarse_silhouette",
+      "acceptance_allowed": true
+    },
+    {
+      "source": "IMG_7329.MOV",
+      "time_s": 7.405,
+      "condition": "clear_blue_sequence",
+      "proposals": 21,
+      "top1_iou": 0.30187112878627015,
+      "best_iou": 0.6381057826174054,
+      "accepted": false,
+      "accepted_iou": null,
+      "accepted_reference": "coarse_silhouette",
+      "acceptance_allowed": true
+    },
+    {
+      "source": "IMG_7329.MOV",
+      "time_s": 13.610000000000001,
+      "condition": "clear_blue_sequence",
+      "proposals": 16,
+      "top1_iou": 0.5825269573753378,
+      "best_iou": 0.6236981497200114,
+      "accepted": true,
+      "accepted_iou": 0.1649251212029307,
+      "accepted_reference": "coarse_silhouette",
+      "acceptance_allowed": true
+    },
+    {
+      "source": "IMG_7329.MOV",
+      "time_s": 13.71,
+      "condition": "clear_blue_sequence",
+      "proposals": 18,
+      "top1_iou": 0.6283669367690616,
+      "best_iou": 0.6765995529701316,
+      "accepted": true,
+      "accepted_iou": 0.17654995922555744,
+      "accepted_reference": "coarse_silhouette",
+      "acceptance_allowed": true
+    },
+    {
+      "source": "IMG_7329.MOV",
+      "time_s": 13.81,
+      "condition": "clear_blue_sequence",
+      "proposals": 17,
+      "top1_iou": 0.44883774622488914,
+      "best_iou": 0.7230760443545355,
+      "accepted": true,
+      "accepted_iou": 0.19809650086511138,
+      "accepted_reference": "coarse_silhouette",
+      "acceptance_allowed": true
+    },
+    {
+      "source": "IMG_7329.MOV",
+      "time_s": 13.91,
+      "condition": "clear_blue_sequence",
+      "proposals": 17,
+      "top1_iou": 0.3933254787431081,
+      "best_iou": 0.7932723205860455,
+      "accepted": true,
+      "accepted_iou": 0.26536255595422636,
+      "accepted_reference": "coarse_silhouette",
+      "acceptance_allowed": true
+    },
+    {
+      "source": "IMG_7329.MOV",
+      "time_s": 14.110000000000001,
+      "condition": "clear_blue_sequence",
+      "proposals": 16,
+      "top1_iou": 0.27863542771138555,
+      "best_iou": 0.3347890134414722,
+      "accepted": false,
+      "accepted_iou": null,
+      "accepted_reference": "coarse_silhouette",
+      "acceptance_allowed": true
+    },
+    {
+      "source": "IMG_7329.MOV",
+      "time_s": 14.21,
+      "condition": "clear_blue_sequence",
+      "proposals": 16,
+      "top1_iou": 0.24014142302312594,
+      "best_iou": 0.4153655636337866,
+      "accepted": false,
+      "accepted_iou": null,
+      "accepted_reference": "coarse_silhouette",
+      "acceptance_allowed": true
+    },
+    {
+      "source": "IMG_7329.MOV",
+      "time_s": 14.31,
+      "condition": "clear_blue_sequence",
+      "proposals": 15,
+      "top1_iou": 0.15439990188790054,
+      "best_iou": 0.376877205718933,
+      "accepted": false,
+      "accepted_iou": null,
+      "accepted_reference": "coarse_silhouette",
+      "acceptance_allowed": true
+    },
+    {
+      "source": "IMG_7329.MOV",
+      "time_s": 14.41,
+      "condition": "clear_blue_sequence",
+      "proposals": 21,
+      "top1_iou": 0.26192389547513956,
+      "best_iou": 0.625769578909319,
+      "accepted": false,
+      "accepted_iou": null,
+      "accepted_reference": "coarse_silhouette",
+      "acceptance_allowed": true
+    },
+    {
+      "source": "IMG_7329.MOV",
+      "time_s": 14.510000000000002,
+      "condition": "clear_blue_sequence",
+      "proposals": 19,
+      "top1_iou": 0.16905524408315037,
+      "best_iou": 0.8906817665453556,
+      "accepted": false,
+      "accepted_iou": null,
+      "accepted_reference": "coarse_silhouette",
+      "acceptance_allowed": true
+    },
+    {
+      "source": "IMG_7329.MOV",
+      "time_s": 14.610000000000001,
+      "condition": "clear_blue_sequence",
+      "proposals": 21,
+      "top1_iou": 0.09329341072841281,
+      "best_iou": 0.8476257273175085,
+      "accepted": false,
+      "accepted_iou": null,
+      "accepted_reference": "coarse_silhouette",
+      "acceptance_allowed": true
+    },
+    {
+      "source": "IMG_7329.MOV",
+      "time_s": 14.71,
+      "condition": "clear_blue_sequence",
+      "proposals": 22,
+      "top1_iou": 0.15331172368019616,
+      "best_iou": 0.8795891934548868,
+      "accepted": false,
+      "accepted_iou": null,
+      "accepted_reference": "coarse_silhouette",
+      "acceptance_allowed": true
+    },
+    {
+      "source": "IMG_7329.MOV",
+      "time_s": 5.003333333333334,
+      "condition": "ambiguous_glass_corner",
+      "proposals": 20,
+      "top1_iou": 0.20854887830244118,
+      "best_iou": 0.5625336191259608,
+      "accepted": true,
+      "accepted_iou": 0.20854887830244118,
+      "accepted_reference": "coarse_silhouette",
+      "acceptance_allowed": false
+    },
+    {
+      "source": "IMG_7329.MOV",
+      "time_s": 5.1033333333333335,
+      "condition": "ambiguous_glass_corner",
+      "proposals": 20,
+      "top1_iou": 0.20461752713329542,
+      "best_iou": 0.5643635448741171,
+      "accepted": true,
+      "accepted_iou": 0.07964547413042652,
+      "accepted_reference": "coarse_silhouette",
+      "acceptance_allowed": false
+    },
+    {
+      "source": "IMG_7329.MOV",
+      "time_s": 5.203333333333334,
+      "condition": "ambiguous_glass_corner",
+      "proposals": 20,
+      "top1_iou": 0.20691839983983112,
+      "best_iou": 0.4677071800872101,
+      "accepted": true,
+      "accepted_iou": 0.09859863188896914,
+      "accepted_reference": "coarse_silhouette",
+      "acceptance_allowed": false
+    },
+    {
+      "source": "IMG_7329.MOV",
+      "time_s": 5.303333333333334,
+      "condition": "ambiguous_glass_corner",
+      "proposals": 20,
+      "top1_iou": 0.07353092386600782,
+      "best_iou": 0.48215537004280085,
+      "accepted": true,
+      "accepted_iou": 0.06370975669487795,
+      "accepted_reference": "coarse_silhouette",
+      "acceptance_allowed": false
+    },
+    {
+      "source": "IMG_7329.MOV",
+      "time_s": 5.403333333333333,
+      "condition": "ambiguous_glass_corner",
+      "proposals": 19,
+      "top1_iou": 0.061157189617440225,
+      "best_iou": 0.28675262819065545,
+      "accepted": false,
+      "accepted_iou": null,
+      "accepted_reference": "coarse_silhouette",
+      "acceptance_allowed": false
+    },
+    {
+      "source": "IMG_7329.MOV",
+      "time_s": 5.503333333333334,
+      "condition": "ambiguous_glass_corner",
+      "proposals": 15,
+      "top1_iou": 0.07688128600738059,
+      "best_iou": 0.18228696382327605,
+      "accepted": false,
+      "accepted_iou": null,
+      "accepted_reference": "coarse_silhouette",
+      "acceptance_allowed": false
+    },
+    {
+      "source": "IMG_7329.MOV",
+      "time_s": 5.6033333333333335,
+      "condition": "ambiguous_glass_corner",
+      "proposals": 10,
+      "top1_iou": 0.0473188676131156,
+      "best_iou": 0.15772962705252314,
+      "accepted": false,
+      "accepted_iou": null,
+      "accepted_reference": "coarse_silhouette",
+      "acceptance_allowed": false
+    },
+    {
+      "source": "IMG_7329.MOV",
+      "time_s": 5.703333333333334,
+      "condition": "ambiguous_glass_corner",
+      "proposals": 9,
+      "top1_iou": 0.09655926304800012,
+      "best_iou": 0.1301186402306567,
+      "accepted": false,
+      "accepted_iou": null,
+      "accepted_reference": "coarse_silhouette",
+      "acceptance_allowed": false
+    },
+    {
+      "source": "IMG_7329.MOV",
+      "time_s": 5.803333333333334,
+      "condition": "ambiguous_glass_corner",
+      "proposals": 7,
+      "top1_iou": 0.12260321438280226,
+      "best_iou": 0.12260321438280226,
+      "accepted": false,
+      "accepted_iou": null,
+      "accepted_reference": "coarse_silhouette",
+      "acceptance_allowed": false
+    }
+  ],
+  "negative_region_diagnostics": {
+    "crops": 6,
+    "crops_with_proposals": 4,
+    "regions": [
+      {
+        "source": "IMG_7325.JPG",
+        "box": [
+          0.65,
+          0.01,
+          0.99,
+          0.25
+        ],
+        "kind": "gray_background",
+        "proposals": 0,
+        "max_score": null,
+        "accepted_frames": 0
+      },
+      {
+        "source": "IMG_7326.JPG",
+        "box": [
+          0.7,
+          0.02,
+          0.99,
+          0.29
+        ],
+        "kind": "background_attachments",
+        "proposals": 2,
+        "max_score": 0.5455219594248869,
+        "accepted_frames": 0
+      },
+      {
+        "source": "IMG_7327.JPG",
+        "box": [
+          0.65,
+          0.02,
+          0.99,
+          0.3
+        ],
+        "kind": "background_attachments",
+        "proposals": 1,
+        "max_score": 0.5711943491660575,
+        "accepted_frames": 0
+      },
+      {
+        "source": "IMG_7328.JPG",
+        "box": [
+          0.4,
+          0.01,
+          0.99,
+          0.38
+        ],
+        "kind": "gray_background",
+        "proposals": 3,
+        "max_score": 0.6132231153337757,
+        "accepted_frames": 0
+      },
+      {
+        "source": "IMG_7321.JPG",
+        "box": [
+          0.55,
+          0.3,
+          0.99,
+          0.75
+        ],
+        "kind": "plants",
+        "proposals": 0,
+        "max_score": null,
+        "accepted_frames": 0
+      },
+      {
+        "source": "IMG_7316.JPG",
+        "box": [
+          0.15,
+          0.83,
+          0.95,
+          0.99
+        ],
+        "kind": "floor_reflection",
+        "proposals": 18,
+        "max_score": 0.7726034769098136,
+        "accepted_frames": 14
+      }
+    ],
+    "crops_with_accepted_outputs": 1,
+    "caveat": "Hand-selected development crops with no physical target. Tracking repeats each still 15 times at 10 fps; this is not natural video or a deployment false-positive rate."
+  }
+}

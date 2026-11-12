@@ -28,7 +28,8 @@
 
 Original inputs remain in `ENEE408V Hoop/`. The latest annotated video is
 [ellipse-tracking.mp4](hoop-vision/ellipse-tracking/ellipse-tracking.mp4).
-Generated media and full logs are ignored by git; archive them explicitly when
-transferring to another checkout. Only the final 10 fps, 5 fps, 15 fps and
+Selected generated media and full logs are now versioned under `camera_results/`;
+videos and ZIP files use Git LFS. See the recording guide for download options.
+Only the final 10 fps, 5 fps, 15 fps and
 source-rate runs are retained locally. Superseded experiments and reports have
 been removed.

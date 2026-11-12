@@ -1,0 +1,20 @@
+{
+  "model": "testudo_training/runs/testudo-3/weights/best.pt",
+  "classes": [
+    "testudo"
+  ],
+  "confidence": 0.25,
+  "imgsz": 640,
+  "device": "mps",
+  "source": "underwater_test1.mp4",
+  "output": "underwater_test1_testudo_yolo26n.mp4",
+  "decoded_source_frames": 2306,
+  "verified_output_frames": 2306,
+  "output_fps": 10.00291347583737,
+  "resolution": [
+    1280,
+    720
+  ],
+  "source_metadata_frames": 2366,
+  "note": "Source container reports 2366 frames; OpenCV and FFmpeg both decode 2306. Output includes all decodable frames at source nominal playback rate. No ground-truth accuracy evaluation. No audio."
+}

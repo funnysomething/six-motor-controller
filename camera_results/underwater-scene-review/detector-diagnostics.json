@@ -1,0 +1,12 @@
+{
+  "proposals": 2046,
+  "passed_proposals": 23,
+  "strong_proposals": 7,
+  "frames_with_passed_proposals": 17,
+  "rejections": {
+    "needs_paired_boundary": 1533,
+    "insufficient_rim_edges": 1984,
+    "clipped": 281,
+    "inconsistent_band_side": 358
+  }
+}

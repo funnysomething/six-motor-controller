@@ -18,8 +18,9 @@ Run these commands on the Pi to clone the testing branch into its own directory.
 
 ```sh
 sudo apt update
-sudo apt install git
-git clone --branch codex/pi-underwater-vision-testing --single-branch \
+sudo apt install git git-lfs
+git lfs install
+GIT_LFS_SKIP_SMUDGE=1 git clone --branch codex/pi-underwater-vision-testing --single-branch \
   https://github.com/funnysomething/six-motor-controller.git ~/underwater-vision
 cd ~/underwater-vision
 git branch --show-current
@@ -32,7 +33,7 @@ cd ~/underwater-vision
 git status --short
 git fetch origin
 git switch codex/pi-underwater-vision-testing
-git pull --ff-only origin codex/pi-underwater-vision-testing
+GIT_LFS_SKIP_SMUDGE=1 git pull --ff-only origin codex/pi-underwater-vision-testing
 ```
 
 If Git reports local edits or refuses to switch/pull, preserve those edits before continuing. A fresh clone in another directory is also fine. Run the following setup and recording commands from the repository root, not from `raspberry_pi/`.
@@ -50,7 +51,7 @@ rpicam-hello --list-cameras
 
 Reboot after first installing IMX500 firmware if needed. Do not install pip replacements for libcamera/Picamera2 or replace the OS NumPy/OpenCV packages for this test. If `PyavOutput` is unavailable, update the OS Picamera2 package. The recorder deliberately requires the output backend that preserves encoder timestamps.
 
-The clone records its Git commit and whether files have local changes in each session's `session.json`. Recordings under `camera_results/` are ignored by Git and remain on the Pi when pulling updates. Copy them separately when archiving results. After future pulls, check this guide for dependency changes; the virtual environment is local to the Pi and is not downloaded from GitHub.
+The clone records its Git commit and whether files have local changes in each session's `session.json`. Reviewed camera results are now versioned: MP4, MOV, AVI and ZIP files under `camera_results/` use Git LFS. The commands above skip downloading these large objects on the Pi; they leave small pointer files instead of usable media. Run `git lfs pull` to download all media, or select one file, for example `git lfs pull --include="camera_results/underwater_test1.mp4"`. On an existing Pi clone, first run `sudo apt install git-lfs` and `git lfs install` before pulling this update. New recordings are local until explicitly committed and pushed. Preserve uncommitted recordings before pulling if a tracked filename would collide. After future pulls, check this guide for dependency changes; the virtual environment is local to the Pi and is not downloaded from GitHub.
 
 ## Record and view
 

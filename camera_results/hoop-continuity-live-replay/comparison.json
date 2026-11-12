@@ -1,0 +1,36 @@
+{
+  "before": {
+    "frames": 445,
+    "accepted": 218,
+    "consecutive_accepted_id_changes": 26,
+    "boundary_kind_changes": 29,
+    "orientation_available_frames": 218,
+    "orientation_pair_count": 204,
+    "tilt_jumps_ge15deg": 22,
+    "reasons": {
+      "accumulating_evidence": 35,
+      "no_verified_measurement": 190,
+      "fresh_confirmed_image_track": 218,
+      "ambiguous_targets_or_association": 2
+    }
+  },
+  "continuity": {
+    "frames": 445,
+    "accepted": 203,
+    "consecutive_accepted_id_changes": 0,
+    "boundary_kind_changes": 13,
+    "orientation_available_frames": 172,
+    "orientation_pair_count": 147,
+    "tilt_jumps_ge15deg": 1,
+    "reasons": {
+      "accumulating_evidence": 36,
+      "no_verified_measurement": 129,
+      "fresh_confirmed_image_track": 166,
+      "tracked_boundary_unstable": 31,
+      "locked_target_not_observed": 75,
+      "maintained_local_image_track": 6,
+      "ambiguous_targets_or_association": 2
+    }
+  },
+  "scope": "Frozen original live candidates; maintenance flags derived from recorded current-pixel diagnostics. Refits/image detection not rerun. Not live validation or an accuracy benchmark."
+}

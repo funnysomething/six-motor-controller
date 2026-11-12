@@ -1,0 +1,246 @@
+{
+  "processed_frames": 445,
+  "source_span_s": 46.637309999990975,
+  "decisions": {
+    "unknown": 227,
+    "accepted": 218
+  },
+  "decision_availability": 0.4898876404494382,
+  "accepted_boundary_kind_changes": 29,
+  "consecutive_accepted_tilt_jumps_ge15deg": [
+    [
+      20,
+      21,
+      23.85,
+      "material_outline",
+      "material_outline",
+      true
+    ],
+    [
+      21,
+      22,
+      19.58,
+      "material_outline",
+      "material_outline",
+      true
+    ],
+    [
+      23,
+      24,
+      22.31,
+      "apparent_opening",
+      "material_outline",
+      false
+    ],
+    [
+      26,
+      27,
+      25.96,
+      "material_outline",
+      "apparent_opening",
+      false
+    ],
+    [
+      27,
+      28,
+      27.46,
+      "apparent_opening",
+      "material_outline",
+      false
+    ],
+    [
+      28,
+      29,
+      27.52,
+      "material_outline",
+      "apparent_opening",
+      false
+    ],
+    [
+      30,
+      31,
+      25.23,
+      "apparent_opening",
+      "material_outline",
+      false
+    ],
+    [
+      33,
+      34,
+      26.78,
+      "material_outline",
+      "apparent_opening",
+      false
+    ],
+    [
+      36,
+      37,
+      22.64,
+      "apparent_opening",
+      "material_outline",
+      false
+    ],
+    [
+      39,
+      40,
+      25.14,
+      "material_outline",
+      "apparent_opening",
+      false
+    ],
+    [
+      40,
+      41,
+      22.92,
+      "apparent_opening",
+      "material_outline",
+      true
+    ],
+    [
+      79,
+      80,
+      18.38,
+      "material_outline",
+      "apparent_opening",
+      false
+    ],
+    [
+      83,
+      84,
+      21.87,
+      "apparent_opening",
+      "material_outline",
+      false
+    ],
+    [
+      86,
+      87,
+      23.71,
+      "material_outline",
+      "apparent_opening",
+      false
+    ],
+    [
+      89,
+      90,
+      26.86,
+      "apparent_opening",
+      "material_outline",
+      false
+    ],
+    [
+      91,
+      92,
+      26.0,
+      "material_outline",
+      "apparent_opening",
+      false
+    ],
+    [
+      93,
+      94,
+      18.5,
+      "apparent_opening",
+      "material_outline",
+      false
+    ],
+    [
+      247,
+      248,
+      25.1,
+      "apparent_opening",
+      "material_outline",
+      false
+    ],
+    [
+      249,
+      250,
+      28.76,
+      "material_outline",
+      "apparent_opening",
+      false
+    ],
+    [
+      256,
+      257,
+      25.03,
+      "apparent_opening",
+      "material_outline",
+      false
+    ],
+    [
+      257,
+      258,
+      17.69,
+      "material_outline",
+      "apparent_opening",
+      false
+    ],
+    [
+      269,
+      270,
+      21.2,
+      "apparent_opening",
+      "material_outline",
+      false
+    ]
+  ],
+  "same_track_tilt_jumps_ge15deg": [
+    [
+      20,
+      21,
+      23.85,
+      "material_outline",
+      "material_outline",
+      true
+    ],
+    [
+      21,
+      22,
+      19.58,
+      "material_outline",
+      "material_outline",
+      true
+    ],
+    [
+      40,
+      41,
+      22.92,
+      "apparent_opening",
+      "material_outline",
+      true
+    ]
+  ],
+  "accepted_kinds": {
+    "apparent_opening": 69,
+    "material_outline": 149
+  },
+  "frames_without_candidates": 59,
+  "candidate_rejection_counts": {
+    "insufficient_rim_edges": 322,
+    "inconsistent_band_side": 401,
+    "clipped": 140,
+    "needs_paired_boundary": 39,
+    "insufficient_band_material": 24,
+    "outside_white_hsv_range": 178,
+    "insufficient_white_arc_distribution": 171,
+    "unbounded_white_background": 19
+  },
+  "processing_ms": {
+    "p50": 32.28916700000006,
+    "p95": 46.528007799999926,
+    "p99": 52.15635695999997
+  },
+  "host_receipt_to_publish_ms": {
+    "p50": 33.504041000000484,
+    "p95": 49.333949999999035,
+    "p99": 61.2124035200003
+  },
+  "source_interval_s": {
+    "p50": 0.10000999999465421,
+    "p95": 0.10001000000920612,
+    "p99": 0.133350000003702
+  },
+  "capture_stopped": true,
+  "ground_truth_pose_available": false
+}

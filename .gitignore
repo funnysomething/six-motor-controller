@@ -4,7 +4,8 @@
 .vscode/launch.json
 .vscode/ipch
 __pycache__/
-camera_results/
+camera_results/.continuity-camera/
+camera_results/**/*.partial.mp4
 .venv-hoop/
 testudo_training/.venv/
 raspberry_pi/.venv-imx500/

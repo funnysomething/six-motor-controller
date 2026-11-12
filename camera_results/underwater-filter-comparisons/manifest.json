@@ -1,0 +1,866 @@
+{
+  "source": "camera_results/underwater_test1.mp4",
+  "source_sha256": "948f8b529bfd05483762e2d14256d8d857774ad15f9ad664b17633b86e7d3743",
+  "nominal_fps": 10.00291347582345,
+  "time_note": "Labels use decoded frame index / nominal FPS; approximate source time.",
+  "views": [
+    {
+      "target": "testudo",
+      "view": "01-oblique",
+      "frame_index": 960,
+      "approximate_time_s": 95.97203877852915,
+      "crop_xyxy": [
+        300,
+        100,
+        820,
+        540
+      ],
+      "gray_world_bgr_gains": [
+        1.0847068651603669,
+        0.9281227997054837,
+        0.9993521101631326
+      ],
+      "transforms": {
+        "appearance": [
+          {
+            "key": "01-original",
+            "label": "Original color",
+            "formula": "Unmodified decoded pixels"
+          },
+          {
+            "key": "02-grayscale",
+            "label": "Grayscale",
+            "formula": "OpenCV BGR-to-gray luminance"
+          },
+          {
+            "key": "03-red",
+            "label": "Red channel",
+            "formula": "R shown as grayscale; fixed 0-255 scale"
+          },
+          {
+            "key": "04-green",
+            "label": "Green channel",
+            "formula": "G shown as grayscale; fixed 0-255 scale"
+          },
+          {
+            "key": "05-blue",
+            "label": "Blue channel",
+            "formula": "B shown as grayscale; fixed 0-255 scale"
+          },
+          {
+            "key": "06-white-balance",
+            "label": "Gray-world white balance",
+            "formula": "Full-frame channel means; gains clipped 0.5-2"
+          },
+          {
+            "key": "07-gray-clahe",
+            "label": "Grayscale + CLAHE",
+            "formula": "Local contrast; clip limit 2, grid 8x8"
+          },
+          {
+            "key": "08-lab-clahe",
+            "label": "Color + CLAHE on Lab L",
+            "formula": "Local brightness contrast; original a/b retained"
+          },
+          {
+            "key": "09-wb-clahe",
+            "label": "White balance + Lab CLAHE",
+            "formula": "Same white balance and CLAHE parameters"
+          },
+          {
+            "key": "10-unsharp",
+            "label": "Mild unsharp mask",
+            "formula": "1.5 original - 0.5 Gaussian; sigma 1.2"
+          },
+          {
+            "key": "11-gamma",
+            "label": "Gamma brighten",
+            "formula": "Output = 255 * (input/255)^(1/1.4)"
+          },
+          {
+            "key": "12-bilateral-clahe",
+            "label": "Bilateral denoise + Lab CLAHE",
+            "formula": "Bilateral d=5, sigmaColor=25, sigmaSpace=3"
+          }
+        ],
+        "channels-and-masks": [
+          {
+            "key": "01-hsv-value",
+            "label": "HSV value",
+            "formula": "V = max(R,G,B); fixed 0-255 scale"
+          },
+          {
+            "key": "02-hsv-saturation",
+            "label": "HSV saturation",
+            "formula": "White means highly saturated color"
+          },
+          {
+            "key": "03-inverse-saturation",
+            "label": "Inverse saturation",
+            "formula": "255-S; white means neutral, including gray/dark"
+          },
+          {
+            "key": "04-lab-lightness",
+            "label": "Lab lightness",
+            "formula": "OpenCV encoded L; fixed 0-255 scale"
+          },
+          {
+            "key": "05-red-green-average",
+            "label": "Red + green average",
+            "formula": "(R+G)/2; fixed 0-255 scale"
+          },
+          {
+            "key": "06-green-blue-average",
+            "label": "Green + blue average",
+            "formula": "(G+B)/2; fixed 0-255 scale"
+          },
+          {
+            "key": "07-red-minus-green",
+            "label": "Red minus green",
+            "formula": "128 + 2*(R-G); neutral=128; clipped"
+          },
+          {
+            "key": "08-red-minus-blue",
+            "label": "Red minus blue",
+            "formula": "128 + 2*(R-B); neutral=128; clipped"
+          },
+          {
+            "key": "09-red-opponent",
+            "label": "Red emphasis",
+            "formula": "max(R - max(G,B), 0) * 3; clipped to 255"
+          },
+          {
+            "key": "10-normalized-red",
+            "label": "Normalized red",
+            "formula": "255 * R / max(R+G+B,1); fixed scale"
+          },
+          {
+            "key": "11-edges-original",
+            "label": "Edges from original grayscale",
+            "formula": "Sobel magnitude x4 after Gaussian 3x3"
+          },
+          {
+            "key": "12-edges-clahe",
+            "label": "Edges after grayscale CLAHE",
+            "formula": "Same Sobel scale; contrast can amplify false edges"
+          }
+        ]
+      }
+    },
+    {
+      "target": "testudo",
+      "view": "02-shaded",
+      "frame_index": 1280,
+      "approximate_time_s": 127.96271837137222,
+      "crop_xyxy": [
+        200,
+        240,
+        840,
+        720
+      ],
+      "gray_world_bgr_gains": [
+        1.0470527952771271,
+        0.9257750079816941,
+        1.0365247886821198
+      ],
+      "transforms": {
+        "appearance": [
+          {
+            "key": "01-original",
+            "label": "Original color",
+            "formula": "Unmodified decoded pixels"
+          },
+          {
+            "key": "02-grayscale",
+            "label": "Grayscale",
+            "formula": "OpenCV BGR-to-gray luminance"
+          },
+          {
+            "key": "03-red",
+            "label": "Red channel",
+            "formula": "R shown as grayscale; fixed 0-255 scale"
+          },
+          {
+            "key": "04-green",
+            "label": "Green channel",
+            "formula": "G shown as grayscale; fixed 0-255 scale"
+          },
+          {
+            "key": "05-blue",
+            "label": "Blue channel",
+            "formula": "B shown as grayscale; fixed 0-255 scale"
+          },
+          {
+            "key": "06-white-balance",
+            "label": "Gray-world white balance",
+            "formula": "Full-frame channel means; gains clipped 0.5-2"
+          },
+          {
+            "key": "07-gray-clahe",
+            "label": "Grayscale + CLAHE",
+            "formula": "Local contrast; clip limit 2, grid 8x8"
+          },
+          {
+            "key": "08-lab-clahe",
+            "label": "Color + CLAHE on Lab L",
+            "formula": "Local brightness contrast; original a/b retained"
+          },
+          {
+            "key": "09-wb-clahe",
+            "label": "White balance + Lab CLAHE",
+            "formula": "Same white balance and CLAHE parameters"
+          },
+          {
+            "key": "10-unsharp",
+            "label": "Mild unsharp mask",
+            "formula": "1.5 original - 0.5 Gaussian; sigma 1.2"
+          },
+          {
+            "key": "11-gamma",
+            "label": "Gamma brighten",
+            "formula": "Output = 255 * (input/255)^(1/1.4)"
+          },
+          {
+            "key": "12-bilateral-clahe",
+            "label": "Bilateral denoise + Lab CLAHE",
+            "formula": "Bilateral d=5, sigmaColor=25, sigmaSpace=3"
+          }
+        ],
+        "channels-and-masks": [
+          {
+            "key": "01-hsv-value",
+            "label": "HSV value",
+            "formula": "V = max(R,G,B); fixed 0-255 scale"
+          },
+          {
+            "key": "02-hsv-saturation",
+            "label": "HSV saturation",
+            "formula": "White means highly saturated color"
+          },
+          {
+            "key": "03-inverse-saturation",
+            "label": "Inverse saturation",
+            "formula": "255-S; white means neutral, including gray/dark"
+          },
+          {
+            "key": "04-lab-lightness",
+            "label": "Lab lightness",
+            "formula": "OpenCV encoded L; fixed 0-255 scale"
+          },
+          {
+            "key": "05-red-green-average",
+            "label": "Red + green average",
+            "formula": "(R+G)/2; fixed 0-255 scale"
+          },
+          {
+            "key": "06-green-blue-average",
+            "label": "Green + blue average",
+            "formula": "(G+B)/2; fixed 0-255 scale"
+          },
+          {
+            "key": "07-red-minus-green",
+            "label": "Red minus green",
+            "formula": "128 + 2*(R-G); neutral=128; clipped"
+          },
+          {
+            "key": "08-red-minus-blue",
+            "label": "Red minus blue",
+            "formula": "128 + 2*(R-B); neutral=128; clipped"
+          },
+          {
+            "key": "09-red-opponent",
+            "label": "Red emphasis",
+            "formula": "max(R - max(G,B), 0) * 3; clipped to 255"
+          },
+          {
+            "key": "10-normalized-red",
+            "label": "Normalized red",
+            "formula": "255 * R / max(R+G+B,1); fixed scale"
+          },
+          {
+            "key": "11-edges-original",
+            "label": "Edges from original grayscale",
+            "formula": "Sobel magnitude x4 after Gaussian 3x3"
+          },
+          {
+            "key": "12-edges-clahe",
+            "label": "Edges after grayscale CLAHE",
+            "formula": "Same Sobel scale; contrast can amplify false edges"
+          }
+        ]
+      }
+    },
+    {
+      "target": "testudo",
+      "view": "03-close",
+      "frame_index": 2080,
+      "approximate_time_s": 207.93941735347985,
+      "crop_xyxy": [
+        360,
+        0,
+        1100,
+        560
+      ],
+      "gray_world_bgr_gains": [
+        1.0993443959432356,
+        0.9260568828550639,
+        0.9895898386752386
+      ],
+      "transforms": {
+        "appearance": [
+          {
+            "key": "01-original",
+            "label": "Original color",
+            "formula": "Unmodified decoded pixels"
+          },
+          {
+            "key": "02-grayscale",
+            "label": "Grayscale",
+            "formula": "OpenCV BGR-to-gray luminance"
+          },
+          {
+            "key": "03-red",
+            "label": "Red channel",
+            "formula": "R shown as grayscale; fixed 0-255 scale"
+          },
+          {
+            "key": "04-green",
+            "label": "Green channel",
+            "formula": "G shown as grayscale; fixed 0-255 scale"
+          },
+          {
+            "key": "05-blue",
+            "label": "Blue channel",
+            "formula": "B shown as grayscale; fixed 0-255 scale"
+          },
+          {
+            "key": "06-white-balance",
+            "label": "Gray-world white balance",
+            "formula": "Full-frame channel means; gains clipped 0.5-2"
+          },
+          {
+            "key": "07-gray-clahe",
+            "label": "Grayscale + CLAHE",
+            "formula": "Local contrast; clip limit 2, grid 8x8"
+          },
+          {
+            "key": "08-lab-clahe",
+            "label": "Color + CLAHE on Lab L",
+            "formula": "Local brightness contrast; original a/b retained"
+          },
+          {
+            "key": "09-wb-clahe",
+            "label": "White balance + Lab CLAHE",
+            "formula": "Same white balance and CLAHE parameters"
+          },
+          {
+            "key": "10-unsharp",
+            "label": "Mild unsharp mask",
+            "formula": "1.5 original - 0.5 Gaussian; sigma 1.2"
+          },
+          {
+            "key": "11-gamma",
+            "label": "Gamma brighten",
+            "formula": "Output = 255 * (input/255)^(1/1.4)"
+          },
+          {
+            "key": "12-bilateral-clahe",
+            "label": "Bilateral denoise + Lab CLAHE",
+            "formula": "Bilateral d=5, sigmaColor=25, sigmaSpace=3"
+          }
+        ],
+        "channels-and-masks": [
+          {
+            "key": "01-hsv-value",
+            "label": "HSV value",
+            "formula": "V = max(R,G,B); fixed 0-255 scale"
+          },
+          {
+            "key": "02-hsv-saturation",
+            "label": "HSV saturation",
+            "formula": "White means highly saturated color"
+          },
+          {
+            "key": "03-inverse-saturation",
+            "label": "Inverse saturation",
+            "formula": "255-S; white means neutral, including gray/dark"
+          },
+          {
+            "key": "04-lab-lightness",
+            "label": "Lab lightness",
+            "formula": "OpenCV encoded L; fixed 0-255 scale"
+          },
+          {
+            "key": "05-red-green-average",
+            "label": "Red + green average",
+            "formula": "(R+G)/2; fixed 0-255 scale"
+          },
+          {
+            "key": "06-green-blue-average",
+            "label": "Green + blue average",
+            "formula": "(G+B)/2; fixed 0-255 scale"
+          },
+          {
+            "key": "07-red-minus-green",
+            "label": "Red minus green",
+            "formula": "128 + 2*(R-G); neutral=128; clipped"
+          },
+          {
+            "key": "08-red-minus-blue",
+            "label": "Red minus blue",
+            "formula": "128 + 2*(R-B); neutral=128; clipped"
+          },
+          {
+            "key": "09-red-opponent",
+            "label": "Red emphasis",
+            "formula": "max(R - max(G,B), 0) * 3; clipped to 255"
+          },
+          {
+            "key": "10-normalized-red",
+            "label": "Normalized red",
+            "formula": "255 * R / max(R+G+B,1); fixed scale"
+          },
+          {
+            "key": "11-edges-original",
+            "label": "Edges from original grayscale",
+            "formula": "Sobel magnitude x4 after Gaussian 3x3"
+          },
+          {
+            "key": "12-edges-clahe",
+            "label": "Edges after grayscale CLAHE",
+            "formula": "Same Sobel scale; contrast can amplify false edges"
+          }
+        ]
+      }
+    },
+    {
+      "target": "hoop",
+      "view": "01-oblique",
+      "frame_index": 960,
+      "approximate_time_s": 95.97203877852915,
+      "crop_xyxy": [
+        650,
+        80,
+        1280,
+        720
+      ],
+      "gray_world_bgr_gains": [
+        1.0847068651603669,
+        0.9281227997054837,
+        0.9993521101631326
+      ],
+      "transforms": {
+        "appearance": [
+          {
+            "key": "01-original",
+            "label": "Original color",
+            "formula": "Unmodified decoded pixels"
+          },
+          {
+            "key": "02-grayscale",
+            "label": "Grayscale",
+            "formula": "OpenCV BGR-to-gray luminance"
+          },
+          {
+            "key": "03-red",
+            "label": "Red channel",
+            "formula": "R shown as grayscale; fixed 0-255 scale"
+          },
+          {
+            "key": "04-green",
+            "label": "Green channel",
+            "formula": "G shown as grayscale; fixed 0-255 scale"
+          },
+          {
+            "key": "05-blue",
+            "label": "Blue channel",
+            "formula": "B shown as grayscale; fixed 0-255 scale"
+          },
+          {
+            "key": "06-white-balance",
+            "label": "Gray-world white balance",
+            "formula": "Full-frame channel means; gains clipped 0.5-2"
+          },
+          {
+            "key": "07-gray-clahe",
+            "label": "Grayscale + CLAHE",
+            "formula": "Local contrast; clip limit 2, grid 8x8"
+          },
+          {
+            "key": "08-lab-clahe",
+            "label": "Color + CLAHE on Lab L",
+            "formula": "Local brightness contrast; original a/b retained"
+          },
+          {
+            "key": "09-wb-clahe",
+            "label": "White balance + Lab CLAHE",
+            "formula": "Same white balance and CLAHE parameters"
+          },
+          {
+            "key": "10-unsharp",
+            "label": "Mild unsharp mask",
+            "formula": "1.5 original - 0.5 Gaussian; sigma 1.2"
+          },
+          {
+            "key": "11-gamma",
+            "label": "Gamma brighten",
+            "formula": "Output = 255 * (input/255)^(1/1.4)"
+          },
+          {
+            "key": "12-bilateral-clahe",
+            "label": "Bilateral denoise + Lab CLAHE",
+            "formula": "Bilateral d=5, sigmaColor=25, sigmaSpace=3"
+          }
+        ],
+        "channels-and-masks": [
+          {
+            "key": "01-hsv-value",
+            "label": "HSV value",
+            "formula": "V = max(R,G,B); fixed 0-255 scale"
+          },
+          {
+            "key": "02-hsv-saturation",
+            "label": "HSV saturation",
+            "formula": "White means highly saturated color"
+          },
+          {
+            "key": "03-inverse-saturation",
+            "label": "Inverse saturation",
+            "formula": "255-S; white means neutral, including gray/dark"
+          },
+          {
+            "key": "04-lab-lightness",
+            "label": "Lab lightness",
+            "formula": "OpenCV encoded L; fixed 0-255 scale"
+          },
+          {
+            "key": "05-red-green-average",
+            "label": "Red + green average",
+            "formula": "(R+G)/2; fixed 0-255 scale"
+          },
+          {
+            "key": "06-green-blue-average",
+            "label": "Green + blue average",
+            "formula": "(G+B)/2; fixed 0-255 scale"
+          },
+          {
+            "key": "07-red-minus-green",
+            "label": "Red minus green",
+            "formula": "128 + 2*(R-G); neutral=128; clipped"
+          },
+          {
+            "key": "08-red-minus-blue",
+            "label": "Red minus blue",
+            "formula": "128 + 2*(R-B); neutral=128; clipped"
+          },
+          {
+            "key": "09-white-current",
+            "label": "Current white HSV mask",
+            "formula": "Raw color: S <= 60 and V >= 160; white=pass"
+          },
+          {
+            "key": "10-white-relaxed",
+            "label": "Relaxed white HSV mask",
+            "formula": "EXPERIMENT: S <= 90 and V >= 100; white=pass"
+          },
+          {
+            "key": "11-edges-original",
+            "label": "Edges from original grayscale",
+            "formula": "Sobel magnitude x4 after Gaussian 3x3"
+          },
+          {
+            "key": "12-edges-clahe",
+            "label": "Edges after grayscale CLAHE",
+            "formula": "Same Sobel scale; contrast can amplify false edges"
+          }
+        ]
+      }
+    },
+    {
+      "target": "hoop",
+      "view": "02-shadow-and-blue-background",
+      "frame_index": 1280,
+      "approximate_time_s": 127.96271837137222,
+      "crop_xyxy": [
+        690,
+        270,
+        1280,
+        720
+      ],
+      "gray_world_bgr_gains": [
+        1.0470527952771271,
+        0.9257750079816941,
+        1.0365247886821198
+      ],
+      "transforms": {
+        "appearance": [
+          {
+            "key": "01-original",
+            "label": "Original color",
+            "formula": "Unmodified decoded pixels"
+          },
+          {
+            "key": "02-grayscale",
+            "label": "Grayscale",
+            "formula": "OpenCV BGR-to-gray luminance"
+          },
+          {
+            "key": "03-red",
+            "label": "Red channel",
+            "formula": "R shown as grayscale; fixed 0-255 scale"
+          },
+          {
+            "key": "04-green",
+            "label": "Green channel",
+            "formula": "G shown as grayscale; fixed 0-255 scale"
+          },
+          {
+            "key": "05-blue",
+            "label": "Blue channel",
+            "formula": "B shown as grayscale; fixed 0-255 scale"
+          },
+          {
+            "key": "06-white-balance",
+            "label": "Gray-world white balance",
+            "formula": "Full-frame channel means; gains clipped 0.5-2"
+          },
+          {
+            "key": "07-gray-clahe",
+            "label": "Grayscale + CLAHE",
+            "formula": "Local contrast; clip limit 2, grid 8x8"
+          },
+          {
+            "key": "08-lab-clahe",
+            "label": "Color + CLAHE on Lab L",
+            "formula": "Local brightness contrast; original a/b retained"
+          },
+          {
+            "key": "09-wb-clahe",
+            "label": "White balance + Lab CLAHE",
+            "formula": "Same white balance and CLAHE parameters"
+          },
+          {
+            "key": "10-unsharp",
+            "label": "Mild unsharp mask",
+            "formula": "1.5 original - 0.5 Gaussian; sigma 1.2"
+          },
+          {
+            "key": "11-gamma",
+            "label": "Gamma brighten",
+            "formula": "Output = 255 * (input/255)^(1/1.4)"
+          },
+          {
+            "key": "12-bilateral-clahe",
+            "label": "Bilateral denoise + Lab CLAHE",
+            "formula": "Bilateral d=5, sigmaColor=25, sigmaSpace=3"
+          }
+        ],
+        "channels-and-masks": [
+          {
+            "key": "01-hsv-value",
+            "label": "HSV value",
+            "formula": "V = max(R,G,B); fixed 0-255 scale"
+          },
+          {
+            "key": "02-hsv-saturation",
+            "label": "HSV saturation",
+            "formula": "White means highly saturated color"
+          },
+          {
+            "key": "03-inverse-saturation",
+            "label": "Inverse saturation",
+            "formula": "255-S; white means neutral, including gray/dark"
+          },
+          {
+            "key": "04-lab-lightness",
+            "label": "Lab lightness",
+            "formula": "OpenCV encoded L; fixed 0-255 scale"
+          },
+          {
+            "key": "05-red-green-average",
+            "label": "Red + green average",
+            "formula": "(R+G)/2; fixed 0-255 scale"
+          },
+          {
+            "key": "06-green-blue-average",
+            "label": "Green + blue average",
+            "formula": "(G+B)/2; fixed 0-255 scale"
+          },
+          {
+            "key": "07-red-minus-green",
+            "label": "Red minus green",
+            "formula": "128 + 2*(R-G); neutral=128; clipped"
+          },
+          {
+            "key": "08-red-minus-blue",
+            "label": "Red minus blue",
+            "formula": "128 + 2*(R-B); neutral=128; clipped"
+          },
+          {
+            "key": "09-white-current",
+            "label": "Current white HSV mask",
+            "formula": "Raw color: S <= 60 and V >= 160; white=pass"
+          },
+          {
+            "key": "10-white-relaxed",
+            "label": "Relaxed white HSV mask",
+            "formula": "EXPERIMENT: S <= 90 and V >= 100; white=pass"
+          },
+          {
+            "key": "11-edges-original",
+            "label": "Edges from original grayscale",
+            "formula": "Sobel magnitude x4 after Gaussian 3x3"
+          },
+          {
+            "key": "12-edges-clahe",
+            "label": "Edges after grayscale CLAHE",
+            "formula": "Same Sobel scale; contrast can amplify false edges"
+          }
+        ]
+      }
+    },
+    {
+      "target": "hoop",
+      "view": "03-close-shaded-band",
+      "frame_index": 1920,
+      "approximate_time_s": 191.9440775570583,
+      "crop_xyxy": [
+        300,
+        0,
+        1180,
+        720
+      ],
+      "gray_world_bgr_gains": [
+        1.0562152636044222,
+        0.9142147741634346,
+        1.0423306853912595
+      ],
+      "transforms": {
+        "appearance": [
+          {
+            "key": "01-original",
+            "label": "Original color",
+            "formula": "Unmodified decoded pixels"
+          },
+          {
+            "key": "02-grayscale",
+            "label": "Grayscale",
+            "formula": "OpenCV BGR-to-gray luminance"
+          },
+          {
+            "key": "03-red",
+            "label": "Red channel",
+            "formula": "R shown as grayscale; fixed 0-255 scale"
+          },
+          {
+            "key": "04-green",
+            "label": "Green channel",
+            "formula": "G shown as grayscale; fixed 0-255 scale"
+          },
+          {
+            "key": "05-blue",
+            "label": "Blue channel",
+            "formula": "B shown as grayscale; fixed 0-255 scale"
+          },
+          {
+            "key": "06-white-balance",
+            "label": "Gray-world white balance",
+            "formula": "Full-frame channel means; gains clipped 0.5-2"
+          },
+          {
+            "key": "07-gray-clahe",
+            "label": "Grayscale + CLAHE",
+            "formula": "Local contrast; clip limit 2, grid 8x8"
+          },
+          {
+            "key": "08-lab-clahe",
+            "label": "Color + CLAHE on Lab L",
+            "formula": "Local brightness contrast; original a/b retained"
+          },
+          {
+            "key": "09-wb-clahe",
+            "label": "White balance + Lab CLAHE",
+            "formula": "Same white balance and CLAHE parameters"
+          },
+          {
+            "key": "10-unsharp",
+            "label": "Mild unsharp mask",
+            "formula": "1.5 original - 0.5 Gaussian; sigma 1.2"
+          },
+          {
+            "key": "11-gamma",
+            "label": "Gamma brighten",
+            "formula": "Output = 255 * (input/255)^(1/1.4)"
+          },
+          {
+            "key": "12-bilateral-clahe",
+            "label": "Bilateral denoise + Lab CLAHE",
+            "formula": "Bilateral d=5, sigmaColor=25, sigmaSpace=3"
+          }
+        ],
+        "channels-and-masks": [
+          {
+            "key": "01-hsv-value",
+            "label": "HSV value",
+            "formula": "V = max(R,G,B); fixed 0-255 scale"
+          },
+          {
+            "key": "02-hsv-saturation",
+            "label": "HSV saturation",
+            "formula": "White means highly saturated color"
+          },
+          {
+            "key": "03-inverse-saturation",
+            "label": "Inverse saturation",
+            "formula": "255-S; white means neutral, including gray/dark"
+          },
+          {
+            "key": "04-lab-lightness",
+            "label": "Lab lightness",
+            "formula": "OpenCV encoded L; fixed 0-255 scale"
+          },
+          {
+            "key": "05-red-green-average",
+            "label": "Red + green average",
+            "formula": "(R+G)/2; fixed 0-255 scale"
+          },
+          {
+            "key": "06-green-blue-average",
+            "label": "Green + blue average",
+            "formula": "(G+B)/2; fixed 0-255 scale"
+          },
+          {
+            "key": "07-red-minus-green",
+            "label": "Red minus green",
+            "formula": "128 + 2*(R-G); neutral=128; clipped"
+          },
+          {
+            "key": "08-red-minus-blue",
+            "label": "Red minus blue",
+            "formula": "128 + 2*(R-B); neutral=128; clipped"
+          },
+          {
+            "key": "09-white-current",
+            "label": "Current white HSV mask",
+            "formula": "Raw color: S <= 60 and V >= 160; white=pass"
+          },
+          {
+            "key": "10-white-relaxed",
+            "label": "Relaxed white HSV mask",
+            "formula": "EXPERIMENT: S <= 90 and V >= 100; white=pass"
+          },
+          {
+            "key": "11-edges-original",
+            "label": "Edges from original grayscale",
+            "formula": "Sobel magnitude x4 after Gaussian 3x3"
+          },
+          {
+            "key": "12-edges-clahe",
+            "label": "Edges after grayscale CLAHE",
+            "formula": "Same Sobel scale; contrast can amplify false edges"
+          }
+        ]
+      }
+    }
+  ]
+}

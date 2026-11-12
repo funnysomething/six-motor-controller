@@ -77,7 +77,7 @@ For context, the current tracker confirmed zero tracks across the 2,306 decodabl
 
 Save the Git commit, camera/housing identification, mount measurements, focus reference photo, sensor mode, resolution/crop, requested and achieved FPS, bitrate, applied exposure/gain/white-balance metadata, processing settings, test distances/views, representative recordings, calibration files and held-out results. Note water conditions and existing lighting.
 
-Archive generated footage separately; `camera_results/` is ignored by Git. Keep the selected settings and calibration metadata versioned with the project.
+Commit selected results under `camera_results/`; video and ZIP files use Git LFS. New recordings remain local until explicitly committed and pushed. Keep compiled camera-helper caches and incomplete MP4 conversions out of Git. See the recording guide for media download and code-only pull instructions. Keep the selected settings and calibration metadata versioned with the project.
 
 ## References
 
