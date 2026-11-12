@@ -2,6 +2,8 @@
 
 Branch: `codex/pi-underwater-vision-testing`, starting from `b36da21` with the latest paired-boundary tracker. This checkout is separate from the Mac/iPhone work. It does not connect to motor controls.
 
+Follow the [underwater camera calibration plan](underwater-camera-calibration-plan.md) to establish focus, exposure/color settings and geometric calibration before submarine integration.
+
 ## Use both recording and live testing
 
 Start with a recording-only session to check focus, exposure, color and sustained capture. Then record with `--hoop` to test the actual Pi CPU processing speed and live tracking. Keep the clean recording from both sessions. Offline replay lets us compare detector versions on identical underwater views, including failures, without needing another tank session. Offline throughput does not establish live latency or reliable real-time tracking.

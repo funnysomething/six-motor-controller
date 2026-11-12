@@ -1,5 +1,6 @@
 # Hoop vision documentation
 
+- [Underwater camera calibration plan](underwater-camera-calibration-plan.md) provides the checklist for focus, camera settings, geometry and vision validation before submarine integration.
 - [Raspberry Pi underwater recording and live testing](pi-underwater-testing.md) covers clean training video, browser preview and optional live hoop tracking.
 
 - [Paired boundaries and alignment/view cues](hoop-paired-alignment.md) describes
