@@ -30,6 +30,42 @@ def capture_rate(value):
     return 'max' if value == 'max' else positive(value)
 
 
+# The IMX500 is a 4:3 sensor (4056x3040 active pixels). Its 2028x1520 mode is a 2x2
+# binned readout of the whole array, so it keeps the full 66 x 52.3 degree field of view.
+FULL_FOV_SENSOR_SIZE = (2028, 1520)
+
+
+def frame_size(value):
+    try:
+        width, height = (int(part) for part in value.lower().split('x'))
+    except ValueError as error:
+        raise argparse.ArgumentTypeError('use WIDTHxHEIGHT, for example 2028x1520') from error
+    if width <= 0 or height <= 0:
+        raise argparse.ArgumentTypeError('size must be positive')
+    return width, height
+
+
+def field_of_view_report(scaler_crop, crop_limits, active_area):
+    """Compare the applied ScalerCrop with the configured mode and the full pixel array."""
+    report = dict(applied_scaler_crop=scaler_crop, scaler_crop_maximum=crop_limits,
+                  pixel_array_active_area=active_area)
+    if scaler_crop is None or crop_limits is None:
+        report.update(full_field_of_view=None, reason='camera did not report ScalerCrop')
+        return report
+    _, _, width, height = (int(value) for value in scaler_crop)
+    _, _, max_width, max_height = (int(value) for value in crop_limits)
+    report['width_fraction'] = width / max_width
+    report['height_fraction'] = height / max_height
+    mode_covers_array = True
+    if active_area is not None:
+        _, _, area_width, area_height = (int(value) for value in active_area)
+        mode_covers_array = max_width >= area_width and max_height >= area_height
+        report['sensor_mode_covers_active_area'] = mode_covers_array
+    report['full_field_of_view'] = (mode_covers_array and report['width_fraction'] >= .99
+                                    and report['height_fraction'] >= .99)
+    return report
+
+
 def make_10fps_copy(directory):
     """Resample presentation times after capture; never slow the master recording."""
     destination = directory / 'clean-10fps.mp4'
@@ -57,8 +93,12 @@ def parse_args(argv=None):
     parser.add_argument('--output', type=Path, required=True, help='new session directory')
     parser.add_argument('--hoop', action='store_true', help='run the existing ellipse tracker on the Pi CPU')
     parser.add_argument('--camera', type=int, default=0)
-    parser.add_argument('--width', type=int, default=1280)
-    parser.add_argument('--height', type=int, default=720)
+    parser.add_argument('--width', type=int, default=1440)
+    parser.add_argument('--height', type=int, default=1080)
+    parser.add_argument('--sensor-size', type=frame_size, default=FULL_FOV_SENSOR_SIZE,
+                        help='sensor mode, WIDTHxHEIGHT; the default 2028x1520 keeps the full field of view')
+    parser.add_argument('--allow-crop', action='store_true',
+                        help='permit a recording aspect ratio or sensor crop that loses field of view')
     parser.add_argument('--fps', type=capture_rate, default='max',
                         help='max for the configured sensor mode, or a positive numeric capture rate')
     parser.add_argument('--process-fps', type=positive, default=10)
@@ -72,6 +112,12 @@ def parse_args(argv=None):
         parser.error('recording size must be even and at least 640x480')
     if args.camera < 0 or args.bitrate <= 0 or not 1 <= args.port <= 65535:
         parser.error('invalid camera, bitrate or port')
+    sensor_width, sensor_height = args.sensor_size
+    # 2028x1520 is 1.334:1, so allow rounding to even sizes such as 1440x1080.
+    if not args.allow_crop and abs(args.width / args.height / (sensor_width / sensor_height) - 1) > .005:
+        parser.error(f'{args.width}x{args.height} does not match the {sensor_width}x{sensor_height} '
+                     'sensor aspect ratio, so the camera would crop the field of view. '
+                     'Use a 4:3 size such as 1440x1080, or pass --allow-crop.')
     return args
 
 
@@ -225,7 +271,14 @@ def run(args):
         camera.configure(camera.create_video_configuration(
             main={'size': (args.width, args.height), 'format': 'YUV420'},
             lores={'size': (640, lores_height), 'format': 'YUV420'},
+            sensor={'output_size': args.sensor_size},
             controls={} if args.fps == 'max' else {'FrameRate': args.fps}, buffer_count=6, queue=False))
+        crop_limits = camera.camera_controls.get('ScalerCrop', (None, None, None))[1]
+        if crop_limits is not None and not args.allow_crop:
+            # Request the configured mode's whole readout instead of the ISP's aspect-ratio crop.
+            camera.set_controls({'ScalerCrop': tuple(int(value) for value in crop_limits)})
+        active_areas = camera.camera_properties.get('PixelArrayActiveAreas') or [None]
+        active_area = active_areas[0]
         if args.fps == 'max':
             minimum_duration = int(camera.camera_controls['FrameDurationLimits'][0])
             if minimum_duration <= 0:
@@ -257,6 +310,14 @@ def run(args):
                 finally:
                     request.release()  # Never hold a camera buffer during CV, JPEG or disk work.
                 processing_start = time.monotonic()
+                if 'field_of_view' not in summary:
+                    report = field_of_view_report(metadata.get('ScalerCrop'), crop_limits, active_area)
+                    summary['field_of_view'] = report
+                    print(f"Field of view: ScalerCrop {report['applied_scaler_crop']} of "
+                          f"{report['scaler_crop_maximum']}, full={report['full_field_of_view']}", flush=True)
+                    if report['full_field_of_view'] is False and not args.allow_crop:
+                        raise RuntimeError('Camera is cropping the field of view; see field_of_view in '
+                                           'session.json, or pass --allow-crop to record anyway')
                 sensor = metadata['SensorTimestamp']
                 if last_sensor is not None and sensor <= last_sensor:
                     raise RuntimeError('Non-increasing camera SensorTimestamp')

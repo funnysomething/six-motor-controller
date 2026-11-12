@@ -74,19 +74,43 @@ class CaptureTests(unittest.TestCase):
             with self.subTest(value=value), self.assertRaises(SystemExit), patch('sys.stderr', io.StringIO()):
                 capture.parse_args(['--output', 'test', '--fps', value])
 
-    def session(self, directory, hoop=False, encoder_error=False, capture_error=False):
+    def test_rejects_sizes_that_crop_the_sensor(self):
+        with self.assertRaises(SystemExit), patch('sys.stderr', io.StringIO()) as stderr:
+            capture.parse_args(['--output', 'test', '--width', '1280', '--height', '720'])
+        self.assertIn('crop the field of view', stderr.getvalue())
+        args = capture.parse_args(['--output', 'test', '--width', '1280', '--height', '720', '--allow-crop'])
+        self.assertTrue(args.allow_crop)
+        args = capture.parse_args(['--output', 'test'])
+        self.assertEqual((args.width, args.height, args.sensor_size), (1440, 1080, (2028, 1520)))
+
+    def test_field_of_view_report(self):
+        full = (0, 0, 4056, 3040)
+        report = capture.field_of_view_report(full, full, full)
+        self.assertTrue(report['full_field_of_view'])
+        cropped = capture.field_of_view_report((0, 380, 4056, 2280), full, full)
+        self.assertFalse(cropped['full_field_of_view'])
+        self.assertAlmostEqual(cropped['height_fraction'], .75)
+        small_mode = capture.field_of_view_report((0, 0, 2028, 1520), (1014, 760, 2028, 1520), full)
+        self.assertFalse(small_mode['sensor_mode_covers_active_area'])
+        self.assertFalse(small_mode['full_field_of_view'])
+        self.assertIsNone(capture.field_of_view_report(None, full, full)['full_field_of_view'])
+
+    def session(self, directory, hoop=False, encoder_error=False, capture_error=False,
+                applied_crop=(0, 0, 4056, 3040)):
         args = capture.parse_args(['--output', str(Path(directory) / 'session'), '--seconds', '.06',
                                    '--process-fps', '100'] + (['--hoop'] if hoop else []))
         camera = Mock()
-        camera.camera_properties = {'Model': 'simulated'}
-        camera.camera_controls = {'FrameDurationLimits': (20000, 1000000, 33333)}
+        camera.camera_properties = {'Model': 'simulated', 'PixelArrayActiveAreas': [(0, 0, 4056, 3040)]}
+        camera.camera_controls = {'FrameDurationLimits': (20000, 1000000, 33333),
+                                  'ScalerCrop': ((0, 0, 64, 64), (0, 0, 4056, 3040), (0, 380, 4056, 2280))}
         camera.camera_configuration.return_value = {'main': 'simulated'}
         # Simulate a proper planar YUV420 frame from the low-resolution stream.
-        yuv = np.full((540, 640), 128, dtype=np.uint8)
+        yuv = np.full((720, 640), 128, dtype=np.uint8)
         request = Mock()
         request.make_array.return_value = yuv
         clock = getattr(time, 'CLOCK_BOOTTIME', time.CLOCK_MONOTONIC)
-        request.get_metadata.side_effect = lambda: {'SensorTimestamp': int(time.clock_gettime(clock) * 1e9)}
+        request.get_metadata.side_effect = lambda: {'SensorTimestamp': int(time.clock_gettime(clock) * 1e9),
+                                                     'ScalerCrop': applied_crop}
         camera.capture_request.side_effect = RuntimeError('CSI failure') if capture_error else lambda: request
         output = Mock()
         output.ptsoutput = io.StringIO()
@@ -133,13 +157,27 @@ class CaptureTests(unittest.TestCase):
             self.assertGreater(summary['processed_frames'], 0)
             self.assertEqual(summary['status'], 'completed')
             self.assertEqual(summary['requested_capture_fps'], 50)
-            camera.set_controls.assert_called_once_with({'FrameDurationLimits': (20000, 20000)})
+            camera.set_controls.assert_any_call({'FrameDurationLimits': (20000, 20000)})
+            camera.set_controls.assert_any_call({'ScalerCrop': (0, 0, 4056, 3040)})
+            config = camera.create_video_configuration.call_args.kwargs
+            self.assertEqual(config['main']['size'], (1440, 1080))
+            self.assertEqual(config['lores']['size'], (640, 480))
+            self.assertEqual(config['sensor'], {'output_size': (2028, 1520)})
+            self.assertTrue(summary['field_of_view']['full_field_of_view'])
             self.assertTrue(np.all(yuv == 128))
             request.release.assert_called()
             camera.stop_recording.assert_called_once()
             camera.close.assert_called_once()
             self.assertTrue(factory.call_args.args[0].endswith('clean.mp4'))
             server.shutdown.assert_called_once()
+
+    def test_cropped_field_of_view_stops_recording(self):
+        with tempfile.TemporaryDirectory() as directory:
+            summary, camera, _, _, _, _, error = self.session(directory, applied_crop=(0, 380, 4056, 2280))
+            self.assertIn('cropping the field of view', str(error))
+            self.assertEqual(summary['status'], 'failed')
+            self.assertFalse(summary['field_of_view']['full_field_of_view'])
+            camera.stop_recording.assert_called_once()
 
     def test_encoder_failure_stops_and_marks_failed(self):
         with tempfile.TemporaryDirectory() as directory:
