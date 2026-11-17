@@ -365,6 +365,31 @@ class GuiTests(unittest.TestCase):
         self.assertTrue(all(str(widget.cget("state")) == "normal" for widget in self.app.controls))
         self.assertIsNone(self.controller.fault)
 
+    def test_pi_thermals_disabled_without_monitor(self):
+        self.app.poll()
+        self.assertEqual(self.app.pi_temperature.get(), "CPU temperature: disabled")
+        self.assertEqual(self.app.pi_throttle.get(), "Throttling: disabled")
+
+    def test_pi_thermals_show_cached_reading_and_color_severity(self):
+        from raspberry_pi.motor_control import PiThermalReading
+
+        thermals = SimpleNamespace(latest=None)
+        self.app.thermals = thermals
+        self.app.poll()
+        self.assertIn("waiting", self.app.pi_temperature.get())
+        normal = self.app.pi_temperature_label.cget("fg")
+        thermals.latest = PiThermalReading(time.monotonic(), 55.25, 1500.0, 0)
+        self.app.poll()
+        self.assertEqual(self.app.pi_temperature.get(), "CPU temperature: 55.2 C at 1500 MHz")
+        self.assertEqual(self.app.pi_throttle.get(), "Throttling: none")
+        self.assertEqual(self.app.pi_temperature_label.cget("fg"), normal)
+        thermals.latest = PiThermalReading(time.monotonic(), 82.0, 1000.0, 0x20002)
+        self.app.poll()
+        self.assertIn("throttling range", self.app.pi_temperature.get())
+        self.assertEqual(self.app.pi_throttle.get(), "Throttling NOW: ARM frequency capped")
+        self.assertEqual(self.app.pi_temperature_label.cget("fg"), "#b42318")
+        self.assertEqual(self.controller.calls, [])  # Thermals never command motors.
+
 
 if __name__ == "__main__":
     unittest.main()

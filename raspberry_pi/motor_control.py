@@ -36,6 +36,18 @@ DEPTH_FULL_SPEED_CM = 3.0
 DEPTH_STOP_CM = 10.0
 HEADER_CHIP_LABELS = {"pinctrl-bcm2835", "pinctrl-bcm2711", "pinctrl-rp1"}
 MOTOR_GPIO_PINS = sorted(DIRECTION_PINS)
+# Raspberry Pi thermals, sampled off the Tk thread.
+PI_TEMPERATURE_PATH = Path("/sys/class/thermal/thermal_zone0/temp")
+PI_CPU_FREQ_PATH = Path("/sys/devices/system/cpu/cpu0/cpufreq/scaling_cur_freq")
+PI_THROTTLED_PATH = Path("/sys/devices/platform/soc/soc:firmware/get_throttled")
+PI_THERMAL_INTERVAL = 1.0
+PI_THERMAL_STALE_SECONDS = 5.0
+PI_TEMPERATURE_WARN_C = 70.0
+# Firmware begins throttling the CPU at 80 C (Pi 4 and Pi 5).
+PI_TEMPERATURE_THROTTLE_C = 80.0
+# vcgencmd get_throttled bits: 0-3 active now, 16-19 occurred since boot.
+PI_THROTTLE_FLAGS = ((0, "under-voltage"), (1, "ARM frequency capped"),
+                     (2, "throttled"), (3, "soft temperature limit"))
 
 
 def gpio_text(value):
@@ -752,16 +764,110 @@ def interrupted(signum, frame):
     raise KeyboardInterrupt
 
 
+@dataclass(frozen=True)
+class PiThermalReading:
+    at: float
+    temperature_c: float = None
+    cpu_mhz: float = None
+    throttled: int = None
+    error: str = ""
+
+
+def read_pi_throttled(path=PI_THROTTLED_PATH, run=subprocess.run):
+    """Firmware throttle bits from sysfs, falling back to vcgencmd; None if unavailable."""
+    try:
+        return int(path.read_text().strip(), 16)
+    except (OSError, ValueError):
+        pass
+    try:
+        result = run(["vcgencmd", "get_throttled"], capture_output=True, text=True, timeout=1)
+        return int(result.stdout.strip().split("=", 1)[1], 16)
+    except (OSError, subprocess.SubprocessError, ValueError, IndexError):
+        return None
+
+
+def read_pi_thermals(temperature_path=PI_TEMPERATURE_PATH, freq_path=PI_CPU_FREQ_PATH,
+                     throttled_path=PI_THROTTLED_PATH, run=subprocess.run, clock=time.monotonic):
+    try:
+        temperature = int(temperature_path.read_text().strip()) / 1000
+    except (OSError, ValueError) as error:
+        return PiThermalReading(clock(), error=f"no CPU temperature ({error})")
+    try:
+        cpu_mhz = int(freq_path.read_text().strip()) / 1000
+    except (OSError, ValueError):
+        cpu_mhz = None
+    return PiThermalReading(clock(), temperature, cpu_mhz, read_pi_throttled(throttled_path, run))
+
+
+def pi_thermal_text(reading, now):
+    """Return (temperature line, throttle line, severity) for display."""
+    if reading is None:
+        return "CPU temperature: waiting for first reading...", "Throttling: waiting...", "normal"
+    if reading.error:
+        return f"CPU temperature: unavailable ({reading.error})", "Throttling: unavailable", "normal"
+    if now - reading.at > PI_THERMAL_STALE_SECONDS:
+        return "CPU temperature: stale (no recent reading)", "Throttling: stale", "normal"
+    temperature = reading.temperature_c
+    freq = f" at {reading.cpu_mhz:.0f} MHz" if reading.cpu_mhz is not None else ""
+    if temperature >= PI_TEMPERATURE_THROTTLE_C:
+        severity, note = "critical", " - firmware throttling range"
+    elif temperature >= PI_TEMPERATURE_WARN_C:
+        severity, note = "warning", " - hot"
+    else:
+        severity, note = "normal", ""
+    temperature_text = f"CPU temperature: {temperature:.1f} C{freq}{note}"
+    if reading.throttled is None:
+        return temperature_text, "Throttling: unknown (vcgencmd unavailable)", severity
+    now_flags = [name for bit, name in PI_THROTTLE_FLAGS if reading.throttled & (1 << bit)]
+    past_flags = [name for bit, name in PI_THROTTLE_FLAGS
+                  if reading.throttled & (1 << (bit + 16)) and name not in now_flags]
+    if now_flags:
+        throttle_text = "Throttling NOW: " + ", ".join(now_flags)
+        severity = "critical"
+    else:
+        throttle_text = "Throttling: none"
+    if past_flags:
+        throttle_text += "; since boot: " + ", ".join(past_flags)
+        if severity == "normal":
+            severity = "warning"
+    return temperature_text, throttle_text, severity
+
+
+class PiThermalMonitor:
+    """Samples Pi thermals in a daemon thread; the GUI reads only the cached value."""
+
+    def __init__(self, reader=read_pi_thermals, interval=PI_THERMAL_INTERVAL):
+        self.reader, self.interval = reader, interval
+        self.latest = None
+        self.done = threading.Event()
+        self.thread = threading.Thread(target=self._run, daemon=True)
+        self.thread.start()
+
+    def _run(self):
+        while True:
+            try:
+                self.latest = self.reader()
+            except Exception as error:
+                self.latest = PiThermalReading(time.monotonic(), error=str(error))
+            if self.done.wait(self.interval):
+                return
+
+    def close(self):
+        self.done.set()
+        self.thread.join(timeout=2)
+
+
 class MotorGui:
     """Small optional Tk interface; hardware requests never block Tk callbacks."""
 
-    def __init__(self, root, controller, camera=None):
+    def __init__(self, root, controller, camera=None, thermals=None):
         import tkinter as tk
         from tkinter import ttk
 
         self.root = root
         self.controller = controller
         self.camera = camera
+        self.thermals = thermals
         self.camera_image = None
         self.camera_seen = None
         self.results = queue.Queue()
@@ -791,6 +897,8 @@ class MotorGui:
                                                 ("mag", "Magnetic field"),
                                                 ("barometer", "Temperature / pressure"))}
         self.imu_tilt = tk.StringVar(root, value="Tilt: waiting for acceleration...")
+        self.pi_temperature = tk.StringVar(root, value="CPU temperature: waiting for first reading...")
+        self.pi_throttle = tk.StringVar(root, value="Throttling: waiting...")
         root.title("Six motor control and Testudo camera")
         root.minsize(920, 450)
         shell = ttk.Frame(root)
@@ -893,6 +1001,14 @@ class MotorGui:
         for row, variable in enumerate((*self.imu_values.values(), self.imu_tilt)):
             ttk.Label(imu_frame, textvariable=variable, wraplength=330).grid(
                 row=row, column=0, sticky="w", pady=2)
+        thermal_frame = ttk.LabelFrame(frame, text="Raspberry Pi thermals", padding=8)
+        thermal_frame.grid(row=16, column=4, rowspan=2, sticky="new", padx=(18, 0), pady=(8, 0))
+        self.pi_temperature_label = tk.Label(thermal_frame, textvariable=self.pi_temperature,
+                                             wraplength=330, justify="left", anchor="w")
+        self.pi_temperature_label.grid(row=0, column=0, sticky="w", pady=2)
+        self.pi_temperature_fg = self.pi_temperature_label.cget("fg")
+        ttk.Label(thermal_frame, textvariable=self.pi_throttle, wraplength=330).grid(
+            row=1, column=0, sticky="w", pady=2)
         camera_frame = ttk.Frame(self.tabs, padding=16)
         self.tabs.add(camera_frame, text="Testudo camera")
         self.camera_tab = camera_frame
@@ -1089,6 +1205,7 @@ class MotorGui:
             self.status.set("Automatic control active: speed scales over each pair's distance limits; no good reading stops its pair.")
         self.update_distance()
         self.update_imu()
+        self.update_thermals()
         self.update_camera()
         output_problem = self.update_outputs()
         if (output_problem and self.controller.fault is None and not self.busy
@@ -1185,6 +1302,17 @@ class MotorGui:
             self.imu_tilt.set(f"Tilt from acceleration: roll {roll:+.1f} deg, "
                               f"pitch {pitch:+.1f} deg (valid when nearly stationary)")
 
+    def update_thermals(self):
+        if self.thermals is None:
+            self.pi_temperature.set("CPU temperature: disabled")
+            self.pi_throttle.set("Throttling: disabled")
+            return
+        temperature, throttle, severity = pi_thermal_text(self.thermals.latest, time.monotonic())
+        self.pi_temperature.set(temperature)
+        self.pi_throttle.set(throttle)
+        color = {"critical": "#b42318", "warning": "#b54708"}.get(severity, self.pi_temperature_fg)
+        self.pi_temperature_label.configure(fg=color)
+
     def close(self):
         self.closing = True
         if self.camera is not None:
@@ -1205,8 +1333,9 @@ def run_gui(controller, camera=None):
         raise RuntimeError("GUI needs a desktop display; run on the Pi desktop or use SSH X forwarding") from error
     app = None
     previous_handlers = {}
+    thermals = PiThermalMonitor()
     try:
-        app = MotorGui(root, controller, camera=camera)
+        app = MotorGui(root, controller, camera=camera, thermals=thermals)
         # Tk callbacks can swallow KeyboardInterrupt; request a normal GUI
         # shutdown from the next poll instead, without touching Tk in a handler.
         for name in ("SIGINT", "SIGTERM", "SIGHUP"):
@@ -1216,6 +1345,7 @@ def run_gui(controller, camera=None):
                     signum, lambda signum, frame: app.shutdown_requested.set())
         root.mainloop()
     finally:
+        thermals.close()
         if camera is not None:
             camera.stop()
         for signum, handler in previous_handlers.items():

@@ -244,6 +244,10 @@ Use `--pwm-map` only to override this default for different wiring; every channe
 
 The GUI automatically reads the SEN0140 V2 on the same I2C bus as the ESP32. Copy `sen0140.py` alongside `motor_control.py`, then run with `--gui`. No firmware update is needed. Acceleration, gyro rotation rate, magnetic raw counts, barometer temperature/pressure, and acceleration-based roll/pitch appear below the ultrasonic readings. Each missing component reports its own error and retries, and stale values are cleared from the display. Use `--gui --no-imu` to disable it. See the [IMU wiring and component addresses](../README.md#sen0140-v2-imu-on-the-shared-i2c-bus). Keep the board dry; the barometer does not measure underwater depth.
 
+### Raspberry Pi thermals
+
+The GUI's **Raspberry Pi thermals** box shows the Pi's CPU temperature and clock speed, plus the firmware's throttling flags: under-voltage, ARM frequency capped, throttled, and soft temperature limit. A background thread reads them once a second from sysfs, falling back to `vcgencmd get_throttled` for the flags, so the window never waits on a reading. The temperature turns orange at 70 C and red at 80 C, where the firmware starts throttling. Flags active now show as **Throttling NOW**. Flags that have occurred since boot are listed separately, so a brief under-voltage dip during motor starts stays visible. These readings are display-only and never stop the motors.
+
 ### Terminal commands
 
 ```text
